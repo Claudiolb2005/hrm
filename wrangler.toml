@@ -11,11 +11,8 @@ database_id = "4665558e-b9ae-46d9-ab84-efdeabc940cb"
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-# id = "<ID del KV hrm-sessions — completar desde el Dashboard>"
+id = "57c364fa304d448b974f44c77d47da6d"
 
 [[r2_buckets]]
 binding = "DOCS"
 bucket_name = "hrm-nomina-docs"
-
-# Secret (NO va en el repo):
-#   wrangler secret put ANTHROPIC_API_KEY
