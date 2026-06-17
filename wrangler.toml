@@ -1,0 +1,21 @@
+name = "clientes-hrm"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+account_id = "2eae6266491115089bd40cb3c597e136"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hrm-nomina-portal"
+database_id = "4665558e-b9ae-46d9-ab84-efdeabc940cb"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+# id = "<ID del KV hrm-sessions — completar desde el Dashboard>"
+
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "hrm-nomina-docs"
+
+# Secret (NO va en el repo):
+#   wrangler secret put ANTHROPIC_API_KEY
