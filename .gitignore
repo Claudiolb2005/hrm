@@ -1,3 +1,4 @@
+# --- Worker / infra ---
 node_modules/
 .dev.vars
 .wrangler/
@@ -5,3 +6,19 @@ dist/
 *.log
 .DS_Store
 .vscode/
+
+# --- Datos crudos de nómina: PII (RFC/CURP/NSS/salarios). NUNCA versionar ---
+data/
+out/
+**/*.xlsx
+**/*.xls
+**/*.pdf
+**/*.zip
+**/*.csv
+
+# --- Entorno Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/

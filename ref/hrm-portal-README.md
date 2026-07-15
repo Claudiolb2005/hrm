@@ -7,29 +7,6 @@ panel **admin**, **portal de cliente** (socio) y **visor de reportes**.
 > ⚠️ **Repo recomendado PRIVADO.** Contiene la lógica completa de la app y los IDs de
 > infraestructura. No incluye secretos (las contraseñas se guardan hasheadas; la API key
 > de Anthropic va como *secret* del Worker, fuera del repo).
-> **Nunca** se versionan insumos de nómina (Excel/PDF con RFC/CURP/NSS/salarios): ver `.gitignore`.
-
-## Dos partes del proyecto
-
-1. **Portal (Cloudflare Worker)** — `worker.js` + `schema.sql` + `wrangler.toml` (abajo).
-2. **Motor determinista (Python)** — `motor/` — reimplementación al centavo del cálculo de
-   nómina (percepciones, ISR, IMSS, RCV, ISN) y del informe de 13 secciones, con pruebas en
-   `tests/` y scripts en `src/`. Es la referencia que valida/portará el Worker.
-
-### Motor Python — uso
-
-```bash
-pip install -r requirements.txt          # openpyxl, pandas, pytest
-pytest                                    # pruebas (requieren insumos locales en data/, NO versionados)
-python src/run_informe.py enero           # arma el informe de 13 secciones
-python src/render_informe_html.py enero   # -> out/informe_enero2026.html (reporte visual)
-```
-
-- `motor/nomina_cliente.py` — genera **Nomina Cliente** (74 cols) desde **INCIDENCIAS** de PRIME;
-  reproduce el cálculo de la plataforma origen al **98% exacto / 99.6% en $1**. Ver `ref/nomina-cliente-README.md`.
-- `motor/informe.py` + `motor/secciones.py` — Informe de Supervisión de 13 secciones.
-- Parámetros fiscales 2026 (UMA, tarifa ISR, subsidio, cuotas IMSS, cesantía patronal, ISN)
-  recuperados de la data real y verificados contra el DOF.
 
 ## Stack
 
