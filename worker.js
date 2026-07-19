@@ -3138,6 +3138,7 @@ tr.tot td{font-weight:800;color:#1a2e3a;border-top:2px solid #b8ced8;background:
 <p style="color:#3d5a6b;font-size:14px;margin-bottom:24px" id="ts"></p>
 <div id="kpis"></div>
 <div id="impuestosBanner"></div>
+<div id="nominaClienteBanner"></div>
 <div id="sections"><div class="loading" style="text-align:center;padding:40px 20px"><div style="width:42px;height:42px;border:4px solid #e8f1f4;border-top-color:#1a8a8a;border-radius:50%;margin:0 auto 14px;animation:ldoRot 1s linear infinite"></div><div style="font-size:14px;font-weight:700;color:#3d5a6b">Cargando reporte</div><div style="font-size:12px;color:#8ba5b2;margin-top:4px">Consultando 12 secciones de informaci\xF3n...</div></div></div>
 <div class="foot"><img src="${LOGO}" alt="HRM" style="height:24px;opacity:.5;display:block;margin:0 auto 6px">HRM Human Resources Management</div>
 </div>
@@ -3242,6 +3243,19 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
       if(banner)banner.innerHTML='';
       if(el)el.innerHTML='<span style="color:#8ba5b2;font-size:10px;font-style:italic">PDF no disponible</span>';
     });
+  })();
+
+  // Load Nomina Cliente (Excel) banner — admin ve todas, socio solo su empresa (gating en /api/download)
+  (function(){
+    fetch('/api/documentos?periodo_id='+pid+'&tipo=nomina_cliente',{headers:tk_h}).then(function(r){return r.json()}).then(function(d){
+      var banner=document.getElementById('nominaClienteBanner');if(!banner)return;
+      if(d.documentos&&d.documentos.length>0){
+        var doc=d.documentos[0];var nm=doc.nombre||'Nomina Cliente.xlsx';
+        banner.innerHTML='<div style="background:#eafaf1;border:1px solid #8fd3ad;border-left:4px solid #1a8a5a;border-radius:12px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div style="font-size:11px;font-weight:700;color:#1a8a5a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">N\xF3mina Cliente del periodo</div><div style="font-size:15px;font-weight:700;color:#1a2e3a;margin-bottom:2px">Excel disponible para descarga</div><div style="font-size:12px;color:#5f7d8a" id="ncBnrNm"></div></div><button type="button" id="ncBnrBtn" style="background:#1a8a5a;color:#fff;border:none;border-radius:8px;padding:12px 22px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Excel</button></div>';
+        var nmEl=document.getElementById('ncBnrNm');if(nmEl)nmEl.textContent=nm;
+        var b=document.getElementById('ncBnrBtn');if(b)b.onclick=function(){dlFile(doc.r2_key,nm,b);};
+      }
+    }).catch(function(){});
   })();
 
   }
