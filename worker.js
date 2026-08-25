@@ -46,11 +46,14 @@ var worker_default = {
         if (p === "/api/procesar-reporte" && m === "POST") return await apiProcesarReporte(request, env, u, C);
         if (p === "/api/seed-placeholders" && m === "POST") return await apiSeedPlaceholders(request, env, u, C);
         if (p === "/api/upload-raw" && m === "POST") return await apiUploadRaw(request, env, u, C);
+        if (p === "/api/auditoria" && m === "GET") return await apiGetAuditoria(request, env, u, C);
+        if (p === "/api/auditoria" && m === "POST") return await apiSaveAuditoria(request, env, u, C);
         return J({ error: "Not found" }, 404, C);
       }
       if (p === "/" || p === "/login") return H(pageLogin());
       if (p === "/recover") return H(pageRecover());
       if (p === "/admin") return H(pageAdmin());
+      if (p === "/motor-auditoria.js") return new Response(MOTOR_AUDITORIA_JS, { headers: { "Content-Type": "application/javascript;charset=utf-8", "Cache-Control": "no-cache" } });
       if (p === "/portal") return H(pagePortal());
       if (p === "/reporte") return H(pageReporte());
       return new Response("Not found", { status: 404 });
@@ -591,6 +594,246 @@ async function apiProcesarReporte(req, env, u, C) {
   return J({ ok: true, secciones_guardadas: count }, 201, C);
 }
 __name(apiProcesarReporte, "apiProcesarReporte");
+async function apiGetAuditoria(req, env, u, C) {
+  const url = new URL(req.url);
+  const pid = url.searchParams.get("periodo_id"), tipo = url.searchParams.get("tipo") || "cfdi";
+  if (!pid) return J({ error: "periodo_id requerido" }, 400, C);
+  const r = await env.DB.prepare("SELECT a.id,a.periodo_id,a.empresa_id,a.tipo,a.resultado_json,a.creado FROM auditorias a JOIN periodos p ON p.id=a.periodo_id WHERE a.periodo_id=?1 AND a.tipo=?2" + (u.rol === "admin" ? "" : " AND p.empresa_id=?3")).bind(pid, tipo, u.empresa_id || 0).first();
+  if (!r) return J({ auditoria: null }, 200, C);
+  return J({ auditoria: { id: r.id, periodo_id: r.periodo_id, empresa_id: r.empresa_id, tipo: r.tipo, creado: r.creado, resultado: JSON.parse(r.resultado_json) } }, 200, C);
+}
+__name(apiGetAuditoria, "apiGetAuditoria");
+async function apiSaveAuditoria(req, env, u, C) {
+  if (u.rol !== "admin") return J({ error: "Forbidden" }, 403, C);
+  const d = await req.json();
+  if (!d.periodo_id || !d.empresa_id || !d.resultado) return J({ error: "periodo_id, empresa_id y resultado requeridos" }, 400, C);
+  await env.DB.prepare("INSERT OR REPLACE INTO auditorias(periodo_id,empresa_id,tipo,resultado_json,creado)VALUES(?1,?2,?3,?4,datetime('now'))").bind(d.periodo_id, d.empresa_id, d.tipo || "cfdi", JSON.stringify(d.resultado)).run();
+  return J({ ok: true }, 201, C);
+}
+__name(apiSaveAuditoria, "apiSaveAuditoria");
+var MOTOR_AUDITORIA_JS = String.raw`// tarifas.js — Motor de Auditoría HRM · Parámetros fiscales por ejercicio
+// Todo en CENTAVOS enteros. Fuente: Anexo 8 RMF 2026 (DOF 28/12/2025), Decreto subsidio (DOF 31/12/2025), CONASAMI, INEGI.
+// Las tarifas por periodo (7/10/15 días) se derivan de la mensual × días/30.4 — es el mismo método del Anexo 8.
+(function(root){
+  var TARIFAS = {
+    2026: {
+      uma_diaria_c: 11731,            // $117.31 vigente 1-feb-2026 (enero: $113.14)
+      uma_diaria_enero_c: 11314,
+      sm_general_c: 31504,            // $315.04
+      sm_frontera_c: 44087,           // $440.87 (ZLFN) — verificar contra CONASAMI
+      // Art. 96 LISR — tarifa MENSUAL: [limInf, limSup, cuotaFija, tasa%]  (centavos, tasa en basis 10000)
+      isr_mensual: [
+        [1,        84459,    0,        192],
+        [84460,    716851,   1622,     640],
+        [716852,   1259802,  42095,    1088],
+        [1259803,  1464464,  101168,   1600],
+        [1464465,  1753364,  133914,   1792],
+        [1753365,  3536283,  185684,   2136],
+        [3536284,  5573668,  566516,   2352],
+        [5573669,  10641050, 1045709,  3000],
+        [10641051, 14188066, 2565923,  3200],
+        [14188067, 42564199, 3700969,  3400],
+        [42564200, Infinity, 13348854, 3500]
+      ],
+      subsidio: {
+        limite_ingreso_mensual_c: 1149266,   // $11,492.66
+        monto_mensual_c: 53565,              // $535.65 = UMA mensual 3,566.22 × 15.02%
+        monto_mensual_enero_c: 53621         // $536.21 = UMA 2025 mensual × 15.59% (transitorio)
+      },
+      tope_sbc_umas: 25,
+      factor_integracion_min: 1.0452,        // 15 días aguinaldo + 25% de 12 días vacaciones (LFT)
+      // Cuotas IMSS 2026 (LSS) — porcentaje sobre SBC, basis 10000
+      imss: {
+        enf_mat_cuota_fija_patron: 2040,     // 20.40% sobre UMA
+        enf_mat_exc_patron: 110, enf_mat_exc_obrero: 40,   // excedente 3 UMA
+        prest_dinero_patron: 70, prest_dinero_obrero: 25,
+        gastos_med_pens_patron: 105, gastos_med_pens_obrero: 375/10, // 1.05% / 0.375%
+        invalidez_vida_patron: 175, invalidez_vida_obrero: 625/10,   // 1.75% / 0.625%
+        guarderias_patron: 100,
+        retiro_patron: 200,
+        cesantia_obrero: 1125/10,            // 1.125%
+        // cesantia_patron: tabla progresiva por rango UMA (art. 168 LSS reforma 2020) — se carga en módulo IMSS junto con EMA
+        infonavit_patron: 500
+      }
+    }
+  };
+  function tarifaPeriodo(ejercicio, dias){
+    var t = TARIFAS[ejercicio]; if(!t) throw new Error('Sin tarifas para '+ejercicio);
+    if(dias===30.4||dias===30) return t.isr_mensual;
+    var f = dias/30.4;
+    return t.isr_mensual.map(function(r){ return [Math.round(r[0]*f), r[1]===Infinity?Infinity:Math.round(r[1]*f), Math.round(r[2]*f), r[3]]; });
+  }
+  function subsidioPeriodo(ejercicio, dias, mes){
+    var s = TARIFAS[ejercicio].subsidio;
+    var mensual = (mes===1) ? s.monto_mensual_enero_c : s.monto_mensual_c;
+    return Math.min(mensual, Math.round(mensual/30.4*dias));
+  }
+  var api = { TARIFAS:TARIFAS, tarifaPeriodo:tarifaPeriodo, subsidioPeriodo:subsidioPeriodo };
+  if(typeof module!=='undefined') module.exports = api; else root.HRM_TARIFAS = api;
+})(typeof window!=='undefined'?window:globalThis);
+// cfdi-xml.js — Parser de CFDI 4.0/3.3 con complemento Nómina 1.2 → registro normalizado en centavos.
+// Sin dependencias: funciona en navegador y en Node (regex sobre atributos; CFDI es XML basado en atributos).
+(function(root){
+  function aC(v){ if(v==null||v==='') return 0; var n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:Math.round(n*100); }
+  function unesc(s){ return s.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'); }
+  function attrs(tag){ var o={}, re=/([\w:.\-]+)\s*=\s*"([^"]*)"/g, m; while((m=re.exec(tag))) o[m[1].replace(/^\w+:/,'')]=unesc(m[2]); return o; }
+  function findTags(xml, local){ // todos los tags <prefijo:local ...> o <local ...>
+    var re=new RegExp('<(?:[\\w\\-]+:)?'+local+'(?=[\\s/>])[^>]*?/?>','g'), out=[], m;
+    while((m=re.exec(xml))) out.push(attrs(m[0])); return out;
+  }
+  function first(xml, local){ var a=findTags(xml,local); return a.length?a[0]:null; }
+
+  function parseCfdiNomina(xml){
+    if(!/Comprobante/.test(xml)) throw new Error('No es un CFDI');
+    var comp=first(xml,'Comprobante')||{}, emisor=first(xml,'Emisor')||{}, receptor=first(xml,'Receptor')||{},
+        tfd=first(xml,'TimbreFiscalDigital')||{}, nom=first(xml,'Nomina')||{},
+        nEmisor=findTags(xml,'Emisor')[1]||{},
+        nRec=findTags(xml,'Receptor')[1]||{},
+        percs=findTags(xml,'Percepcion'), deds=findTags(xml,'Deduccion'), otros=findTags(xml,'OtroPago'),
+        subs=first(xml,'SubsidioAlEmpleo')||{}, incap=findTags(xml,'Incapacidad'),
+        percTot=first(xml,'Percepciones')||{}, dedTot=first(xml,'Deducciones')||{},
+        sep=first(xml,'SeparacionIndemnizacion'), jub=first(xml,'JubilacionPensionRetiro'),
+        rel=first(xml,'CfdiRelacionados'), relUuids=findTags(xml,'CfdiRelacionado').map(function(r){return r.UUID;});
+    var r={
+      uuid:(tfd.UUID||'').toUpperCase(), fecha_timbrado:tfd.FechaTimbrado||null, fecha_emision:comp.Fecha||null,
+      version:comp.Version||null, version_nomina:nom.Version||null, serie:comp.Serie||null, folio:comp.Folio||null,
+      tipo_comprobante:comp.TipoDeComprobante||null, metodo_pago:comp.MetodoPago||null, forma_pago:comp.FormaPago||null,
+      uso_cfdi:receptor.UsoCFDI||null, estatus:'vigente',
+      emisor_rfc:(emisor.Rfc||'').toUpperCase(), emisor_nombre:emisor.Nombre||null,
+      registro_patronal:nEmisor.RegistroPatronal||null, curp_patron:nEmisor.Curp||null,
+      rfc:(receptor.Rfc||'').toUpperCase(), nombre:receptor.Nombre||null, curp:nRec.Curp||null, nss:nRec.NumSeguridadSocial||null,
+      num_empleado:nRec.NumEmpleado||null, puesto:nRec.Puesto||null, departamento:nRec.Departamento||null,
+      periodicidad_pago:nRec.PeriodicidadPago||null, tipo_contrato:nRec.TipoContrato||null, tipo_regimen:nRec.TipoRegimen||null,
+      tipo_jornada:nRec.TipoJornada||null, riesgo_puesto:nRec.RiesgoPuesto||null, sindicalizado:nRec.Sindicalizado||null,
+      fecha_ingreso:nRec.FechaInicioRelLaboral||null, antiguedad:nRec.Antigüedad||nRec['Antiguedad']||null,
+      entidad:nRec.ClaveEntFed||null, banco:nRec.Banco||null, cuenta:nRec.CuentaBancaria||null,
+      sbc_c:aC(nRec.SalarioBaseCotApor), sdi_c:aC(nRec.SalarioDiarioIntegrado),
+      tipo_nomina:nom.TipoNomina||null, fecha_pago:nom.FechaPago||null, fecha_inicial:nom.FechaInicialPago||null, fecha_final:nom.FechaFinalPago||null,
+      dias_pagados:parseFloat(nom.NumDiasPagados||0),
+      total_percepciones_c:aC(nom.TotalPercepciones), total_deducciones_c:aC(nom.TotalDeducciones), total_otros_pagos_c:aC(nom.TotalOtrosPagos),
+      sueldos_c:aC(percTot.TotalSueldos), separacion_c:aC(percTot.TotalSeparacionIndemnizacion), jubilacion_c:aC(percTot.TotalJubilacionPensionRetiro),
+      gravado_c:aC(percTot.TotalGravado), exento_c:aC(percTot.TotalExento),
+      isr_retenido_c:0, otras_deducciones_c:aC(dedTot.TotalOtrasDeducciones), isr_ded_total_c:aC(dedTot.TotalImpuestosRetenidos),
+      subsidio_causado_c:aC(subs.SubsidioCausado), subsidio_entregado_c:0,
+      subtotal_c:aC(comp.SubTotal), descuento_c:aC(comp.Descuento), total_c:aC(comp.Total),
+      percepciones:[], deducciones:[], otros_pagos:[], incapacidades:[], relacionados:{tipo:rel?rel.TipoRelacion:null, uuids:relUuids},
+      separacion:sep?{total_pagado_c:aC(sep.TotalPagado),anios:parseInt(sep.NumAñosServicio||sep.NumAnosServicio||0),ultimo_sueldo_c:aC(sep.UltimoSueldoMensOrd),ingreso_acum_c:aC(sep.IngresoAcumulable),ingreso_no_acum_c:aC(sep.IngresoNoAcumulable)}:null,
+      hallazgos_parser:[]
+    };
+    percs.forEach(function(p){ r.percepciones.push({tipo:p.TipoPercepcion,clave:p.Clave,concepto:p.Concepto,gravado_c:aC(p.ImporteGravado),exento_c:aC(p.ImporteExento)}); });
+    deds.forEach(function(d){ var o={tipo:d.TipoDeduccion,clave:d.Clave,concepto:d.Concepto,importe_c:aC(d.Importe)}; r.deducciones.push(o); if(d.TipoDeduccion==='002') r.isr_retenido_c+=o.importe_c; });
+    otros.forEach(function(o){ var x={tipo:o.TipoOtroPago,clave:o.Clave,concepto:o.Concepto,importe_c:aC(o.Importe)}; r.otros_pagos.push(x); if(o.TipoOtroPago==='002') r.subsidio_entregado_c+=x.importe_c; });
+    incap.forEach(function(i){ r.incapacidades.push({dias:parseInt(i.DiasIncapacidad||0),tipo:i.TipoIncapacidad,importe_c:aC(i.ImporteMonetario)}); });
+    if(r.percepciones.length){
+      var g=0,e=0; r.percepciones.forEach(function(p){g+=p.gravado_c;e+=p.exento_c;});
+      if(!r.gravado_c) r.gravado_c=g; if(!r.exento_c) r.exento_c=e;
+      if(!r.total_percepciones_c) r.total_percepciones_c=g+e;
+    }
+    if(!r.total_deducciones_c) r.total_deducciones_c=r.deducciones.reduce(function(a,d){return a+d.importe_c;},0);
+    if(!r.total_otros_pagos_c) r.total_otros_pagos_c=r.otros_pagos.reduce(function(a,o){return a+o.importe_c;},0);
+    // Neto CFDI = percepciones + otros pagos − deducciones (regla Motor V6)
+    r.neto_c = r.total_percepciones_c + r.total_otros_pagos_c - r.total_deducciones_c;
+    // Integridad interna del comprobante
+    var sumP=r.percepciones.reduce(function(a,p){return a+p.gravado_c+p.exento_c;},0);
+    if(r.percepciones.length && Math.abs(sumP-r.total_percepciones_c)>1) r.hallazgos_parser.push({regla:'P0',detalle:'Σ percepciones ≠ TotalPercepciones',dif_c:sumP-r.total_percepciones_c});
+    if(Math.abs((r.subtotal_c-r.descuento_c)-r.total_c)>1) r.hallazgos_parser.push({regla:'P0',detalle:'SubTotal − Descuento ≠ Total',dif_c:(r.subtotal_c-r.descuento_c)-r.total_c});
+    if(r.subtotal_c && Math.abs(r.subtotal_c-(r.total_percepciones_c+r.total_otros_pagos_c))>1) r.hallazgos_parser.push({regla:'P0',detalle:'SubTotal ≠ Percepciones + OtrosPagos',dif_c:r.subtotal_c-(r.total_percepciones_c+r.total_otros_pagos_c)});
+    if(!r.uuid) r.hallazgos_parser.push({regla:'P1',detalle:'Sin TimbreFiscalDigital (no timbrado)'});
+    if(r.fecha_pago && r.fecha_timbrado && (new Date(r.fecha_timbrado)-new Date(r.fecha_pago))>3*86400000) r.hallazgos_parser.push({regla:'P2',detalle:'Timbrado fuera de plazo (>3 días hábiles aprox. tras FechaPago)',dias:Math.round((new Date(r.fecha_timbrado)-new Date(r.fecha_pago))/86400000)});
+    if(r.relacionados.tipo==='04') r.estatus='sustitucion';
+    return r;
+  }
+  // Lote: acepta array de {nombre, xml}. Detecta duplicados por UUID y por RFC+fechaPago+total.
+  function parseLote(files){
+    var out=[], errores=[], uuids={}, firmas={}, dup=0;
+    files.forEach(function(f){
+      try{ var r=parseCfdiNomina(f.xml); r.archivo=f.nombre;
+        if(r.uuid&&uuids[r.uuid]){dup++;return;} uuids[r.uuid]=1;
+        var k=r.rfc+'|'+r.fecha_pago+'|'+r.total_c; if(firmas[k]){r.hallazgos_parser.push({regla:'R5',detalle:'Posible duplicado (RFC+FechaPago+Total) con '+firmas[k]});} else firmas[k]=r.uuid;
+        out.push(r);
+      }catch(e){ errores.push({archivo:f.nombre,error:e.message}); }
+    });
+    return {recibos:out, duplicados_uuid:dup, errores:errores};
+  }
+  var api={parseCfdiNomina:parseCfdiNomina, parseLote:parseLote, aC:aC};
+  if(typeof module!=='undefined') module.exports=api; else root.HRM_CFDI=api;
+})(typeof window!=='undefined'?window:globalThis);
+// recalculo.js — Frente 1 · ISR art. 96 + subsidio + SBC. Recibo por recibo, en centavos.
+// Produce objetos HALLAZGO cuantificados: {regla, articulo, severidad, rfc, uuid, periodo, esperado_c, reportado_c, dif_c, multa_min_c, detalle}
+(function(root){
+  var T = (typeof module!=='undefined') ? require('./tarifas.js') : root.HRM_TARIFAS;
+  var DIAS = {'01':1,'02':7,'03':14,'04':15,'05':30.4,'06':60.8,'07':10,'08':7,'09':1,'10':1,'99':1}; // c_PeriodicidadPago SAT
+  var MULTA_CFDI_MIN_C = 1702000, MULTA_CFDI_MAX_C = 9733000; // art. 83/84 CFF (validar vigencia 2026)
+
+  function isrTarifa(gravado_c, tabla){
+    for(var i=0;i<tabla.length;i++){ var r=tabla[i]; if(gravado_c>=r[0] && gravado_c<=r[1]) return r[2] + Math.round((gravado_c-r[0])*r[3]/10000); }
+    return 0;
+  }
+  function hallazgo(o){ o.severidad = o.severidad || (Math.abs(o.dif_c||0)>50000?'critica':Math.abs(o.dif_c||0)>5000?'alta':'media'); return o; }
+
+  // ISR por recibo. tol_c: tolerancia (default $0.50 por empleado, regla del cliente)
+  function recalcularISR(r, opts){
+    opts=opts||{}; var ej=opts.ejercicio|| (r.fecha_pago?parseInt(r.fecha_pago.slice(0,4)):2026), tol=opts.tol_c!=null?opts.tol_c:50;
+    var mes = r.fecha_pago?parseInt(r.fecha_pago.slice(5,7)):null;
+    var dias = r.dias_pagados || DIAS[r.periodicidad_pago] || 15;
+    var esExtra = r.tipo_nomina==='E';
+    var base_c = r.gravado_c;
+    var out={uuid:r.uuid, rfc:r.rfc, fecha_pago:r.fecha_pago, dias:dias, gravado_c:base_c, hallazgos:[]};
+    if(esExtra || r.separacion){ out.omitido='nomina extraordinaria/separacion: art. 96 penúltimo párrafo o art. 174 RLISR — se valida en módulo finiquitos'; return out; }
+    var tabla = T.tarifaPeriodo(ej, dias);
+    var isr_causado = isrTarifa(base_c, tabla);
+    // Subsidio: aplica si el ingreso MENSUALIZADO ≤ límite (ingresos por separación excluidos)
+    var ingreso_mensual_c = Math.round(base_c*30.4/dias);
+    var sub_proc_c = ingreso_mensual_c <= T.TARIFAS[ej].subsidio.limite_ingreso_mensual_c ? T.subsidioPeriodo(ej, dias, mes) : 0;
+    var isr_neto = isr_causado - sub_proc_c;
+    var isr_esp_c = Math.max(0, isr_neto), sub_entregar_c = isr_neto<0 ? -isr_neto : 0;
+    out.isr_causado_c=isr_causado; out.subsidio_procedente_c=sub_proc_c; out.isr_esperado_c=isr_esp_c; out.subsidio_entregar_esperado_c=sub_entregar_c;
+    out.isr_reportado_c=r.isr_retenido_c; out.subsidio_entregado_reportado_c=r.subsidio_entregado_c; out.subsidio_causado_reportado_c=r.subsidio_causado_c;
+    var d1 = r.isr_retenido_c - isr_esp_c;
+    if(Math.abs(d1)>tol) out.hallazgos.push(hallazgo({regla:'ISR-01',articulo:'LISR 96',rfc:r.rfc,uuid:r.uuid,fecha_pago:r.fecha_pago,esperado_c:isr_esp_c,reportado_c:r.isr_retenido_c,dif_c:d1,detalle:d1>0?'ISR retenido en exceso':'ISR retenido de menos (contingencia patrón como retenedor)',multa_min_c:d1<0?MULTA_CFDI_MIN_C:0}));
+    var d2 = r.subsidio_entregado_c - sub_entregar_c;
+    if(Math.abs(d2)>tol) out.hallazgos.push(hallazgo({regla:'SUB-01',articulo:'Decreto subsidio DOF 31/12/2025',rfc:r.rfc,uuid:r.uuid,fecha_pago:r.fecha_pago,esperado_c:sub_entregar_c,reportado_c:r.subsidio_entregado_c,dif_c:d2,detalle:'Subsidio entregado (OtroPago 002) difiere del procedente'}));
+    if(sub_proc_c===0 && r.subsidio_causado_c>0) out.hallazgos.push(hallazgo({regla:'SUB-02',articulo:'Decreto subsidio',rfc:r.rfc,uuid:r.uuid,fecha_pago:r.fecha_pago,esperado_c:0,reportado_c:r.subsidio_causado_c,dif_c:r.subsidio_causado_c,detalle:'Subsidio causado reportado con ingreso mensual > límite ($11,492.66)'}));
+    return out;
+  }
+
+  // SBC: tope 25 UMA, piso SM, factor de integración mínimo, SBC vs SD del acumulado
+  function validarSBC(r, opts){
+    opts=opts||{}; var ej=opts.ejercicio||2026, P=T.TARIFAS[ej], hs=[];
+    var sbc=r.sbc_c||r.sdi_c, sd=opts.sd_c||0, frontera=!!opts.frontera;
+    if(!sbc) return hs;
+    var tope=P.tope_sbc_umas*P.uma_diaria_c;
+    if(sbc>tope+1) hs.push(hallazgo({regla:'SBC-01',articulo:'LSS 28',rfc:r.rfc,uuid:r.uuid,esperado_c:tope,reportado_c:sbc,dif_c:sbc-tope,detalle:'SBC excede tope de 25 UMA (sobrecotización — posible saldo a favor)',severidad:'media'}));
+    var piso=frontera?P.sm_frontera_c:P.sm_general_c;
+    if(sbc<Math.round(piso*P.factor_integracion_min)-1) hs.push(hallazgo({regla:'SBC-02',articulo:'LSS 27/28, LFT 90',rfc:r.rfc,uuid:r.uuid,esperado_c:Math.round(piso*P.factor_integracion_min),reportado_c:sbc,dif_c:sbc-Math.round(piso*P.factor_integracion_min),detalle:'SBC por debajo del salario mínimo integrado',severidad:'critica'}));
+    if(sd){ var fi=sbc/sd; if(fi<P.factor_integracion_min-0.0001) hs.push(hallazgo({regla:'SBC-03',articulo:'LSS 27',rfc:r.rfc,uuid:r.uuid,esperado_c:Math.round(sd*P.factor_integracion_min),reportado_c:sbc,dif_c:sbc-Math.round(sd*P.factor_integracion_min),detalle:'Factor de integración '+fi.toFixed(4)+' < mínimo legal '+P.factor_integracion_min+' (subintegración)',severidad:'alta'})); }
+    return hs;
+  }
+
+  // Corre todo el lote y arma la matriz + cédula de exposición
+  function auditarLote(recibos, opts){
+    opts=opts||{}; var isr=[], hs=[];
+    recibos.forEach(function(r){
+      (r.hallazgos_parser||[]).forEach(function(h){ hs.push(hallazgo(Object.assign({rfc:r.rfc,uuid:r.uuid,fecha_pago:r.fecha_pago,dif_c:0,multa_min_c:h.regla==='P1'?MULTA_CFDI_MIN_C:0},h))); });
+      var x=recalcularISR(r,opts); isr.push(x); hs=hs.concat(x.hallazgos);
+      hs=hs.concat(validarSBC(r,Object.assign({},opts,{sd_c:(opts.sd_por_rfc||{})[r.rfc]})));
+    });
+    var porRegla={}; hs.forEach(function(h){ var k=h.regla; porRegla[k]=porRegla[k]||{regla:k,n:0,dif_c:0,multa_min_c:0}; porRegla[k].n++; porRegla[k].dif_c+=h.dif_c||0; porRegla[k].multa_min_c+=h.multa_min_c||0; });
+    var recibosConHallazgo={}; hs.forEach(function(h){recibosConHallazgo[h.uuid]=1;});
+    var top=hs.slice().sort(function(a,b){return Math.abs(b.dif_c)-Math.abs(a.dif_c);}).slice(0,10);
+    return {
+      resumen:{recibos:recibos.length, con_hallazgo:Object.keys(recibosConHallazgo).length, tasa_error:recibos.length?+(Object.keys(recibosConHallazgo).length/recibos.length*100).toFixed(2):0,
+        isr_esperado_c:isr.reduce(function(a,x){return a+(x.isr_esperado_c||0);},0), isr_reportado_c:isr.reduce(function(a,x){return a+(x.isr_reportado_c||0);},0)},
+      matriz:hs, por_regla:Object.values(porRegla), top10:top,
+      cedula_exposicion:{diferencia_impuesto_c:hs.filter(function(h){return h.regla==='ISR-01'&&h.dif_c<0;}).reduce(function(a,h){return a-h.dif_c;},0),
+        multa_cfdi_min_c:hs.reduce(function(a,h){return a+(h.multa_min_c||0);},0), sobrepago_c:hs.filter(function(h){return h.dif_c>0&&/ISR|SBC-01/.test(h.regla);}).reduce(function(a,h){return a+h.dif_c;},0)},
+      detalle_isr:isr
+    };
+  }
+  var api={recalcularISR:recalcularISR, validarSBC:validarSBC, auditarLote:auditarLote, isrTarifa:isrTarifa};
+  if(typeof module!=='undefined') module.exports=api; else root.HRM_RECALCULO=api;
+})(typeof window!=='undefined'?window:globalThis);
+`;
 async function apiSeedPlaceholders(req, env, u, C) {
   if (u.rol !== "admin") return J({ error: "Forbidden" }, 403, C);
   const d = await req.json();
@@ -1008,7 +1251,8 @@ input[type=file]{display:none}
 }
 </style><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script></head><html style="overflow-x:hidden"><body style="overflow-x:hidden;max-width:100vw;margin:0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>
+<script src="/motor-auditoria.js"><\/script></head><html style="overflow-x:hidden"><body style="overflow-x:hidden;max-width:100vw;margin:0">
 <div class="top"><div class="top-l"><img src="${LOGO}" alt="HRM"><span style="color:#1a8a8a;font-weight:700">Administrador</span></div><div class="top-r"><span id="uN" style="color:#5a7a8a;font-size:13px"></span><button class="bo" onclick="showMapeo()" data-tip="Configurar mapeo de columnas Excel" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3H3v18h18z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Mapeo</button><button class="bo" onclick="showBases()" data-tip="Bases ISN por registro patronal" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>Bases ISN</button><button class="bo" onclick="showMo('usuario')" data-tip="Gestionar usuarios y accesos al portal" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuarios</button><a href="/portal" class="bo" data-tip="Abrir vista de cliente" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Ver portal</a><button class="bo br" onclick="logout()" data-tip="Cerrar sesi\xF3n" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Salir</button></div></div>
 <div class="lay">
 <div class="sb">
@@ -1169,6 +1413,68 @@ async function cPI(){
     renderClient();
   }catch(e){hideLoading();toast('Error: '+e.message,false);}
 }
+
+/* ===== AUDITORIA CFDI (Frente 1 · modulo 1-3) ===== */
+var AUD=null;
+function fm(c){return '$'+((c||0)/100).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function renderAudPanel(){
+  var h='<div style="margin-top:22px;background:#fff;border:1px solid #d4e5eb;border-radius:12px;padding:18px 20px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><div style="font-size:14px;font-weight:800;color:#1a2e3a">Auditor&#237;a de CFDI (XML)</div><div style="font-size:11px;color:#8ba5b2">Rec&#225;lculo ISR art. 96, subsidio, SBC e integridad de timbrado &#183; 100% de los recibos</div></div>';
+  h+='<div style="display:flex;gap:8px"><button class="bo" style="font-size:12px;padding:8px 16px;background:#1a8a8a;color:#fff;border:none" onclick="document.getElementById(&#39;audIn&#39;).click()">&#128230; ZIP / XML de n&#243;mina</button></div></div>';
+  h+='<input type="file" id="audIn" multiple accept=".zip,.xml" style="display:none" onchange="runAud(this.files)">';
+  h+='<div id="audSt" style="font-size:12px;color:#5a7a8a;margin-top:8px"></div><div id="audOut" style="margin-top:12px"></div></div>';
+  return h;
+}
+async function loadAud(){
+  if(!CP)return;
+  try{var r=await fetch('/api/auditoria?periodo_id='+CP.id,{headers:H});var d=await r.json();if(d.auditoria){AUD=d.auditoria.resultado;renderAudOut(AUD,d.auditoria.creado)}}catch(e){}
+}
+async function runAud(files){
+  var st=document.getElementById('audSt');if(!files||!files.length)return;
+  st.textContent='Leyendo archivos...';
+  var xmls=[];
+  for(var i=0;i<files.length;i++){var f=files[i];
+    if(/\\.zip$/i.test(f.name)){var z=await JSZip.loadAsync(f);var names=Object.keys(z.files).filter(function(k){return /\\.xml$/i.test(k)&&!z.files[k].dir});
+      for(var j=0;j<names.length;j++){xmls.push({nombre:names[j],xml:await z.files[names[j]].async('string')});if(j%200===0)st.textContent='Extrayendo '+j+'/'+names.length+'...';}
+    } else if(/\\.xml$/i.test(f.name)){xmls.push({nombre:f.name,xml:await f.text()});}
+  }
+  if(!xmls.length){st.textContent='No se encontraron XML.';return}
+  st.textContent='Parseando '+xmls.length+' CFDI...';
+  await new Promise(function(r){setTimeout(r,20)});
+  var lote=HRM_CFDI.parseLote(xmls);
+  var rfcEmp=(CE&&CE.rfc)?CE.rfc.toUpperCase():null;
+  var ajenos=rfcEmp?lote.recibos.filter(function(r){return r.emisor_rfc&&r.emisor_rfc!==rfcEmp}).length:0;
+  st.textContent='Recalculando '+lote.recibos.length+' recibos...';
+  await new Promise(function(r){setTimeout(r,20)});
+  var ej=CY||new Date().getFullYear();
+  var a=HRM_RECALCULO.auditarLote(lote.recibos,{ejercicio:ej});
+  // Reducir payload: matriz completa se guarda, detalle ISR se resume
+  var res={resumen:a.resumen,por_regla:a.por_regla,top10:a.top10,cedula_exposicion:a.cedula_exposicion,matriz:a.matriz,
+    lote:{archivos:xmls.length,recibos:lote.recibos.length,duplicados_uuid:lote.duplicados_uuid,errores:lote.errores.slice(0,50),emisor_ajeno:ajenos},
+    por_periodo:agrupaPeriodo(lote.recibos),ejercicio:ej,generado:new Date().toISOString()};
+  AUD=res;renderAudOut(res,null);
+  st.textContent='Guardando...';
+  try{var rs=await fetch('/api/auditoria',{method:'POST',headers:H,body:JSON.stringify({periodo_id:CP.id,empresa_id:CE.id,tipo:'cfdi',resultado:res})});
+    st.textContent=rs.ok?'Auditor\u00eda guardada.':'Error al guardar ('+rs.status+')';}catch(e){st.textContent='Error: '+e.message}
+}
+function agrupaPeriodo(recs){var m={};recs.forEach(function(r){var k=(r.fecha_inicial||'?')+' \u2192 '+(r.fecha_final||'?');m[k]=m[k]||{periodo:k,n:0,neto_c:0,isr_c:0,gravado_c:0};m[k].n++;m[k].neto_c+=r.neto_c;m[k].isr_c+=r.isr_retenido_c;m[k].gravado_c+=r.gravado_c});return Object.values(m).sort(function(a,b){return a.periodo<b.periodo?-1:1})}
+function renderAudOut(a,creado){
+  var o=document.getElementById('audOut');if(!o||!a)return;
+  var R=a.resumen,C=a.cedula_exposicion,sem=R.con_hallazgo===0?['#1a8a8a','VERDE','Sin hallazgos']:(R.tasa_error<3?['#d4920a','AMARILLO','Hallazgos por debajo del 3% de mercado']:['#d94452','ROJO','Tasa de error igual o superior al 3%']);
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">';
+  function k(l,v,c){return '<div style="background:#f8fbfc;border:1px solid #e8f1f4;border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;color:#8ba5b2;text-transform:uppercase">'+l+'</div><div style="font-size:18px;font-weight:800;color:'+(c||'#1a2e3a')+'">'+v+'</div></div>'}
+  h+=k('Sem&#225;foro',sem[1],sem[0])+k('Recibos',R.recibos.toLocaleString())+k('Con hallazgo',R.con_hallazgo.toLocaleString()+' ('+R.tasa_error+'%)',R.con_hallazgo?'#d94452':'#1a8a8a');
+  h+=k('ISR esperado',fm(R.isr_esperado_c))+k('ISR reportado',fm(R.isr_reportado_c))+k('Diferencia de impuesto',fm(C.diferencia_impuesto_c),C.diferencia_impuesto_c?'#d94452':'#1a8a8a');
+  h+=k('Multa CFDI m&#237;nima',fm(C.multa_cfdi_min_c),C.multa_cfdi_min_c?'#d94452':'#1a8a8a')+k('Sobrepago (a favor)',fm(C.sobrepago_c),'#1a8a8a')+'</div>';
+  h+='<div style="font-size:11px;color:#8ba5b2;margin:8px 0">'+sem[2]+' &#183; archivos '+a.lote.archivos+' &#183; duplicados UUID '+a.lote.duplicados_uuid+' &#183; errores '+a.lote.errores.length+(a.lote.emisor_ajeno?' &#183; <b style="color:#d94452">'+a.lote.emisor_ajeno+' CFDI de otro RFC emisor</b>':'')+(creado?' &#183; guardada '+creado:'')+'</div>';
+  if(a.por_regla.length){h+='<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:6px"><tr style="color:#8ba5b2;text-align:left"><th>Regla</th><th>Hallazgos</th><th>Diferencia</th><th>Multa m&#237;n.</th></tr>';
+    a.por_regla.forEach(function(r){h+='<tr style="border-top:1px solid #e8f1f4"><td style="padding:5px 0;font-weight:700">'+r.regla+'</td><td>'+r.n+'</td><td>'+fm(r.dif_c)+'</td><td>'+fm(r.multa_min_c)+'</td></tr>'});h+='</table>';}
+  if(a.top10.length){h+='<div style="font-size:12px;font-weight:700;color:#3d5a6b;margin:14px 0 6px">Top 10 por monto</div><table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#8ba5b2;text-align:left"><th>Regla</th><th>Sev.</th><th>RFC</th><th>Fecha</th><th>Esperado</th><th>Reportado</th><th>Dif.</th><th>Detalle</th></tr>';
+    a.top10.forEach(function(x){h+='<tr style="border-top:1px solid #e8f1f4"><td style="padding:4px 0;font-weight:700">'+x.regla+'</td><td style="color:'+(x.severidad==='critica'?'#d94452':x.severidad==='alta'?'#d4920a':'#5a7a8a')+'">'+x.severidad+'</td><td style="font-family:monospace">'+(x.rfc||'')+'</td><td>'+(x.fecha_pago||'')+'</td><td>'+fm(x.esperado_c)+'</td><td>'+fm(x.reportado_c)+'</td><td style="font-weight:700">'+fm(x.dif_c)+'</td><td>'+(x.detalle||'')+'</td></tr>'});h+='</table>';}
+  if(a.por_periodo&&a.por_periodo.length){h+='<div style="font-size:12px;font-weight:700;color:#3d5a6b;margin:14px 0 6px">Por periodo de pago (CFDI)</div><table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#8ba5b2;text-align:left"><th>Periodo</th><th>Recibos</th><th>Gravado</th><th>ISR</th><th>Neto</th></tr>';
+    a.por_periodo.forEach(function(p){h+='<tr style="border-top:1px solid #e8f1f4"><td style="padding:4px 0">'+p.periodo+'</td><td>'+p.n+'</td><td>'+fm(p.gravado_c)+'</td><td>'+fm(p.isr_c)+'</td><td>'+fm(p.neto_c)+'</td></tr>'});h+='</table>';}
+  o.innerHTML=h;
+}
 function renderFileZone(prefix){
   var mb=document.getElementById('mB');
   var h=prefix||'';
@@ -1211,8 +1517,10 @@ function renderFileZone(prefix){
     h+='<div style="margin-top:4px" id="pb" class="pb"><div class="fl" id="pf"></div></div>';
   }
   h+='<div id="dL" style="margin-top:16px"></div>';
+  h+=renderAudPanel();
   h+='<div style="margin-top:12px"><span style="font-size:11px;color:#8ba5b2;cursor:pointer" onclick="CM=null;CP=null;FILES={};FILES_OTROS=[];renderClient()">&#8592; Cambiar mes</span></div>';
   mb.innerHTML=h;
+  loadAud();
   attachDropZone();
   ldD();
 }
