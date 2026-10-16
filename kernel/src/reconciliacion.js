@@ -27,21 +27,24 @@ export function reconciliar(calculos, cliente, { tolerancia_c = 0 } = {}) {
     mapaCli.set(k, m);
   }
   const diferencias = [], sin_par_cliente = [], limitados = [];
-  let coincidencias = 0;
+  let coincidencias = 0, coincidencias_limitadas = 0;
   const usados = new Set();
   for (const c of calculos) {
     const k = llave(c);
     const m = mapaCli.get(k);
     if (!m) { sin_par_cliente.push(c.id); continue; }
     usados.add(k);
-    if (c.limitado || c.valor_calculado_c == null) { limitados.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref }); continue; }
+    // Sin cifra no hay resta: queda como limitado. Con cifra limitada sí se compara (es descubrimiento),
+    // pero se marca: una coincidencia limitada nunca cuenta para «conforme».
+    if (c.valor_calculado_c == null) { limitados.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref }); continue; }
+    if (c.limitado) limitados.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref });
     const d = m.valor_c - c.valor_calculado_c;
-    if (Math.abs(d) <= tolerancia_c) { coincidencias += 1; continue; }
+    if (Math.abs(d) <= tolerancia_c) { if (c.limitado) coincidencias_limitadas += 1; else coincidencias += 1; continue; }
     diferencias.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref, colaborador_id: c.colaborador_id, rubro: c.rubro,
-      kernel_c: c.valor_calculado_c, cliente_c: m.valor_c, diferencia_c: d, cubeta: null });
+      kernel_c: c.valor_calculado_c, cliente_c: m.valor_c, diferencia_c: d, limitado: !!c.limitado, cubeta: null });
   }
   const sin_par_kernel = cliente.filter(m => !usados.has(llave(m))).map(m => m.movimiento_ref);
-  return { coincidencias, diferencias, limitados, sin_par_cliente, sin_par_kernel };
+  return { coincidencias, coincidencias_limitadas, diferencias, limitados, sin_par_cliente, sin_par_kernel };
 }
 
 /** Clasifica una diferencia. Devuelve un objeto nuevo; no muta el original. */

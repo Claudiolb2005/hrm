@@ -104,6 +104,7 @@ test('fuente presente pero incompleta → universo parcial con cobertura declara
   assert.equal(r.resultados[0].estado, 'universo_parcial');
   assert.equal(r.resultados[0].cobertura.esperado, 3);
   assert.equal(r.resultados[0].cobertura.efectivo, 2);
+  assert.equal(r.resultados[0].cobertura.excluidos.total, 0);
 });
 
 test('fuentes completas → completo; cada cálculo lleva versión de reglas, de parámetros y traza', async () => {

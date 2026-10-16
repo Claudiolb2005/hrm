@@ -47,13 +47,20 @@ Worker y en Node. Reemplaza al motor embebido con `String.raw` como fuente de c�
   `bitacora_criterio`, `dictamen` inmutable.
 
 ```bash
-cd kernel && npm test                                                        # 38 pruebas
+cd kernel && npm test                                                        # 54 pruebas
 wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0001_kernel_v1.sql   # aplicar tablas
 ```
 
 Aplicadas en producción el 15-oct-2026: `0001_kernel_v1.sql` (tablas) y
 `0002_semilla_kernel_v1.sql` (65 parámetros, 14 fuentes, 10 reglas activas, criterios C1–C8;
 generada por `kernel/scripts/semilla-sql.mjs`).
+
+### Ingesta en el servidor (`ingesta/`, T8)
+
+El archivo del cliente va a R2, una cola en D1 lo procesa por lotes (cron cada minuto) y al
+terminar la ejecución queda sellada y reconciliada contra lo que calculó la nómina. Ver
+`ingesta/README.md` (incluye los pasos para correr agosto 2026). Migraciones 0003 y 0004
+aplicadas en producción el 15-oct-2026.
 
 ### API del kernel en el Worker (`api/kernel.js`, sólo admin)
 
@@ -68,6 +75,11 @@ generada por `kernel/scripts/semilla-sql.mjs`).
 | `POST /api/kernel/reconciliar` | Crea las diferencias kernel vs cliente |
 | `GET /api/kernel/diferencias?encargo_id=` · `POST /api/kernel/clasificar` | Tres cubetas y criterio de aceptación |
 | `GET /api/kernel/criterios` | Bitácora de criterios |
+| `POST /api/kernel/ingestas` · `GET /api/kernel/ingestas?encargo_id=` | Sube el archivo (multipart) y lo encola; lista |
+| `GET /api/kernel/ingesta?id=` · `POST /api/kernel/ingesta/avanzar` · `/reintentar` | Avance, reporte y reproceso |
+| `GET/POST /api/kernel/calendario` | Calendario de nómina del encargo (fecha de pago y periodicidad por corrida) |
+| `GET/POST /api/kernel/registros` | Entidad y prima de riesgo por registro patronal |
+| `POST /api/kernel/clasificar-grupo` | Clasifica en bloque las diferencias sin clasificar de un filtro |
 
 Ver `kernel/README.md`.
 

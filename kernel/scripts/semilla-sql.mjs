@@ -15,8 +15,15 @@ multi('INSERT OR IGNORE INTO parametro_fiscal (id, clave, entidad, tipo, valor_j
 multi('INSERT OR IGNORE INTO fuente (clave, descripcion, anexo)', Object.entries(FUENTES).map(([k, f]) => [k, f.descripcion, f.anexo]));
 multi('INSERT OR IGNORE INTO regla (id, version, rubro, titulo, fundamento, activa)', REGLAS_V1.map(r => [r.id, r.version, r.rubro, r.titulo, r.fundamento, 0]));
 multi('INSERT OR IGNORE INTO regla_fuente (regla_id, fuente_clave, obligatoria)', REGLAS_V1.flatMap(r => r.fuentes.map(f => [r.id, f.clave, f.obligatoria ? 1 : 0])));
+// Sincroniza versión y fuentes con el código (las reglas pueden cambiar de versión después de sembradas).
+for (const r of REGLAS_V1) {
+  out.push('UPDATE regla SET version = ' + [r.version, r.rubro, r.titulo, r.fundamento].map(q).map((v, i) => ['', ' rubro = ', ' titulo = ', ' fundamento = '][i] + v).join(',') + ' WHERE id = ' + q(r.id) + ';');
+  for (const f of r.fuentes) out.push('UPDATE regla_fuente SET obligatoria = ' + (f.obligatoria ? 1 : 0) + ' WHERE regla_id = ' + q(r.id) + ' AND fuente_clave = ' + q(f.clave) + ';');
+}
 out.push('UPDATE regla SET activa = 1 WHERE activa = 0 AND id IN (' + REGLAS_V1.map(r => q(r.id)).join(', ') + ');');
 multi('INSERT OR IGNORE INTO bitacora_criterio (id, tema, decision, fundamento, quien, fecha, estado, observaciones)',
   criterios.map(c => [c.id, c.tema, c.decision, c.fundamento, c.quien, c.fecha, c.estado, c.observaciones || null]));
-writeFileSync(new URL('../../migrations/0002_semilla_kernel_v1.sql', import.meta.url), out.join('\n') + '\n');
-console.log('0002_semilla_kernel_v1.sql:', out.length - 2, 'sentencias');
+const destino = process.argv[2] || '0002_semilla_kernel_v1.sql';
+out[0] = '-- ' + destino + ' — Generado por kernel/scripts/semilla-sql.mjs; no editar a mano.';
+writeFileSync(new URL('../../migrations/' + destino, import.meta.url), out.join('\n') + '\n');
+console.log(destino + ':', out.length - 2, 'sentencias');

@@ -21,12 +21,14 @@ export function aniosServicio(fecha_ingreso, fecha_baja) {
 }
 
 export const CALC_EXE_001 = {
-  id: 'CALC-EXE-001', version: '1.0.0', rubro: 'base_gravable_isr',
+  id: 'CALC-EXE-001', version: '1.1.0', rubro: 'base_gravable_isr',
   titulo: 'Exenciones de ISR y base gravable', fundamento: 'LISR art. 93; UMA vigente a la fecha de pago',
   fuentes: [
     { clave: 'prenomina', obligatoria: true },
-    { clave: 'acumulado_anual_exenciones', obligatoria: true },
-    { clave: 'fecha_ingreso', obligatoria: true },
+    // Sólo se necesitan cuando el renglón trae un concepto con tope anual o una separación;
+    // si faltan en ese caso, el renglón queda limitado (no toda la regla).
+    { clave: 'acumulado_anual_exenciones', obligatoria: false },
+    { clave: 'fecha_ingreso', obligatoria: false },
     { clave: 'convenio_fondo_ahorro', obligatoria: false },
   ],
   /**
@@ -34,6 +36,7 @@ export const CALC_EXE_001 = {
    *   fecha_pago,
    *   percepciones: [{ concepto, monto_c, domingos?, }],
    *   consumido: { <grupo|concepto>: centavos exentos ya consumidos en su periodo de acumulación },
+   *   semanas_periodo?: número de semanas del periodo (topes semanales; 2 en catorcenal),
    *   perfil: { fondo_ahorro_cumple_requisitos?: boolean },
    *   separacion?: { fecha_ingreso, fecha_baja }
    * }
@@ -57,6 +60,10 @@ export const CALC_EXE_001 = {
         antes = consumido[grupo] || 0;
         switch (v.tipo) {
           case 'tope_uma':
+            if (v.acumula === 'anio' && !(grupo in consumido)) {
+              ctx.limitar('dato_faltante', p.concepto + ': acumulado anual de exenciones (' + grupo + ')');
+              antes = 0;
+            }
             tope = uma.por(v.veces); break;
           case 'uma_por_domingo':
             if (!Number.isInteger(p.domingos) || p.domingos < 1) { ctx.limitar('dato_faltante', p.concepto + ': domingos trabajados'); tope = Exacto.cero; }
@@ -64,7 +71,8 @@ export const CALC_EXE_001 = {
             break;
           case 'pct_hasta_uma': {
             const mitad = monto.por(Exacto.pct(v.porcentaje));
-            tope = uma.por(v.veces);
+            const semanas = v.acumula === 'semana' ? (e.semanas_periodo || 1) : 1;
+            tope = uma.por(v.veces).por(semanas);
             const disp = Exacto.max(tope.resta(Exacto.centavos(antes)), 0);
             ex = Exacto.min(mitad, disp);
             break;

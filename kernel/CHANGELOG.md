@@ -3,6 +3,23 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.2.0 — 2026-10-15
+
+Ingesta en el servidor (T8) y reconciliación por lotes.
+
+- Ejecución por lotes: `abrirEjecucion` → `calcularLote` (idempotente, ids deterministas) →
+  `cerrarEjecucion`. El sello final encadena el sello de cada lote. En D1 la ejecución nace
+  `abierta` y sólo puede pasar a `sellada`; no se agregan cálculos a una sellada (migración 0003).
+- Universo esperado por regla (`universo_por_regla`); excluidos resumidos por motivo con muestra.
+- Reconciliación: los cálculos limitados con cifra también se comparan (descubrimiento) y se
+  marcan; una coincidencia limitada nunca cuenta para «conforme».
+- La huella del código cubre kernel e ingesta.
+- CALC-EXE-001 1.1.0 (aplica desde 2026-01-01): el acumulado anual y la fecha de ingreso dejan de
+  ser obligatorios para toda la regla; si un renglón trae un concepto con tope anual o una
+  separación y falta el dato, ese renglón queda limitado. Topes semanales × semanas del periodo.
+- CALC-ISR-AJM-001 y CALC-ISR-EXT-001 1.1.0: rubro `isr` (son el ISR de esa nómina), para
+  reconciliar contra la misma columna del cliente.
+
 ## 0.1.0 — 2026-10-15
 
 Base del kernel de la versión 1 (auditoría de agosto 2026 de PrimeWireless), según la

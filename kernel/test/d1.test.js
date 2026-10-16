@@ -35,7 +35,7 @@ const criterios = JSON.parse(readFileSync(new URL('kernel/data/criterios.json', 
 async function baseLista() {
   const db = d1Local();
   db.raw.exec(readFileSync(new URL('schema.sql', RAIZ), 'utf8'));          // esquema actual del portal
-  db.raw.exec(readFileSync(new URL('migrations/0001_kernel_v1.sql', RAIZ), 'utf8'));
+  for (const m of ['0001_kernel_v1.sql', '0003_ingesta_lotes.sql']) db.raw.exec(readFileSync(new URL('migrations/' + m, RAIZ), 'utf8'));
   db.raw.exec("INSERT INTO empresas (id, nombre, rfc, slug) VALUES (1, 'PRIMEWIRELESS', 'PHO190128QD8', 'prime')");
   db.raw.exec("INSERT INTO usuarios (id, email, password_hash, nombre, rol) VALUES (1,'op@hrm','x','Operador','admin'), (2,'rev@hrm','x','Revisor','admin')");
   db.raw.exec("INSERT INTO encargo (id, empresa_id, nivel, periodo_desde, periodo_hasta, ejercicio, origen_nomina, operador_nomina_usuario_id) VALUES ('enc_prime_2026_08', 1, 'B5+', '2026-08-01', '2026-08-31', 2026, 'cliente', NULL), ('enc_casa', 1, 'B5+', '2026-08-01', '2026-08-31', 2026, 'la_casa', 1)");
@@ -73,11 +73,13 @@ test('ejecución persistida, releída y con sello válido; calculo_kernel es inm
   const r = await ejecutar({ catalogo, encargo_id: 'enc_prime_2026_08', corrida_id: 'SEM31', fuentes: FUENTES, items: ITEMS });
   await persistirEjecucion(db, r, { catalogo, ejercicio: 2026 });
   const leido = await leerEjecucion(db, r.ejecucion.id);
+  assert.equal(leido.estado, 'sellada');
   assert.equal(leido.calculos.length, 3);
   assert.equal(await verificarSello(leido), true, 'el sello verifica después de la ida y vuelta por D1');
   assert.throws(() => db.raw.exec('UPDATE calculo_kernel SET valor_calculado_c = 0'), /inmutable/);
   assert.throws(() => db.raw.exec('DELETE FROM calculo_kernel'), /inmutable/);
-  assert.throws(() => db.raw.exec('UPDATE ejecucion SET sello = 0'), /inmutable/);
+  assert.throws(() => db.raw.exec("UPDATE ejecucion SET sello = '0'"), /inmutable/);
+  assert.throws(() => db.raw.exec("INSERT INTO calculo_kernel (id, ejecucion_id, encargo_id, ejercicio, colaborador_id, rubro, valor_calculado_c, regla_id, regla_version, version_catalogo_reglas, version_parametros, nivel_minimo, limitado, traza_json, calculado_en) SELECT 'x', ejecucion_id, encargo_id, ejercicio, colaborador_id, rubro, 1, regla_id, regla_version, version_catalogo_reglas, version_parametros, nivel_minimo, limitado, traza_json, calculado_en FROM calculo_kernel LIMIT 1"), /sellada/);
   const foto = db.raw.prepare('SELECT filas_json FROM parametro_version WHERE version = ?').get(r.ejecucion.version_parametros);
   assert.ok(JSON.parse(foto.filas_json).length > 0, 'la foto del catálogo queda guardada');
 });

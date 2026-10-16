@@ -19,7 +19,7 @@ const ADMIN = { id: 2, nombre: 'Revisor', rol: 'admin' };
 
 async function entorno() {
   const db = d1Local();
-  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
+  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql', 'migrations/0003_ingesta_lotes.sql', 'migrations/0004_sync_reglas_v1_1.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
   db.raw.exec("INSERT INTO empresas (id, nombre, slug) VALUES (1, 'PRIMEWIRELESS', 'prime')");
   db.raw.exec("INSERT INTO usuarios (id, email, password_hash, nombre, rol) VALUES (2,'rev@hrm','x','Revisor','admin')");
   const llamar = async (metodo, ruta, body, u = ADMIN) => {
@@ -59,7 +59,7 @@ test('flujo completo: encargo → ejecutar → movimientos → reconciliar → c
     { corrida_id: 'SEM31', colaborador_id: '1073134', rubro: 'isr', valor_c: 2942 },
     { corrida_id: 'SEM31', colaborador_id: '1067513', rubro: 'isr', valor_c: 122287 }] });
   const rec = await llamar('POST', '/api/kernel/reconciliar', { ejecucion_id: id });
-  assert.deepEqual(rec.json, { coincidencias: 1, diferencias: 1, limitados: 0, sin_par_cliente: 0, sin_par_kernel: 0 });
+  assert.deepEqual(rec.json, { coincidencias: 1, coincidencias_limitadas: 0, diferencias: 1, limitados: 0, sin_par_cliente: 0, sin_par_kernel: 0 });
   let dif = await llamar('GET', '/api/kernel/diferencias?encargo_id=enc1');
   assert.equal(dif.json.diferencias[0].diferencia_c, -468);
   assert.equal(dif.json.aceptacion.aceptado, false);
@@ -73,4 +73,61 @@ test('lote demasiado grande se rechaza (se parte en lotes)', async () => {
   await llamar('POST', '/api/kernel/encargos', { id: 'enc1', empresa_id: 1, nivel: 'B5+', periodo_desde: '2026-08-01', periodo_hasta: '2026-08-31', ejercicio: 2026, origen_nomina: 'cliente' });
   const items = Array.from({ length: 501 }, (_, i) => ({ regla_id: 'CALC-INF-001', colaborador_id: String(i), entrada: {} }));
   assert.equal((await llamar('POST', '/api/kernel/ejecutar', { encargo_id: 'enc1', items })).status, 413);
+});
+
+// ── Rutas de ingesta, calendario, registros y clasificación en bloque ──
+import { r2Local, xlsx as libroXlsx, baseDatos } from './util.js';
+
+async function entornoIngesta() {
+  const db = baseDatos();
+  const DOCS = r2Local();
+  db.raw.exec("INSERT INTO empresas (id, nombre, slug) VALUES (1, 'PRIMEWIRELESS', 'prime')");
+  db.raw.exec("INSERT INTO usuarios (id, email, password_hash, nombre, rol) VALUES (2,'rev@hrm','x','Revisor','admin')");
+  const pendientes = [];
+  const ctx = { waitUntil: (p) => pendientes.push(p) };
+  const llamar = async (metodo, ruta, body) => {
+    const r = await rutasKernel(new Request('https://x' + ruta, { method: metodo, body: body ? JSON.stringify(body) : undefined, headers: { 'Content-Type': 'application/json' } }), { DB: db, DOCS }, ADMIN, {}, J, ctx);
+    return { status: r.status, json: await r.json() };
+  };
+  return { db, DOCS, llamar, pendientes };
+}
+
+test('estado: la matriz en D1 coincide con la del código (después de 0004)', async () => {
+  const { llamar } = await entornoIngesta();
+  const r = await llamar('GET', '/api/kernel/estado');
+  assert.deepEqual(r.json.matriz_d1_vs_codigo, []);
+});
+
+test('registros: valida clave de entidad y formato; calendario: valida fechas', async () => {
+  const { llamar } = await entornoIngesta();
+  assert.equal((await llamar('POST', '/api/kernel/registros', { empresa_id: 1, fuente: 'x', registros: [{ registro: 'Z3337346103', entidad: 'Sinaloa' }] })).status, 400);
+  assert.equal((await llamar('POST', '/api/kernel/registros', { empresa_id: 1, fuente: 'SUA ago-2026', registros: [{ registro: 'Z3337346103', entidad: 'SIN', prima_rt_pct: '0.50' }] })).status, 200);
+  await llamar('POST', '/api/kernel/encargos', { id: 'enc1', empresa_id: 1, nivel: 'B5+', periodo_desde: '2026-08-01', periodo_hasta: '2026-08-31', ejercicio: 2026, origen_nomina: 'cliente' });
+  assert.equal((await llamar('POST', '/api/kernel/calendario', { encargo_id: 'enc1', fuente: 'x', corridas: [{ corrida_id: 'SEM31', periodicidad: 'semanal', desde: '27/07/2026' }] })).status, 400);
+  assert.equal((await llamar('POST', '/api/kernel/calendario', { encargo_id: 'enc1', fuente: 'PRIME', corridas: [{ corrida_id: 'SEM31', periodicidad: 'semanal', desde: '2026-07-27', hasta: '2026-08-02', fecha_pago: '2026-08-06' }] })).status, 200);
+  assert.equal((await llamar('GET', '/api/kernel/calendario?encargo_id=enc1')).json.calendario.length, 1);
+});
+
+test('ingesta por API: crea, arranca sola, avanza, reporta y clasifica en bloque', async () => {
+  const { db, DOCS, llamar, pendientes } = await entornoIngesta();
+  await llamar('POST', '/api/kernel/encargos', { id: 'enc1', empresa_id: 1, nivel: 'B5+', periodo_desde: '2026-08-01', periodo_hasta: '2026-08-31', ejercicio: 2026, origen_nomina: 'cliente' });
+  await llamar('POST', '/api/kernel/calendario', { encargo_id: 'enc1', fuente: 'prueba', corridas: [
+    { corrida_id: 'SEM31', periodicidad: 'semanal', desde: '2026-07-27', hasta: '2026-08-02', fecha_pago: '2026-08-06' },
+    { corrida_id: 'SEM34', periodicidad: 'semanal', desde: '2026-08-17', hasta: '2026-08-23', fecha_pago: '2026-08-27' }] });
+  const enc = ['SEMANA / CATORCENA', 'NO.', 'RFC', 'SD', 'Registro patronal', 'Sueldo', 'Comisiones', 'TOTAL PERCEPCIONES', 'I.S.R. (sp)', 'TOTAL DEDUCCIONES', 'NETO SUELDO FISCAL', 'Impuesto estatal'];
+  const filas = [enc];
+  for (let i = 0; i < 30; i++) filas.push(['SEM 31', 3000 + i, 'RFC', 400, 'Y6079749104', 2206.68, 0, 2206.68, 29.42, 29.42, 2177.26, 0]);
+  await DOCS.put('encargos/enc1/acum.xlsx', libroXlsx([{ nombre: 'H', filas }]));
+  const c = await llamar('POST', '/api/kernel/ingestas', { encargo_id: 'enc1', r2_key: 'encargos/enc1/acum.xlsx' });
+  assert.equal(c.status, 201);
+  await Promise.all(pendientes);
+  let st = (await llamar('GET', '/api/kernel/ingesta?id=' + c.json.id)).json.ingesta;
+  for (let i = 0; st.estado !== 'terminado' && i < 5; i++) st = (await llamar('POST', '/api/kernel/ingesta/avanzar', { id: c.json.id })).json.ingesta;
+  assert.equal(st.estado, 'terminado', st.error || '');
+  assert.equal(st.reporte.reconciliacion.diferencias, 30, 'los 30 con subsidio al 15.59%');
+  const g = await llamar('POST', '/api/kernel/clasificar-grupo', { encargo_id: 'enc1', regla_id: 'CALC-ISR-SEM-001', diferencia_c: -468, cubeta: 'proceso_mal', motivo: 'Subsidio 15.59% en lugar de 15.02% (hallazgo 1)' });
+  assert.equal(g.json.clasificadas, 30);
+  const dif = await llamar('GET', '/api/kernel/diferencias?encargo_id=enc1');
+  assert.equal(dif.json.aceptacion.sin_clasificar, 0);
+  assert.equal((await llamar('POST', '/api/kernel/clasificar-grupo', { encargo_id: 'enc1', cubeta: 'proceso_mal', motivo: 'x' })).status, 400, 'sin filtro no se clasifica todo');
 });

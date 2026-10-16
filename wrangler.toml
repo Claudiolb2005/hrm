@@ -16,3 +16,7 @@ id = "57c364fa304d448b974f44c77d47da6d"
 [[r2_buckets]]
 binding = "DOCS"
 bucket_name = "hrm-nomina-docs"
+
+# Cola de ingesta del kernel (T8): el cron consume trabajos pendientes cada minuto.
+[triggers]
+crons = ["* * * * *"]

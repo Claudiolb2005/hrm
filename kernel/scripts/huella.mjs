@@ -5,7 +5,9 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 
+// La huella cubre el kernel y la ingesta (mapeo del perfil): ambos determinan el resultado.
 const raiz = new URL('../src/', import.meta.url).pathname;
+const ingesta = new URL('../../ingesta/', import.meta.url).pathname;
 const archivos = [];
 (function walk(d) {
   for (const n of readdirSync(d).sort()) {
@@ -14,8 +16,17 @@ const archivos = [];
     else if (n.endsWith('.js') && n !== '_huella.js') archivos.push(p);
   }
 })(raiz);
+const deIngesta = [];
+(function walk(d) {
+  for (const n of readdirSync(d).sort()) {
+    const p = join(d, n);
+    if (statSync(p).isDirectory()) walk(p);
+    else if (n.endsWith('.js')) deIngesta.push(p);
+  }
+})(ingesta);
 const h = createHash('sha256');
 for (const p of archivos) { h.update(relative(raiz, p) + '\0'); h.update(readFileSync(p)); h.update('\0'); }
+for (const p of deIngesta) { h.update('ingesta/' + relative(ingesta, p) + '\0'); h.update(readFileSync(p)); h.update('\0'); }
 const huella = 'krn-' + h.digest('hex').slice(0, 16);
 const destino = join(raiz, '_huella.js');
 const contenido = '// Generado por scripts/huella.mjs — no editar a mano.\nexport const KERNEL_HUELLA = ' + JSON.stringify(huella) + ';\n';

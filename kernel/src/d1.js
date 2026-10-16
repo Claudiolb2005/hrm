@@ -26,7 +26,11 @@ export async function sembrar(db, { filasParametros = [], reglas = REGLAS_V1, fu
   }
   for (const r of reglas) {
     s.push(db.prepare('INSERT OR IGNORE INTO regla (id, version, rubro, titulo, fundamento, activa) VALUES (?1,?2,?3,?4,?5,0)').bind(r.id, r.version, r.rubro, r.titulo, r.fundamento));
-    for (const f of r.fuentes) s.push(db.prepare('INSERT OR IGNORE INTO regla_fuente (regla_id, fuente_clave, obligatoria) VALUES (?1,?2,?3)').bind(r.id, f.clave, f.obligatoria ? 1 : 0));
+    s.push(db.prepare('UPDATE regla SET version = ?2, rubro = ?3, titulo = ?4, fundamento = ?5 WHERE id = ?1').bind(r.id, r.version, r.rubro, r.titulo, r.fundamento));
+    for (const f of r.fuentes) {
+      s.push(db.prepare('INSERT OR IGNORE INTO regla_fuente (regla_id, fuente_clave, obligatoria) VALUES (?1,?2,?3)').bind(r.id, f.clave, f.obligatoria ? 1 : 0));
+      s.push(db.prepare('UPDATE regla_fuente SET obligatoria = ?3 WHERE regla_id = ?1 AND fuente_clave = ?2').bind(r.id, f.clave, f.obligatoria ? 1 : 0));
+    }
     s.push(db.prepare('UPDATE regla SET activa = 1 WHERE id = ?1 AND activa = 0').bind(r.id));
   }
   for (const c of criterios) {
@@ -42,6 +46,24 @@ export async function verificarArranque(db) {
   return results.map(r => r.id);
 }
 
+/** La matriz en D1 debe ser idéntica a la que declaran las reglas del código. Devuelve las diferencias. */
+export async function compararMatriz(db, reglas = REGLAS_V1) {
+  const { results: rs } = await db.prepare('SELECT id, version, activa FROM regla').all();
+  const { results: fs } = await db.prepare('SELECT regla_id, fuente_clave, obligatoria FROM regla_fuente').all();
+  const dif = [];
+  const enD1 = new Map(rs.map(r => [r.id, r]));
+  for (const r of reglas) {
+    const d = enD1.get(r.id);
+    if (!d) { dif.push(r.id + ': no está en D1'); continue; }
+    if (d.version !== r.version) dif.push(r.id + ': versión D1 ' + d.version + ' ≠ código ' + r.version);
+    if (d.activa !== 1) dif.push(r.id + ': inactiva en D1');
+    const fd = new Map(fs.filter(f => f.regla_id === r.id).map(f => [f.fuente_clave, f.obligatoria]));
+    for (const f of r.fuentes) if (fd.get(f.clave) !== (f.obligatoria ? 1 : 0)) dif.push(r.id + ': fuente ' + f.clave + ' difiere');
+    if (fd.size !== r.fuentes.length) dif.push(r.id + ': D1 declara ' + fd.size + ' fuentes y el código ' + r.fuentes.length);
+  }
+  return dif;
+}
+
 export async function cargarCatalogo(db) {
   const { results } = await db.prepare('SELECT id, clave, entidad, tipo, valor_json, vigencia_desde, vigencia_hasta, base_temporal, fundamento, fuente, nivel, notas FROM parametro_fiscal ORDER BY id').all();
   return new Catalogo(results.map(r => {
@@ -53,38 +75,85 @@ export async function cargarCatalogo(db) {
   }));
 }
 
-/**
- * Persiste una ejecución completa. Antes guarda la foto del catálogo (si es nueva),
- * para que «con qué parámetros se calculó» se pueda releer en 2029.
- */
-export async function persistirEjecucion(db, { ejecucion, calculos, resultados }, { catalogo, ejercicio }) {
-  if (!Number.isInteger(ejercicio)) throw new Error('persistirEjecucion: ejercicio es obligatorio (partición)');
-  const s = [];
-  s.push(db.prepare('INSERT OR IGNORE INTO parametro_version (version, filas_json) VALUES (?1, ?2)').bind(ejecucion.version_parametros, jsonCanonico(catalogo.filasCanonicas())));
-  s.push(db.prepare('INSERT INTO ejecucion (id, encargo_id, kernel_version, kernel_huella, version_catalogo_reglas, version_parametros, entradas_sha256_json, calculado_en, n_calculos, sello) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)')
-    .bind(ejecucion.id, ejecucion.encargo_id, ejecucion.kernel_version, ejecucion.kernel_huella, ejecucion.version_catalogo_reglas, ejecucion.version_parametros,
-      JSON.stringify(ejecucion.entradas_sha256), ejecucion.calculado_en, ejecucion.n_calculos, ejecucion.sello));
-  for (const r of resultados) {
-    s.push(db.prepare('INSERT INTO resultado_regla (ejecucion_id, regla_id, regla_version, estado, universo_esperado, universo_efectivo, excluidos_json, limitaciones_json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)')
-      .bind(ejecucion.id, r.regla_id, r.regla_version, r.estado, r.cobertura.esperado, r.cobertura.efectivo, JSON.stringify(r.cobertura.excluidos), JSON.stringify(r.limitaciones)));
+const CALC_COLS = 'id, ejecucion_id, encargo_id, ejercicio, lote, corrida_id, colaborador_id, rubro, valor_calculado_c, regla_id, regla_version, version_catalogo_reglas, version_parametros, nivel_minimo, limitado, traza_json, calculado_en';
+const CALC_N = 17;
+
+/** INSERT multirenglón respetando el límite de 100 parámetros por sentencia de D1. */
+export function insertarMultiple(db, tabla, columnas, filas, { ignorar = true } = {}) {
+  const n = columnas.split(',').length;
+  const porSentencia = Math.max(1, Math.floor(100 / n));
+  const out = [];
+  for (let i = 0; i < filas.length; i += porSentencia) {
+    const grupo = filas.slice(i, i + porSentencia);
+    let k = 0;
+    const valores = grupo.map(() => '(' + Array.from({ length: n }, () => '?' + (++k)).join(',') + ')').join(',');
+    out.push(db.prepare('INSERT ' + (ignorar ? 'OR IGNORE ' : '') + 'INTO ' + tabla + ' (' + columnas + ') VALUES ' + valores).bind(...grupo.flat()));
   }
-  await enLotes(db, s);
-  const sc = calculos.map(c => db.prepare('INSERT INTO calculo_kernel (id, ejecucion_id, encargo_id, ejercicio, corrida_id, colaborador_id, rubro, valor_calculado_c, regla_id, regla_version, version_catalogo_reglas, version_parametros, nivel_minimo, limitado, traza_json, calculado_en) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)')
-    .bind(c.id, c.ejecucion_id, c.encargo_id, ejercicio, c.corrida_id, c.colaborador_id, c.rubro, c.valor_calculado_c, c.regla_id, c.regla_version,
-      c.version_catalogo_reglas, c.version_parametros, c.nivel_minimo, c.limitado ? 1 : 0, JSON.stringify(c.traza), c.calculado_en));
-  await enLotes(db, sc);
+  return out;
+}
+
+/** Abre la ejecución en la base y guarda la foto del catálogo de parámetros (idempotente). */
+export async function persistirApertura(db, ejecucion, { catalogo }) {
+  await db.batch([
+    db.prepare('INSERT OR IGNORE INTO parametro_version (version, filas_json) VALUES (?1, ?2)').bind(ejecucion.version_parametros, jsonCanonico(catalogo.filasCanonicas())),
+    db.prepare('INSERT OR IGNORE INTO ejecucion (id, encargo_id, estado, kernel_version, kernel_huella, version_catalogo_reglas, version_parametros, entradas_sha256_json, abierta_en) VALUES (?1,?2,\'abierta\',?3,?4,?5,?6,?7,?8)')
+      .bind(ejecucion.id, ejecucion.encargo_id, ejecucion.kernel_version, ejecucion.kernel_huella, ejecucion.version_catalogo_reglas,
+        ejecucion.version_parametros, JSON.stringify(ejecucion.entradas_sha256), ejecucion.abierta_en),
+  ]);
+}
+
+/** Sentencias para guardar un lote (cálculos + resumen). Idempotente: ids deterministas. */
+export function sentenciasLote(db, { lote, calculos }, { ejecucion_id, ejercicio }) {
+  if (!Number.isInteger(ejercicio)) throw new Error('sentenciasLote: ejercicio es obligatorio (partición)');
+  const filas = calculos.map(c => [c.id, c.ejecucion_id, c.encargo_id, ejercicio, c.lote, c.corrida_id, c.colaborador_id, c.rubro, c.valor_calculado_c,
+    c.regla_id, c.regla_version, c.version_catalogo_reglas, c.version_parametros, c.nivel_minimo, c.limitado ? 1 : 0, JSON.stringify(c.traza), c.calculado_en]);
+  return [
+    ...insertarMultiple(db, 'calculo_kernel', CALC_COLS, filas),
+    db.prepare('INSERT OR IGNORE INTO ejecucion_lote (ejecucion_id, n, sello, n_calculos, cobertura_json) VALUES (?1,?2,?3,?4,?5)')
+      .bind(ejecucion_id, lote.n, lote.sello, lote.n_calculos, JSON.stringify(lote.cobertura)),
+  ];
+}
+
+export async function persistirLote(db, r, opciones) {
+  const st = sentenciasLote(db, r, opciones);
+  for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
+}
+
+export async function leerLotes(db, ejecucion_id) {
+  const { results } = await db.prepare('SELECT n, sello, n_calculos, cobertura_json FROM ejecucion_lote WHERE ejecucion_id = ?1 ORDER BY n').bind(ejecucion_id).all();
+  return results.map(l => ({ n: l.n, sello: l.sello, n_calculos: l.n_calculos, cobertura: JSON.parse(l.cobertura_json) }));
+}
+
+/** Escribe resultados y sella (una sola transacción). */
+export async function persistirCierre(db, { ejecucion, resultados }) {
+  await db.batch([
+    ...resultados.map(r => db.prepare('INSERT INTO resultado_regla (ejecucion_id, regla_id, regla_version, estado, universo_esperado, universo_efectivo, excluidos_json, limitaciones_json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)')
+      .bind(ejecucion.id, r.regla_id, r.regla_version, r.estado, r.cobertura.esperado, r.cobertura.efectivo, JSON.stringify(r.cobertura.excluidos), JSON.stringify(r.limitaciones))),
+    db.prepare("UPDATE ejecucion SET estado = 'sellada', entradas_sha256_json = ?2, calculado_en = ?3, n_calculos = ?4, n_lotes = ?5, sello = ?6 WHERE id = ?1 AND estado = 'abierta'")
+      .bind(ejecucion.id, JSON.stringify(ejecucion.entradas_sha256), ejecucion.calculado_en, ejecucion.n_calculos, ejecucion.n_lotes, ejecucion.sello),
+  ]);
+}
+
+/** Persiste una ejecución chica (lo que devuelve `ejecutar`). */
+export async function persistirEjecucion(db, { ejecucion, calculos, resultados, lotes }, { catalogo, ejercicio }) {
+  await persistirApertura(db, ejecucion, { catalogo });
+  for (const lote of lotes) await persistirLote(db, { lote, calculos: calculos.filter(c => c.lote === lote.n) }, { ejecucion_id: ejecucion.id, ejercicio });
+  await persistirCierre(db, { ejecucion, resultados });
 }
 
 /** Relee una ejecución tal como la produjo el kernel (para verificarSello). */
 export async function leerEjecucion(db, id) {
   const e = await db.prepare('SELECT * FROM ejecucion WHERE id = ?1').bind(id).first();
   if (!e) return null;
-  const { results: cs } = await db.prepare('SELECT * FROM calculo_kernel WHERE ejecucion_id = ?1 ORDER BY rowid').bind(id).all();
-  const { results: rs } = await db.prepare('SELECT * FROM resultado_regla WHERE ejecucion_id = ?1 ORDER BY rowid').bind(id).all();
+  const { results: cs } = await db.prepare('SELECT * FROM calculo_kernel WHERE ejecucion_id = ?1 ORDER BY lote, rowid').bind(id).all();
+  const { results: rs } = await db.prepare('SELECT * FROM resultado_regla WHERE ejecucion_id = ?1 ORDER BY regla_id').bind(id).all();
+  const lotes = (await leerLotes(db, id)).map(l => ({ n: l.n, sello: l.sello, n_calculos: l.n_calculos }));
+  const ejecucion = { id: e.id, encargo_id: e.encargo_id, kernel_version: e.kernel_version, kernel_huella: e.kernel_huella, version_catalogo_reglas: e.version_catalogo_reglas,
+    version_parametros: e.version_parametros, entradas_sha256: JSON.parse(e.entradas_sha256_json), abierta_en: e.abierta_en };
+  if (e.estado === 'sellada') Object.assign(ejecucion, { calculado_en: e.calculado_en, n_calculos: e.n_calculos, n_lotes: e.n_lotes, sello: e.sello });
   return {
-    ejecucion: { id: e.id, encargo_id: e.encargo_id, kernel_version: e.kernel_version, kernel_huella: e.kernel_huella, version_catalogo_reglas: e.version_catalogo_reglas,
-      version_parametros: e.version_parametros, entradas_sha256: JSON.parse(e.entradas_sha256_json), calculado_en: e.calculado_en, n_calculos: e.n_calculos, sello: e.sello },
-    calculos: cs.map(c => ({ id: c.id, ejecucion_id: c.ejecucion_id, encargo_id: c.encargo_id, corrida_id: c.corrida_id, colaborador_id: c.colaborador_id, rubro: c.rubro,
+    estado: e.estado, ejecucion, lotes,
+    calculos: cs.map(c => ({ id: c.id, ejecucion_id: c.ejecucion_id, encargo_id: c.encargo_id, lote: c.lote, corrida_id: c.corrida_id, colaborador_id: c.colaborador_id, rubro: c.rubro,
       valor_calculado_c: c.valor_calculado_c, regla_id: c.regla_id, regla_version: c.regla_version, version_catalogo_reglas: c.version_catalogo_reglas,
       version_parametros: c.version_parametros, nivel_minimo: c.nivel_minimo, limitado: c.limitado === 1, traza: JSON.parse(c.traza_json), calculado_en: c.calculado_en })),
     resultados: rs.map(r => ({ regla_id: r.regla_id, regla_version: r.regla_version, estado: r.estado,

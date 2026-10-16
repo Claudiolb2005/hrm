@@ -119,7 +119,7 @@ export const CALC_ISR_CAT_001 = {
 };
 
 export const CALC_ISR_AJM_001 = {
-  id: 'CALC-ISR-AJM-001', version: '1.0.0', rubro: 'isr_ajuste_mensual',
+  id: 'CALC-ISR-AJM-001', version: '1.1.0', rubro: 'isr', // el ISR de la última nómina del mes
   titulo: 'Ajuste mensual de ISR en la última nómina del mes',
   fundamento: 'LISR art. 96; hoja MENSUAL de R. González. Se aplica sólo si el perfil del cliente lo declara',
   fuentes: [PRENOMINA, CATALOGO_CONCEPTOS, XML],
@@ -150,7 +150,7 @@ export const CALC_ISR_AJM_001 = {
 };
 
 export const CALC_ISR_EXT_001 = {
-  id: 'CALC-ISR-EXT-001', version: '1.0.0', rubro: 'isr_pago_extra',
+  id: 'CALC-ISR-EXT-001', version: '1.1.0', rubro: 'isr', // la corrida extra tiene su propio corrida_id
   titulo: 'ISR de pagos extra en corrida aparte', fundamento: 'Criterio C5 (por confirmar): tarifa del periodo sobre el pago solo',
   fuentes: [PRENOMINA, CATALOGO_CONCEPTOS, XML],
   /** entrada: { pago_gravable_c, periodicidad: 'semanal'|'catorcenal'|…, fecha_pago } */
