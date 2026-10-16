@@ -1,3 +1,4 @@
+import { rutasKernel } from "./api/kernel.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -22,6 +23,7 @@ var worker_default = {
       if (p.startsWith("/api/")) {
         const u = await auth(request, env);
         if (!u) return J({ error: "No autorizado" }, 401, C);
+        if (p.startsWith("/api/kernel/")) return await rutasKernel(request, env, u, C, J);
         if (p === "/api/reset-password" && m === "POST") return await apiResetPassword(request, env, u, C);
         if (p === "/api/empresas" && m === "GET") return await apiEmpresas(env, u, C);
         if (p === "/api/empresas" && m === "POST") return await apiCrearEmpresa(request, env, u, C);

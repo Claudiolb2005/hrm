@@ -51,6 +51,24 @@ cd kernel && npm test                                                        # 3
 wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0001_kernel_v1.sql   # aplicar tablas
 ```
 
+Aplicadas en producción el 15-oct-2026: `0001_kernel_v1.sql` (tablas) y
+`0002_semilla_kernel_v1.sql` (65 parámetros, 14 fuentes, 10 reglas activas, criterios C1–C8;
+generada por `kernel/scripts/semilla-sql.mjs`).
+
+### API del kernel en el Worker (`api/kernel.js`, sólo admin)
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /api/kernel/estado` | Versión y huella del kernel; **integridad**: catálogo en D1 = semilla del código; matriz completa |
+| `GET /api/kernel/pbc` | Lista PBC derivada de las reglas |
+| `GET/POST /api/kernel/encargos` | Alta de encargo con `origen_nomina` (N1) |
+| `POST /api/kernel/ejecutar` | Corre reglas sobre ≤ 500 entradas canónicas y guarda la ejecución sellada |
+| `GET /api/kernel/ejecuciones?encargo_id=` · `GET /api/kernel/ejecucion?id=` | Consulta; verifica el sello |
+| `POST /api/kernel/movimientos` | Carga el lado «cliente» (lo que hoy calcula la nómina) |
+| `POST /api/kernel/reconciliar` | Crea las diferencias kernel vs cliente |
+| `GET /api/kernel/diferencias?encargo_id=` · `POST /api/kernel/clasificar` | Tres cubetas y criterio de aceptación |
+| `GET /api/kernel/criterios` | Bitácora de criterios |
+
 Ver `kernel/README.md`.
 
 ## Stack

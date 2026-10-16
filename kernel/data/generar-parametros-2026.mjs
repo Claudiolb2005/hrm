@@ -138,4 +138,6 @@ for (const c of ['liquidacion', 'indemnizacion', 'prima_antiguedad', 'fondo_ahor
 filas.sort((a, b) => a.id.localeCompare(b.id));
 const out = new URL('./parametros-2026.json', import.meta.url);
 writeFileSync(out, JSON.stringify({ descripcion: 'Semilla del catálogo de parámetros 2026 — ver generar-parametros-2026.mjs', generado: '2026-10-15', filas }, null, 1) + '\n');
-console.log('parametros-2026.json:', filas.length, 'renglones');
+// Misma semilla como módulo ES, para que el Worker la importe sin depender de import attributes.
+writeFileSync(new URL('./parametros-2026.js', import.meta.url), '// Generado por generar-parametros-2026.mjs — no editar a mano.\nexport default ' + JSON.stringify({ filas }) + ';\n');
+console.log('parametros-2026.json/.js:', filas.length, 'renglones');
