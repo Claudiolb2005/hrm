@@ -31,6 +31,28 @@ python src/render_informe_html.py enero   # -> out/informe_enero2026.html (repor
 - Parámetros fiscales 2026 (UMA, tarifa ISR, subsidio, cuotas IMSS, cesantía patronal, ISN)
   recuperados de la data real y verificados contra el DOF.
 
+## Kernel de cálculo v0.1 (`kernel/`) — Revisión del maestro v0.3
+
+Base del kernel que pide la revisión del 13–14 oct 2026 (T1, T2, T3 aprobadas; T9; N1):
+módulo JS propio, versionado y con su suite, sin dependencias, que corre igual en el
+Worker y en Node. Reemplaza al motor embebido con `String.raw` como fuente de cálculo.
+
+- `kernel/src/` — aritmética exacta, catálogo de parámetros con vigencia y base temporal,
+  las 10 reglas v1, ejecución sellada con tres estados, reconciliación con tres cubetas.
+- `kernel/src/d1.js` — persistencia en D1.
+- `kernel/data/` — semilla de parámetros 2026 y bitácora de criterios (C1–C8).
+- `migrations/0001_kernel_v1.sql` — tablas nuevas (aditiva): `encargo` con `origen_nomina`,
+  `parametro_fiscal`, `regla`/`regla_fuente`, `ejecucion`, `calculo_kernel` inmutable,
+  `resultado_regla`, `movimiento_nomina`, `diferencia` + vista `v_diferencia`,
+  `bitacora_criterio`, `dictamen` inmutable.
+
+```bash
+cd kernel && npm test                                                        # 38 pruebas
+wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0001_kernel_v1.sql   # aplicar tablas
+```
+
+Ver `kernel/README.md`.
+
 ## Stack
 
 - **Cloudflare Workers** — worker `clientes-hrm`, app completa en `worker.js`

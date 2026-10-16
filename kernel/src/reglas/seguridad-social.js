@@ -1,0 +1,152 @@
+// seguridad-social.js — CALC-IMSS-001, CALC-RCV-001, CALC-INF-001.
+//
+// Base temporal «día cotizado»: cada día del periodo usa la UMA, el tope de SBC y
+// las cuotas vigentes ESE día. Cada rama se acumula exacta y se redondea a
+// centavos por rama (así calcula el SUA y así lo fija la regla).
+// En la versión 1 el SBC no se recalcula: se toma del SUA tal como viene (V4 → v2).
+import { Exacto, E } from '../exacto.js';
+import { rangoFechas } from '../parametros.js';
+import { tasaPorRango, exigirCentavos, exigirFecha } from './comun.js';
+
+const SUA = { clave: 'sua_ema', obligatoria: true };
+
+/**
+ * Días cotizados del periodo. Las incapacidades se restan del periodo; si llegan
+ * sólo como número y la UMA cambia dentro del periodo, no se sabe qué días restar:
+ * limitación al alcance en vez de suponer.
+ */
+function diasCotizados(ctx, periodo, incapacidades) {
+  exigirFecha('periodo.desde', periodo.desde); exigirFecha('periodo.hasta', periodo.hasta);
+  const todos = rangoFechas(periodo.desde, periodo.hasta);
+  let sinIncap;
+  if (Array.isArray(incapacidades)) {
+    const set = new Set(incapacidades);
+    sinIncap = todos.filter(d => !set.has(d));
+  } else {
+    const n = incapacidades || 0;
+    if (n > todos.length) throw new Error('Incapacidades exceden los días del periodo');
+    const tramosUma = ctx.porDia('UMA_DIARIA', todos);
+    if (n > 0 && tramosUma.length > 1) ctx.limitar('dato_faltante', 'fechas de incapacidad: la UMA cambia dentro del periodo');
+    sinIncap = todos.slice(0, todos.length - n);
+  }
+  return { todos, sinIncap };
+}
+
+function sbcDelDia(ctx, sbc, dia) {
+  const uma = E(ctx.param('UMA_DIARIA', dia).valor);
+  const tope = uma.por(ctx.param('TOPE_SBC_VECES_UMA', dia).valor);
+  return { uma, tope, sbc: Exacto.min(sbc, tope), topado: sbc.gt(tope) };
+}
+
+export const CALC_IMSS_001 = {
+  id: 'CALC-IMSS-001', version: '1.0.0', rubro: 'imss',
+  titulo: 'Cuotas IMSS por rama', fundamento: 'LSS arts. 25, 71 a 74, 106, 107, 147 y 211',
+  fuentes: [SUA, { clave: 'prima_rt_registro', obligatoria: true }, { clave: 'faltas_incapacidades', obligatoria: true }, { clave: 'movimientos_idse', obligatoria: false }],
+  /**
+   * entrada: { sbc_c, periodo: {desde, hasta}, incapacidades: string[]|number,
+   *            ausentismos?: number, prima_rt: { pct: '0.50', vigencia_desde, vigencia_hasta, registro } }
+   * Devuelve valor_c = cuota obrera; extra.patronal_c = cuota patronal (dos renglones de calculo_kernel).
+   */
+  calcular(e, ctx) {
+    exigirCentavos('sbc_c', e.sbc_c);
+    const sbc = Exacto.centavos(e.sbc_c);
+    const { sinIncap } = diasCotizados(ctx, e.periodo, e.incapacidades);
+    if (e.ausentismos > 0) ctx.limitar('criterio_pendiente', 'ausentismos por rama (art. 31 LSS): ' + e.ausentismos + ' días no descontados');
+
+    // Prima de riesgo: dato de entrada por registro, con vigencia y validación de captura.
+    const pr = e.prima_rt;
+    if (!pr || !pr.pct) { ctx.limitar('dato_faltante', 'prima de riesgo del registro'); }
+    const rango = ctx.param('PRIMA_RT_RANGO', e.periodo.desde).valor;
+    const prima = pr && pr.pct ? Exacto.pct(pr.pct) : Exacto.cero;
+    if (pr && pr.pct && (E(pr.pct).lt(rango.minima) || E(pr.pct).gt(rango.maxima))) ctx.limitar('captura_invalida', 'prima de riesgo ' + pr.pct + '% fuera de [' + rango.minima + ', ' + rango.maxima + ']');
+    if (pr && pr.vigencia_desde && (e.periodo.desde < pr.vigencia_desde || (pr.vigencia_hasta && e.periodo.hasta > pr.vigencia_hasta))) ctx.limitar('dato_fuera_de_vigencia', 'prima de riesgo ' + (pr.registro || ''));
+
+    const acc = { cuota_fija_pat: Exacto.cero, excedente_pat: Exacto.cero, excedente_obr: Exacto.cero, dinero_pat: Exacto.cero, dinero_obr: Exacto.cero,
+      gmp_pat: Exacto.cero, gmp_obr: Exacto.cero, rt_pat: Exacto.cero, iv_pat: Exacto.cero, iv_obr: Exacto.cero, guarderias_pat: Exacto.cero };
+    const porTramo = new Map();
+    let topado = false;
+    for (const dia of sinIncap) {
+      const c = ctx.param('IMSS_CUOTAS', dia).valor;
+      const { uma, sbc: s, topado: t } = sbcDelDia(ctx, sbc, dia);
+      topado = topado || t;
+      const umbral = uma.por(ctx.param('UMBRAL_EXCEDENTE_VECES_UMA', dia).valor);
+      const exc = Exacto.max(s.resta(umbral), 0);
+      acc.cuota_fija_pat = acc.cuota_fija_pat.suma(uma.por(Exacto.pct(c.cuota_fija_pat)));
+      acc.excedente_pat = acc.excedente_pat.suma(exc.por(Exacto.pct(c.excedente_pat)));
+      acc.excedente_obr = acc.excedente_obr.suma(exc.por(Exacto.pct(c.excedente_obr)));
+      acc.dinero_pat = acc.dinero_pat.suma(s.por(Exacto.pct(c.dinero_pat)));
+      acc.dinero_obr = acc.dinero_obr.suma(s.por(Exacto.pct(c.dinero_obr)));
+      acc.gmp_pat = acc.gmp_pat.suma(s.por(Exacto.pct(c.gmp_pat)));
+      acc.gmp_obr = acc.gmp_obr.suma(s.por(Exacto.pct(c.gmp_obr)));
+      acc.rt_pat = acc.rt_pat.suma(s.por(prima));
+      acc.iv_pat = acc.iv_pat.suma(s.por(Exacto.pct(c.iv_pat)));
+      acc.iv_obr = acc.iv_obr.suma(s.por(Exacto.pct(c.iv_obr)));
+      acc.guarderias_pat = acc.guarderias_pat.suma(s.por(Exacto.pct(c.guarderias_pat)));
+      const k = uma.texto(2);
+      porTramo.set(k, (porTramo.get(k) || 0) + 1);
+    }
+    const ramas = {};
+    for (const [k, v] of Object.entries(acc)) ramas[k] = v.aCentavos();
+    const obrera_c = ramas.excedente_obr + ramas.dinero_obr + ramas.gmp_obr + ramas.iv_obr;
+    const patronal_c = ramas.cuota_fija_pat + ramas.excedente_pat + ramas.dinero_pat + ramas.gmp_pat + ramas.rt_pat + ramas.iv_pat + ramas.guarderias_pat;
+    const traza = { sbc_c: e.sbc_c, tope_aplicado: topado, dias_cotizados: sinIncap.length, dias_por_uma: Object.fromEntries(porTramo),
+      prima_rt: pr || null, ramas_c: ramas, obrera_c, patronal_c, redondeo: 'por rama, a centavo' };
+    return { valor_c: obrera_c, traza, extra: { obrera_c, patronal_c },
+      renglones: [{ rubro: 'imss_obrera', valor_c: obrera_c }, { rubro: 'imss_patronal', valor_c: patronal_c }] };
+  },
+};
+
+export const CALC_RCV_001 = {
+  id: 'CALC-RCV-001', version: '1.0.0', rubro: 'rcv',
+  titulo: 'Retiro, cesantía y vejez', fundamento: 'LSS art. 168; Segundo Transitorio DOF 16-dic-2020; criterio C4',
+  fuentes: [{ clave: 'sua_eba', obligatoria: true }],
+  /** entrada: { sbc_c, periodo: {desde, hasta}, incapacidades } */
+  calcular(e, ctx) {
+    exigirCentavos('sbc_c', e.sbc_c);
+    ctx.criterio('C4');
+    const sbc = Exacto.centavos(e.sbc_c);
+    const { todos, sinIncap } = diasCotizados(ctx, e.periodo, e.incapacidades);
+    const ceavDias = new Set(sinIncap);
+    let retiro = Exacto.cero, ceavPat = Exacto.cero, ceavObr = Exacto.cero;
+    const rangos = new Map();
+    for (const dia of todos) {
+      const c = ctx.param('RCV_CUOTAS', dia).valor;
+      const { uma, sbc: s } = sbcDelDia(ctx, sbc, dia);
+      retiro = retiro.suma(s.por(Exacto.pct(c.retiro_pat)));       // retiro no resta incapacidades
+      if (ceavDias.has(dia)) {
+        const veces = s.div(uma).trunc2();                          // C4: truncado a dos decimales
+        const r = tasaPorRango(ctx.param('CEAV_PATRONAL_TABLA', dia), veces);
+        ceavPat = ceavPat.suma(s.por(Exacto.pct(r.tasa)));
+        ceavObr = ceavObr.suma(s.por(Exacto.pct(c.ceav_obr)));
+        const k = veces.texto(2) + '→' + r.tasa + '%';
+        rangos.set(k, (rangos.get(k) || 0) + 1);
+      }
+    }
+    const retiro_c = retiro.aCentavos(), ceav_pat_c = ceavPat.aCentavos(), ceav_obr_c = ceavObr.aCentavos();
+    const patronal_c = retiro_c + ceav_pat_c;
+    return { valor_c: patronal_c,
+      traza: { sbc_c: e.sbc_c, dias_retiro: todos.length, dias_ceav: sinIncap.length, rango_ceav: Object.fromEntries(rangos),
+        retiro_c, ceav_patronal_c: ceav_pat_c, ceav_obrera_c: ceav_obr_c, patronal_c },
+      extra: { retiro_c, ceav_pat_c, ceav_obr_c, patronal_c },
+      renglones: [{ rubro: 'rcv_patronal', valor_c: patronal_c }, { rubro: 'ceav_obrera', valor_c: ceav_obr_c }] };
+  },
+};
+
+export const CALC_INF_001 = {
+  id: 'CALC-INF-001', version: '1.0.0', rubro: 'infonavit',
+  titulo: 'Aportación patronal INFONAVIT', fundamento: 'Ley del INFONAVIT art. 29 fr. II',
+  fuentes: [{ clave: 'sua_eba', obligatoria: true }],
+  /** entrada: { sbc_c, periodo: {desde, hasta} } — no resta incapacidades */
+  calcular(e, ctx) {
+    exigirCentavos('sbc_c', e.sbc_c);
+    const sbc = Exacto.centavos(e.sbc_c);
+    let ap = Exacto.cero;
+    const dias = rangoFechas(e.periodo.desde, e.periodo.hasta);
+    for (const dia of dias) {
+      const pct = ctx.param('INFONAVIT_APORTACION', dia).valor;
+      ap = ap.suma(sbcDelDia(ctx, sbc, dia).sbc.por(Exacto.pct(pct)));
+    }
+    const v = ap.aCentavos();
+    return { valor_c: v, traza: { sbc_c: e.sbc_c, dias: dias.length, aportacion_c: v } };
+  },
+};

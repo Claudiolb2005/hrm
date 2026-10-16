@@ -8,8 +8,8 @@ dist/
 .vscode/
 
 # --- Datos crudos de nómina: PII (RFC/CURP/NSS/salarios). NUNCA versionar ---
-data/
-out/
+/data/
+/out/
 **/*.xlsx
 **/*.xls
 **/*.pdf
