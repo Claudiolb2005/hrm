@@ -205,3 +205,13 @@ En **Archivos**, sube el `.zip` con los XML originales del periodo y, si lo tien
 | `POST /api/kernel/requerimiento/archivo/revisar` · `POST …/archivo/procesar` | admin | Aceptar o rechazar (con motivo); mandar a lectura |
 | `GET /api/encargos` · `GET /api/encargo?id=` | cliente y admin | Revisiones de la empresa; detalle del encargo |
 | `POST /api/encargo/archivo` (multipart) · `POST /api/encargo/hallazgo` | cliente y admin | Subir un documento; responsable, fecha y comentario de un hallazgo |
+
+
+## Maestro de empleados y afiliación (D7 cualitativo)
+
+En **Archivos → Maestro de empleados**, sube el `.xlsx` del HC (hojas de activos, bajas aplicadas y finiquitos). Se guardan sólo número de empleado, RFC, fechas y grupo de nómina. Se cruza con la última prenómina terminada: pago en corrida ordinaria que empieza después de la baja (sin conceptos de separación) y pago en corrida que termina antes del alta. Cada caso se clasifica; los de «proceso actual mal» van a una cédula cualitativa (pago a persona sin alta o ya dada de baja, siempre material). El módulo 4.12 queda en universo parcial mientras las fechas vengan del maestro y no del IDSE.
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/kernel/maestro` (multipart: `file`, `encargo_id`) · `GET /api/kernel/maestro?encargo_id=` · `POST /api/kernel/maestro/cruzar` | Carga, lista y vuelve a cruzar |
+| `GET /api/kernel/afiliacion?carga_id=` · `POST /api/kernel/afiliacion/clasificar` | Casos vigentes y clasificación |

@@ -14,6 +14,8 @@ import { nuevoId } from '../kernel/src/sello.js';
 
 // Sin estas dos no hay opinión (D13), aunque ninguna regla las marque como obligatorias.
 export const ESENCIALES = ['prenomina', 'xml_nomina'];
+// Fuentes que no declara una regla CALC pero que el dictamen usa (cruce de afiliación, D7 cualitativo).
+export const ADICIONALES = ['maestro_empleados'];
 const ESTADOS = ['pendiente', 'entregada', 'completa', 'incompleta', 'no_aplica'];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const MAX = 95 * 1024 * 1024;
@@ -38,6 +40,12 @@ export async function requerimientoDe(db, encargo_id) {
   if (xml) {
     const m = (JSON.parse(xml.reporte_json || '{}').modulo_4_2) || {};
     auto.xml_nomina = { estado: m.estado === 'completo' ? 'completa' : 'incompleta', por: 'lectura de los XML', en: xml.actualizado_en, detalle: m.motivos || [] };
+  }
+  const mae = await db.prepare('SELECT registros, reporte_json, creado_en FROM maestro_carga WHERE encargo_id = ?1 ORDER BY creado_en DESC LIMIT 1').bind(encargo_id).first();
+  if (mae) {
+    const r = JSON.parse(mae.reporte_json || '{}');
+    auto.maestro_empleados = { estado: r.sin_maestro ? 'incompleta' : 'completa', por: 'lectura del maestro (' + mae.registros + ' empleados)', en: mae.creado_en,
+      detalle: r.sin_maestro ? [r.sin_maestro + ' colaboradores pagados que no aparecen en el maestro'] : [] };
   }
   return items.map(i => {
     const a = auto[i.fuente_clave];
@@ -167,9 +175,9 @@ export async function rutasRequerimiento(request, env, u, C, J, ctx) {
     if (d.fecha_compromiso && !FECHA.test(d.fecha_compromiso)) return J({ error: 'fecha_compromiso: AAAA-MM-DD' }, 400, C);
     const ahora = new Date().toISOString();
     const pbc = listaPBC();
-    if (!pbc.some(x => x.clave === 'xml_nomina')) pbc.push({ clave: 'xml_nomina', obligatoria_para: [] });
+    for (const k of [...ESENCIALES, ...ADICIONALES]) if (!pbc.some(x => x.clave === k)) pbc.push({ clave: k, obligatoria_para: [] });
     const st = pbc.map(x => db.prepare('INSERT OR IGNORE INTO requerimiento (encargo_id, fuente_clave, esencial, obligatoria, responsable, solicitado_en, fecha_compromiso) VALUES (?1,?2,?3,?4,?5,?6,?7)')
-      .bind(e.id, x.clave, ESENCIALES.includes(x.clave) ? 1 : 0, x.obligatoria_para.length || ESENCIALES.includes(x.clave) ? 1 : 0, d.responsable || null, ahora, d.fecha_compromiso || null));
+      .bind(e.id, x.clave, ESENCIALES.includes(x.clave) ? 1 : 0, x.obligatoria_para.length || ESENCIALES.includes(x.clave) || ADICIONALES.includes(x.clave) ? 1 : 0, d.responsable || null, ahora, d.fecha_compromiso || null));
     await db.batch(st);
     return J({ ok: true, requerimiento: await requerimientoDe(db, e.id) }, 201, C);
   }

@@ -129,6 +129,13 @@ ${CSS}
       <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num">Entradas</th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detCfdi"></div>
+    <div class="k-card">
+      <h2>Maestro de empleados</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Fechas de alta y baja por trabajador para detectar pagos a personas sin alta o ya dadas de baja (siempre material). Sólo se guardan número de empleado, RFC, fechas y grupo de nómina.</div>
+      <div class="drop" id="dropM">Arrastra aquí el .xlsx del maestro (HC con hojas de activos, bajas y finiquitos) o <a href="#" onclick="document.getElementById('fMae').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>.<input type="file" id="fMae" accept=".xlsx" class="oculto" onchange="subirMaestro(this.files[0])"></div>
+      <div id="msgMae"></div>
+      <div id="detMae"></div>
+    </div>
   </section>
 
   <section id="t-cfdi" class="oculto">
@@ -354,7 +361,7 @@ function cambiarEncargo(){
   var id=document.getElementById('selEnc').value;ENC=ENCS.filter(function(e){return e.id===id})[0]||null;
   try{if(ENC)localStorage.setItem('hrm_kernel_enc',ENC.id)}catch(x){}
   ING=null;document.getElementById('detIng').classList.add('oculto');
-  cargarIngestas();cargarCfdi();
+  cargarIngestas();cargarCfdi();cargarMaestro();
   var act=document.querySelector('.k-tab.act');if(act&&act.dataset.t!=='archivos')act.click();
 }
 function crearEncargo(){
@@ -567,6 +574,53 @@ function guardarReq(i){
   api('POST','/api/kernel/requerimiento/item',b).then(function(){aviso('msgReq','Guardado','ok');cargarReq()}).catch(function(e){aviso('msgReq',e.message,'err')});
 }
 
+// ── Maestro de empleados y afiliación
+var TIPOA={pago_despues_de_baja:'Pago después de la baja',pago_antes_de_alta:'Pago antes del alta'};
+var MAE=null;
+var dropM=document.getElementById('dropM');
+['dragenter','dragover'].forEach(function(e){dropM.addEventListener(e,function(ev){ev.preventDefault();dropM.classList.add('on')})});
+['dragleave','drop'].forEach(function(e){dropM.addEventListener(e,function(ev){ev.preventDefault();dropM.classList.remove('on')})});
+dropM.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirMaestro(ev.dataTransfer.files[0])});
+function subirMaestro(f){
+  if(!ENC){aviso('msgMae','Primero elige un encargo','err');return}
+  if(!f)return;if(!/\\.xlsx$/i.test(f.name)){aviso('msgMae','El maestro va en .xlsx','err');return}
+  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);aviso('msgMae','Leyendo '+f.name+'…');
+  api('POST','/api/kernel/maestro',fd).then(function(r){aviso('msgMae',r.registros.toLocaleString('es-MX')+' empleados leídos'+(r.cruzado?'. Cruzado con la prenómina.':'. '+(r.motivo||'')),'ok');document.getElementById('fMae').value='';cargarMaestro()}).catch(function(e){aviso('msgMae',e.message,'err')});
+}
+function cargarMaestro(){
+  if(!ENC)return;
+  api('GET','/api/kernel/maestro?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    MAE=(r.cargas||[])[0]||null;var d=document.getElementById('detMae');
+    if(!MAE){d.innerHTML='';return}
+    var rep=MAE.reporte||{},h='<div class="sub mono" style="color:#8ba5b2;margin:10px 0">'+esc(MAE.archivo_nombre)+' · '+Number(MAE.registros).toLocaleString('es-MX')+' empleados · SHA-256 '+esc(MAE.archivo_sha256.slice(0,16))+'…</div>';
+    if(rep.revisados!=null){
+      h+='<div class="kpis">'+[['Pagos revisados',rep.revisados],['Después de la baja',(rep.por_tipo||{}).pago_despues_de_baja],['Antes del alta',(rep.por_tipo||{}).pago_antes_de_alta],['Pagados sin maestro',rep.sin_maestro],['Activos con baja (inconsistencia)',rep.inconsistencias]]
+        .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
+      h+='<div class="k-row" style="margin-bottom:8px"><button class="k-btn peq sec" onclick="recruzarMaestro()">Volver a cruzar</button></div><div id="tbAfiW"></div>';
+    } else h+='<div class="aviso">Falta la prenómina terminada para cruzar. <button class="k-btn peq sec" onclick="recruzarMaestro()">Cruzar ahora</button></div>';
+    d.innerHTML=h;
+    if(rep.revisados!=null)cargarAfiliacion();
+  });
+}
+function recruzarMaestro(){api('POST','/api/kernel/maestro/cruzar',{id:MAE.id}).then(cargarMaestro).catch(function(e){aviso('msgMae',e.message,'err')})}
+function cargarAfiliacion(){
+  api('GET','/api/kernel/afiliacion?carga_id='+encodeURIComponent(MAE.id)).then(function(r){
+    var l=r.casos||[],w=document.getElementById('tbAfiW');if(!w)return;
+    if(!l.length){w.innerHTML='<div class="aviso ok">Ningún pago a personas sin alta o ya dadas de baja.</div>';return}
+    w.innerHTML=(r.aceptacion.aceptado?'<div class="aviso ok">Todos los casos están clasificados.</div>':'<div class="aviso">Faltan <b>'+r.aceptacion.sin_clasificar+'</b> casos por clasificar.</div>')+
+      '<div class="scroll alto"><table class="k-tbl"><thead><tr><th>Caso</th><th>Colaborador</th><th>Corrida</th><th>Fecha</th><th class="num">Percepciones</th><th>Cubeta</th></tr></thead><tbody>'+
+      l.map(function(c){return '<tr><td>'+esc(TIPOA[c.tipo])+'</td><td class="mono">'+esc(c.colaborador_id)+'</td><td>'+esc(c.corrida_id)+'</td><td>'+esc(c.fuente_fecha+' '+c.fecha_evento)+'</td><td class="num">'+pesos(c.percepciones_c)+'</td><td>'+(c.cubeta?'<span class="b b-neu">'+esc(CUBC[c.cubeta])+'</span> <span style="font-size:11px;color:#5a7a8a">'+esc(c.motivo)+'</span>':'—')+'</td></tr>'}).join('')+'</tbody></table></div>'+
+      '<div class="frm"><div><label>Casos</label><select id="aTip" class="k-sel"><option value="pago_despues_de_baja">Pagos después de la baja</option><option value="pago_antes_de_alta">Pagos antes del alta</option></select></div>'+
+      '<div><label>Cubeta</label><select id="aCub" class="k-sel"><option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="explicada">Explicada (no es incumplimiento)</option></select></div>'+
+      '<div style="grid-column:span 2"><label>Motivo</label><input id="aMot" class="k-in" placeholder="Ej. sueldo pagado después de la baja ante el IMSS"></div><div><button class="k-btn" onclick="clasificarAfi()">Clasificar</button></div></div>';
+  });
+}
+function clasificarAfi(){
+  var b={carga_id:MAE.id,tipo:document.getElementById('aTip').value,cubeta:document.getElementById('aCub').value,motivo:document.getElementById('aMot').value.trim()};
+  if(!b.motivo){alert('Escribe el motivo');return}
+  api('POST','/api/kernel/afiliacion/clasificar',b).then(cargarAfiliacion).catch(function(e){alert(e.message)});
+}
+
 // ── XML de nómina, metadata del SAT y cruce (módulo 4.2)
 var CFI=null,POLLC=null,GCRU=null;
 var TIPOC={diferencia:'Diferencia',sin_cfdi:'Pago sin CFDI',sin_nomina:'CFDI sin nómina'};
@@ -703,22 +757,23 @@ function guardarConfig(){
 }
 function cargarPendH(){
   api('GET','/api/kernel/hallazgos/pendientes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
-    var l=(r.pendientes||[]).concat((r.cruces||[]).map(function(c){return {cruce:true,ingesta_cfdi_id:c.ingesta_cfdi_id,regla_id:'Cruce nómina ↔ CFDI',rubro:c.rubro,motivo:c.motivo,tipo:c.tipo,n:c.n,colaboradores:c.colaboradores,suma_abs_c:c.suma_abs_c,suma_c:c.suma_c}}));window.PENH=l;
+    var l=(r.pendientes||[]).concat((r.afiliacion||[]).map(function(a){return {afiliacion:true,carga_id:a.carga_id,regla_id:'Afiliación',rubro:TIPOA[a.tipo],tipo:a.tipo,motivo:a.motivo,n:a.n,colaboradores:a.colaboradores,suma_abs_c:a.suma_abs_c,suma_c:a.suma_abs_c}})).concat((r.cruces||[]).map(function(c){return {cruce:true,ingesta_cfdi_id:c.ingesta_cfdi_id,regla_id:'Cruce nómina ↔ CFDI',rubro:c.rubro,motivo:c.motivo,tipo:c.tipo,n:c.n,colaboradores:c.colaboradores,suma_abs_c:c.suma_abs_c,suma_c:c.suma_c}}));window.PENH=l;
     document.getElementById('tbPenH').innerHTML=l.length?l.map(function(g,i){return '<tr><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+(g.cruce?' · '+esc(TIPOC[g.tipo]):'')+'</td><td>'+esc(g.rubro)+'</td><td>'+esc(g.motivo)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.colaboradores+'</td><td class="num">'+pesos(g.suma_abs_c)+'</td><td><button class="k-btn peq" data-i="'+i+'">Crear cédula</button></td></tr>'}).join('')
       :'<tr><td colspan="7" class="vacio">Ninguna: toda diferencia de proceso ya está en una cédula.</td></tr>';
     document.querySelectorAll('#tbPenH button').forEach(function(b){b.addEventListener('click',function(){nuevaCedula(l[Number(b.dataset.i)])})});
   });
 }
 function nuevaCedula(g){
-  FILTRO=g?(g.cruce?{cruces:{ingesta_cfdi_id:g.ingesta_cfdi_id,tipo:g.tipo,rubro:g.rubro,motivo:g.motivo}}:{diferencias:{regla_id:g.regla_id,rubro:g.rubro,motivo:g.motivo}}):null;
+  FILTRO=g?(g.afiliacion?{afiliacion:{carga_id:g.carga_id,tipo:g.tipo,motivo:g.motivo}}:g.cruce?{cruces:{ingesta_cfdi_id:g.ingesta_cfdi_id,tipo:g.tipo,rubro:g.rubro,motivo:g.motivo}}:{diferencias:{regla_id:g.regla_id,rubro:g.rubro,motivo:g.motivo}}):null;
   var f=document.getElementById('frmHal');f.classList.remove('oculto');
   document.getElementById('hMod').innerHTML=Object.keys(MODS).map(function(k){return '<option value="'+k+'">'+k+' · '+esc(MODS[k])+'</option>'}).join('');
   document.getElementById('hMot').innerHTML=Object.keys(MOTC).map(function(k){return '<option value="'+k+'">'+esc(MOTC[k])+'</option>'}).join('');
   ['hTit','hCri','hCon','hCau','hRec','hRes','hFec','hEmi','hEma'].forEach(function(id){document.getElementById(id).value=''});
   if(g){
-    var mod=g.cruce?'4.2':/^CALC-(IMSS|RCV)/.test(g.regla_id)?'4.5':/^CALC-INF/.test(g.regla_id)?'4.7':/^CALC-ISN/.test(g.regla_id)?'4.8':'4.3';
+    var mod=g.afiliacion?'4.12':g.cruce?'4.2':/^CALC-(IMSS|RCV)/.test(g.regla_id)?'4.5':/^CALC-INF/.test(g.regla_id)?'4.7':/^CALC-ISN/.test(g.regla_id)?'4.8':'4.3';
     document.getElementById('hMod').value=mod;document.getElementById('hTit').value=g.motivo||'';document.getElementById('hCri').value=g.fundamento||'';
     document.getElementById('hCon').value=g.cruce?g.n+' casos ('+TIPOC[g.tipo]+', '+g.rubro+') en '+g.colaboradores+' colaboradores; efecto '+pesos(g.suma_abs_c)+'.':g.n+' diferencias en '+g.colaboradores+' colaboradores; suma '+pesos(g.suma_c)+' (de '+pesos(g.min_c)+' a '+pesos(g.max_c)+' por caso).';
+    if(g.afiliacion){document.getElementById('hTip').value='cualitativo';document.getElementById('hMotW').classList.remove('oculto');document.getElementById('hMot').value='pago_baja_imss';document.getElementById('hCri').value='LSS arts. 15 fr. I y 27; RLSSMACERF';document.getElementById('hCon').value=g.n+' pagos ('+g.rubro+') a '+g.colaboradores+' colaboradores por '+pesos(g.suma_abs_c)+'.';}
     if(g.cruce&&g.tipo==='sin_cfdi'){document.getElementById('hTip').value='cualitativo';document.getElementById('hMotW').classList.remove('oculto');document.getElementById('hMot').value='pago_sin_cfdi';}
     document.getElementById('hFil').textContent='Se ligan los '+g.n+' casos de '+(g.cruce?'cruce nómina ↔ CFDI':(REGLAS[g.regla_id]||g.regla_id))+' · '+g.rubro+' con el motivo «'+g.motivo+'». El efecto se deriva de ellos.';
   } else document.getElementById('hFil').textContent='Sin diferencias ligadas: el efecto máximo valuado es obligatorio en un hallazgo cuantitativo.';
@@ -732,8 +787,9 @@ function crearHallazgo(){
   if(b.tipo==='cualitativo')b.motivo_cualitativo=v('hMot');
   if(FILTRO&&FILTRO.diferencias){b.diferencias=FILTRO.diferencias;b.regla_id=FILTRO.diferencias.regla_id;b.rubro=FILTRO.diferencias.rubro}
   if(FILTRO&&FILTRO.cruces){b.cruces=FILTRO.cruces;b.rubro=FILTRO.cruces.rubro}
+  if(FILTRO&&FILTRO.afiliacion){b.afiliacion=FILTRO.afiliacion}
   if(isNaN(b.efecto_min_c)||isNaN(b.efecto_max_c)){aviso('msgHal','Efecto: escribe el importe como 1234.56','err');return}
-  api('POST','/api/kernel/hallazgos',b).then(function(r){aviso('msgHal','Cédula '+r.id+' guardada'+(r.diferencias||r.cruces?' con '+((r.diferencias||0)+(r.cruces||0))+' casos ligados':'')+'.','ok');
+  api('POST','/api/kernel/hallazgos',b).then(function(r){aviso('msgHal','Cédula '+r.id+' guardada'+(r.diferencias||r.cruces||r.afiliacion?' con '+((r.diferencias||0)+(r.cruces||0)+(r.afiliacion||0))+' casos ligados':'')+'.','ok');
     document.getElementById('frmHal').classList.add('oculto');cargarHallazgos();cargarPendH()}).catch(function(e){aviso('msgHal',e.message,'err')});
 }
 function cargarHallazgos(){
@@ -764,6 +820,8 @@ function verHallazgo(id){
       '<div><button class="k-btn" onclick="guardarHallazgo()">Guardar</button></div></div><div id="msgX"></div>';
     if(r.muestra.length)x+='<h3>Casos (los 50 mayores)</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Kernel</th><th class="num">Nómina</th><th class="num">Diferencia</th></tr></thead><tbody>'+
       r.muestra.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_id)+'</td><td>'+esc(m.corrida_id)+'</td><td class="num">'+pesos(m.kernel_c)+'</td><td class="num">'+pesos(m.cliente_c)+'</td><td class="num">'+pesos(m.diferencia_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
+    if(r.muestra_afiliacion&&r.muestra_afiliacion.length)x+='<h3>Pagos de afiliación</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th>Caso</th><th>Fecha</th><th class="num">Percepciones</th></tr></thead><tbody>'+
+      r.muestra_afiliacion.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_id)+'</td><td>'+esc(m.corrida_id)+'</td><td>'+esc(TIPOA[m.tipo])+'</td><td>'+esc(m.fuente_fecha+' '+m.fecha_evento)+'</td><td class="num">'+pesos(m.percepciones_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
     if(r.muestra_cruces&&r.muestra_cruces.length)x+='<h3>Cruces nómina ↔ CFDI (los 50 mayores)</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th>Tipo</th><th class="num">Nómina</th><th class="num">CFDI</th></tr></thead><tbody>'+
       r.muestra_cruces.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_llave)+'</td><td>'+esc(m.corrida_id)+'</td><td>'+esc(TIPOC[m.tipo]+' · '+m.rubro)+'</td><td class="num">'+pesos(m.nomina_c)+'</td><td class="num">'+pesos(m.cfdi_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
     x+='<h3>Bitácora</h3><div class="scroll"><table class="k-tbl"><thead><tr><th>Cuándo</th><th>Quién</th><th>Campo</th><th>Antes</th><th>Después</th><th>Motivo</th></tr></thead><tbody>'+

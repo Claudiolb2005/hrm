@@ -3,6 +3,20 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.5.0 — 2026-10-15
+
+Requerimiento de información y cruce de afiliación. No cambia ninguna regla de cálculo.
+
+- Fuente nueva `maestro_empleados` (no la declara ninguna regla CALC; la usa el cruce de afiliación).
+- `ingesta/maestro.js`: lector del maestro de empleados (perfil HC de PRIME: activos, bajas aplicadas, finiquitos)
+  que guarda sólo número de empleado, RFC, fechas y grupo (N7). Validado contra el maestro real de PRIME del
+  14-oct (3,148 empleados; sólo estadísticas, ningún dato se versiona).
+- Cruce de afiliación (D7 cualitativo): pago después de la baja en corrida ordinaria sin separación, pago antes del
+  alta; pagados ausentes del maestro cuentan como cobertura. Módulo 4.12 siempre en universo parcial mientras las
+  fechas sean del maestro y no del IDSE.
+- El contenido del dictamen declara los documentos pedidos no recibidos completos (documento, responsable, fecha).
+- Migraciones 0008 y 0009.
+
 ## 0.4.0 — 2026-10-15
 
 XML de nómina (B3) y cruce nómina ↔ CFDI (módulo 4.2; D5, D13). No cambia ninguna regla de cálculo.

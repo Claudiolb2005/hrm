@@ -310,7 +310,7 @@ export function armarContenido(e) {
     s1_alcance: {
       fuentes: e.fuentes,
       modulos: e.modulos.map(m => ({ modulo: m.modulo, nombre: m.nombre, estado: m.estado, esperado: m.esperado, efectivo: m.efectivo, motivos: m.motivos })),
-      tolerancia: e.tolerancia, materialidad: e.materialidad, cfdi: e.cfdi || null,
+      tolerancia: e.tolerancia, materialidad: e.materialidad, cfdi: e.cfdi || null, maestro: e.maestro || null,
       // Limitación al alcance: el documento, quién lo entrega y la fecha en que se pidió (glosario, módulo 1).
       requerimiento_pendiente: e.requerimiento || [],
     },

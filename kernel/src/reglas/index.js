@@ -26,6 +26,7 @@ export const FUENTES = {
   entidad_por_registro:       { descripcion: 'Entidad federativa del centro de trabajo de cada registro patronal', anexo: null },
   matriz_isn_concepto:        { descripcion: 'Matriz ISN concepto × entidad con trato, tope y fundamento', anexo: null },
   declaraciones_isn:          { descripcion: 'Declaraciones estatales de ISN del mes, para conciliar el entero', anexo: null },
+  maestro_empleados:          { descripcion: 'Maestro de empleados del periodo: fechas de alta y de baja (incluida la baja ante el IMSS) por trabajador', anexo: null },
 };
 
 export const REGLAS_V1 = [
