@@ -11,3 +11,7 @@ export { reconciliar, clasificar, aceptacion, resultadoPrueba, CUBETAS } from '.
 export { sha256Hex, jsonCanonico } from './sello.js';
 export { KERNEL_VERSION } from './version.js';
 export { KERNEL_HUELLA } from './_huella.js';
+export { TOLERANCIA_DEF, toleranciaAgregada, aplicarTolerancia, toleranciaPorGrupo, MATERIALIDAD_DEF, MOTIVOS_CUALITATIVOS, umbralMaterialidad,
+  efectoHallazgo, evaluarMaterialidad, MODULOS_FRENTE1, moduloDeRegla, estadoModulos, OPINIONES, ORDEN_OPINION, proponerOpinion, opinionFinal,
+  consolidarOpiniones, LIMITE_REPROCESO_DIAS, validarReproceso, transicionHallazgos, NOTA_ALCANCE, fraseOpinion, armarContenido, huellaContenido,
+  verificarDictamen } from './dictamen.js';

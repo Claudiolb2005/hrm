@@ -12,6 +12,7 @@ import { detectarEncabezado, construirMapa, renglonCanonico } from './canonico.j
 import { itemsDeRenglon, itemsMensuales, ultimasDelMes } from './items.js';
 import { abrirEjecucion, calcularLote, cerrarEjecucion } from '../kernel/src/ejecutar.js';
 import { reconciliar } from '../kernel/src/reconciliacion.js';
+import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import { cargarCatalogo, persistirApertura, sentenciasLote, leerLotes, persistirCierre, insertarMultiple, verificarArranque } from '../kernel/src/d1.js';
 import { sha256Hex, nuevoId } from '../kernel/src/sello.js';
 import prime from './perfiles/prime.js';
@@ -22,6 +23,9 @@ const LOTES_POR_PASO = 6;
 const CANDADO_MS = 120000;
 const MOV_COLS = 'id, encargo_id, ingesta_id, corrida_id, colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen';
 const RUBROS_CONCILIADOS = ['isr', 'isn'];
+// Rubros de entero (retenido contra enterado, cuotas pagadas contra determinadas, ISN declarado contra calculado):
+// la tolerancia no aplica. Ninguno se concilia todavía en la ingesta; quedan declarados para cuando entren.
+export const RUBROS_ENTERO = ['isr_enterado', 'cuotas_pagadas', 'isn_declarado'];
 
 const ahoraISO = () => new Date().toISOString();
 
@@ -255,6 +259,11 @@ async function faseCerrando(env, ing) {
     .bind(ejecucion.id, ...RUBROS_CONCILIADOS).all();
   const { results: movs } = await db.prepare('SELECT id, colaborador_id, rubro, corrida_id, valor_c FROM movimiento_nomina WHERE ingesta_id = ?1').bind(ing.id).all();
   const rec = reconciliar(calcs.map(c => ({ ...c, limitado: c.limitado === 1 })), movs.map(m => ({ ...m, movimiento_ref: m.id })));
+  // T4: tolerancia por rubro y corrida con la configuración del encargo; nunca sobre rubros de entero.
+  const enc = await db.prepare('SELECT tolerancia_individual_c, tolerancia_agregada_min_c FROM encargo WHERE id = ?1').bind(ing.encargo_id).first();
+  const tol = toleranciaPorGrupo(rec.diferencias, calcs, { individual_c: enc.tolerancia_individual_c, agregado_min_c: enc.tolerancia_agregada_min_c,
+    agregado_por_colaborador_c: enc.tolerancia_individual_c, rubros_entero: RUBROS_ENTERO });
+  rec.diferencias = tol.fuera;
   await ejecutarLotes(db, insertarMultiple(db, 'diferencia', 'id, calculo_kernel_id, movimiento_id',
     rec.diferencias.map(d => ['dif_' + d.calculo_kernel_id.slice(5), d.calculo_kernel_id, d.movimiento_ref])));
   // Resumen por regla y rubro, y las diferencias agrupadas por importe (para clasificar en bloque).
@@ -268,6 +277,7 @@ async function faseCerrando(env, ing) {
   }
   for (const g of Object.values(porRegla)) g.por_importe = Object.entries(g.por_importe).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([c, n]) => ({ diferencia_c: Number(c), n }));
   reporte.reconciliacion = { coincidencias: rec.coincidencias, coincidencias_limitadas: rec.coincidencias_limitadas, diferencias: rec.diferencias.length,
+    dentro_de_tolerancia: tol.toleradas, tolerancia: tol.resumen.filter(x => x.toleradas || x.rompe_agregado),
     limitados: rec.limitados.length, sin_par_cliente: rec.sin_par_cliente.length, sin_par_kernel: rec.sin_par_kernel.length, por_regla: porRegla };
   await db.prepare("UPDATE ingesta SET estado = 'terminado', reporte_json = ?2, actualizado_en = datetime('now') WHERE id = ?1").bind(ing.id, JSON.stringify(reporte)).run();
   return 'terminado';

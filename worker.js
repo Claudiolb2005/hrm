@@ -1,6 +1,8 @@
 import { rutasKernel } from "./api/kernel.js";
+import { rutasDictamen } from "./api/dictamen.js";
 import { avanzar as avanzarIngestas } from "./ingesta/trabajos.js";
 import { paginaKernel } from "./paginas/kernel.js";
+import { paginaDictamen } from "./paginas/dictamen.js";
 import { aplicarTema } from "./paginas/tema.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
@@ -30,6 +32,10 @@ var worker_default = {
       if (p.startsWith("/api/")) {
         const u = await auth(request, env);
         if (!u) return J({ error: "No autorizado" }, 401, C);
+        if (p.startsWith("/api/kernel/") || p === "/api/dictamenes" || p === "/api/dictamen") {
+          const rd = await rutasDictamen(request, env, u, C, J);
+          if (rd) return rd;
+        }
         if (p.startsWith("/api/kernel/")) return await rutasKernel(request, env, u, C, J, ctx);
         if (p === "/api/reset-password" && m === "POST") return await apiResetPassword(request, env, u, C);
         if (p === "/api/empresas" && m === "GET") return await apiEmpresas(env, u, C);
@@ -66,6 +72,7 @@ var worker_default = {
       if (p === "/motor-auditoria.js") return new Response(MOTOR_AUDITORIA_JS, { headers: { "Content-Type": "application/javascript;charset=utf-8", "Cache-Control": "no-cache" } });
       if (p === "/portal") return H(pagePortal());
       if (p === "/reporte") return H(pageReporte());
+      if (p === "/dictamen") return H(paginaDictamen({ CSS, LOGO, LOGOUT_FN }));
       return new Response("Not found", { status: 404 });
     } catch (e) {
       return J({ error: e.message }, 500, C);
@@ -3345,6 +3352,7 @@ function pagePortal() {
 <div class="ct">
   <h1 style="font-size:28px;font-weight:800;margin-bottom:6px" id="wt">Bienvenido</h1>
   <p style="color:#3d5a6b;font-size:14px;margin-bottom:28px" id="ws">Selecciona un periodo para ver el informe</p>
+  <div id="dicts"></div>
   <div id="yt"></div>
 <div class="grid-c" id="pg"></div>
   <div class="empty" id="em" style="display:none;padding:60px 20px"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#c4d5dc" stroke-width="1.2" style="margin-bottom:16px;opacity:.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><h3 style="font-size:18px;color:#3d5a6b;margin-bottom:8px">Sin reportes disponibles</h3><p style="color:#5a7a8a;font-size:13px;max-width:380px;margin:0 auto">A\xFAn no hay periodos publicados para tu empresa. Tu administrador HRM los subir\xE1 conforme cierre la n\xF3mina mensual.</p></div>
@@ -3424,6 +3432,19 @@ function render(){
   paintImpIcons();
 }
 load();
+// Dictámenes emitidos para la empresa (la última versión de cada encargo, con acceso a las anteriores).
+(async function(){
+  try{
+    var r=await fetch('/api/dictamenes',{headers:tk_h});if(!r.ok)return;
+    var l=(await r.json()).dictamenes||[];if(!l.length)return;
+    var OP={conforme:'Conforme',conforme_con_observaciones:'Conforme con observaciones',con_salvedades:'Con salvedades',adverso:'Adverso',sin_opinion:'Sin opinión'};
+    var vistos={},ult=l.filter(function(d){if(vistos[d.encargo_id])return false;vistos[d.encargo_id]=1;return true});
+    var e=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+    document.getElementById('dicts').innerHTML='<h2 style="font-size:15px;font-weight:650;margin:0 0 10px">Dictámenes</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:28px">'+
+      ult.map(function(d){return '<a href="/dictamen?id='+encodeURIComponent(d.id)+'" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #DCE5E3;border-radius:12px;padding:14px 16px">'+
+        '<div style="font-size:12px;color:#5E7479">'+e(d.periodo_desde)+' a '+e(d.periodo_hasta)+' · versión '+d.version+'</div><div style="font-size:18px;font-weight:650;margin-top:4px;color:#0D2B31">'+e(OP[d.opinion]||d.opinion)+'</div></a>'}).join('')+'</div>';
+  }catch(x){}
+})();
 // Load impuestos docs once and paint PDF icons on cards
 (async function(){
   try{

@@ -128,7 +128,8 @@ test('ingesta completa: parsea, calcula por lotes, ajusta el mes, sella y reconc
   const { results: difs } = await db.prepare("SELECT colaborador_id, corrida_id, rubro, kernel_c, cliente_c, diferencia_c, regla_id FROM v_diferencia WHERE encargo_id = 'enc_ago' ORDER BY colaborador_id").all();
   const porEmp = Object.fromEntries(difs.map(d => [d.colaborador_id + '/' + d.corrida_id, d]));
   assert.equal(porEmp['1073134/SEM31'].diferencia_c, -468, 'hallazgo 1: subsidio 15.59%');
-  assert.equal(porEmp['191/CAT16'].diferencia_c, 2, 'C1: método catorcenal');
+  assert.equal(porEmp['191/CAT16'], undefined, 'C1: +0.02 del método catorcenal es ruido bajo la tolerancia de T4');
+  assert.equal(rc.dentro_de_tolerancia, 1);
   assert.ok(porEmp['555001/SEM31'], 'el finiquito se compara pero queda limitado');
   assert.ok(rc.limitados >= 2);
   assert.equal(rc.sin_par_kernel, 0);

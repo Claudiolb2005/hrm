@@ -19,7 +19,7 @@ const ADMIN = { id: 2, nombre: 'Revisor', rol: 'admin' };
 
 async function entorno() {
   const db = d1Local();
-  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql', 'migrations/0003_ingesta_lotes.sql', 'migrations/0004_sync_reglas_v1_1.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
+  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql', 'migrations/0003_ingesta_lotes.sql', 'migrations/0004_sync_reglas_v1_1.sql', 'migrations/0005_vista_diferencia.sql', 'migrations/0006_hallazgos_dictamen.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
   db.raw.exec("INSERT INTO empresas (id, nombre, slug) VALUES (1, 'PRIMEWIRELESS', 'prime')");
   db.raw.exec("INSERT INTO usuarios (id, email, password_hash, nombre, rol) VALUES (2,'rev@hrm','x','Revisor','admin')");
   const llamar = async (metodo, ruta, body, u = ADMIN) => {
@@ -59,7 +59,7 @@ test('flujo completo: encargo → ejecutar → movimientos → reconciliar → c
     { corrida_id: 'SEM31', colaborador_id: '1073134', rubro: 'isr', valor_c: 2942 },
     { corrida_id: 'SEM31', colaborador_id: '1067513', rubro: 'isr', valor_c: 122287 }] });
   const rec = await llamar('POST', '/api/kernel/reconciliar', { ejecucion_id: id });
-  assert.deepEqual(rec.json, { coincidencias: 1, coincidencias_limitadas: 0, diferencias: 1, limitados: 0, sin_par_cliente: 0, sin_par_kernel: 0 });
+  assert.deepEqual(rec.json, { coincidencias: 1, coincidencias_limitadas: 0, diferencias: 1, dentro_de_tolerancia: 0, limitados: 0, sin_par_cliente: 0, sin_par_kernel: 0 });
   let dif = await llamar('GET', '/api/kernel/diferencias?encargo_id=enc1');
   assert.equal(dif.json.diferencias[0].diferencia_c, -468);
   assert.equal(dif.json.aceptacion.aceptado, false);

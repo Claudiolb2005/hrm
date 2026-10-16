@@ -3,6 +3,21 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.3.0 — 2026-10-15
+
+Del resultado a la opinión: hallazgos, tolerancia, materialidad y dictamen (T4, T5, T6, T7; D2, D7, D13).
+No cambia ninguna regla de cálculo.
+
+- `dictamen.js`: tolerancia T4 por rubro y corrida ($0.50 individual; agregado = máx($5.00, colaboradores × $0.50)
+  sobre la suma con signo de lo tolerado; nunca en rubros de entero), umbral de materialidad sobre la carga patronal del
+  periodo dictaminado con piso, disparadores cualitativo y por recurrencia, estado por módulo del frente 1, árbol de
+  opinión (sin opinión sin B1/B3, adverso si es generalizado, salvedades, observaciones, conforme), cambio de opinión
+  sólo con motivo, consolidado de grupo por la peor opinión, reproceso con límite de 60 días y transición de hallazgos.
+- La ingesta y `/reconciliar` aplican la tolerancia con la configuración del encargo; el reporte dice cuántas
+  diferencias quedaron dentro de tolerancia.
+- Migración 0006: hallazgo con cédula y bitácora (no se borra), dictamen versionado e inmutable, foto de hallazgos por
+  versión, grupos multi-RFC y dictamen consolidado.
+
 ## 0.2.0 — 2026-10-15
 
 Ingesta en el servidor (T8) y reconciliación por lotes.

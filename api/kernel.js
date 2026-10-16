@@ -5,7 +5,8 @@
 // canónicas; la ingesta con cola (archivo en R2 → lotes idempotentes) se monta encima.
 import { ejecutar, reconciliar, aceptacion, listaPBC, verificarSello, KERNEL_VERSION, KERNEL_HUELLA, versionCatalogoReglas, Catalogo, CUBETAS } from '../kernel/src/index.js';
 import { cargarCatalogo, persistirEjecucion, leerEjecucion, verificarArranque, compararMatriz, insertarMultiple } from '../kernel/src/d1.js';
-import { crearIngesta, avanzar, estadoIngesta, reintentar, PERFILES } from '../ingesta/trabajos.js';
+import { crearIngesta, avanzar, estadoIngesta, reintentar, PERFILES, RUBROS_ENTERO } from '../ingesta/trabajos.js';
+import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import semilla from '../kernel/data/parametros-2026.js';
 
 const MAX_ITEMS = 500;
@@ -122,10 +123,14 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     const rubros = new Set(e.calculos.map(c => c.rubro));
     const cliente = movs.filter(x => rubros.has(x.rubro)).map(x => ({ ...x, corrida_id: x.corrida_id || null, movimiento_ref: x.id }));
     const rec = reconciliar(e.calculos, cliente);
+    const enc = await db.prepare('SELECT tolerancia_individual_c, tolerancia_agregada_min_c FROM encargo WHERE id = ?1').bind(e.ejecucion.encargo_id).first();
+    const tol = toleranciaPorGrupo(rec.diferencias, e.calculos, { individual_c: enc.tolerancia_individual_c, agregado_min_c: enc.tolerancia_agregada_min_c,
+      agregado_por_colaborador_c: enc.tolerancia_individual_c, rubros_entero: RUBROS_ENTERO });
+    rec.diferencias = tol.fuera;
     const st = rec.diferencias.map(df => db.prepare('INSERT OR IGNORE INTO diferencia (id, calculo_kernel_id, movimiento_id) VALUES (?1,?2,?3)')
       .bind('dif_' + df.calculo_kernel_id.slice(5), df.calculo_kernel_id, df.movimiento_ref));
     for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
-    return J({ coincidencias: rec.coincidencias, coincidencias_limitadas: rec.coincidencias_limitadas, diferencias: rec.diferencias.length, limitados: rec.limitados.length,
+    return J({ coincidencias: rec.coincidencias, coincidencias_limitadas: rec.coincidencias_limitadas, diferencias: rec.diferencias.length, dentro_de_tolerancia: tol.toleradas, limitados: rec.limitados.length,
       sin_par_cliente: rec.sin_par_cliente.length, sin_par_kernel: rec.sin_par_kernel.length }, 200, C);
   }
 

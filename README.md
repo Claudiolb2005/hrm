@@ -160,3 +160,23 @@ Recrear la base: `wrangler d1 execute hrm-nomina-portal --file=schema.sql`.
 - Clasificación de periodo por contenido (regex `SEM`/`CAT`), no por nombre de columna.
 - Clasificación de puesto por substring/prefijo (variantes regionales), no por igualdad exacta.
 - Regex dentro de los template literals del Worker requieren doble backslash (`\\s`, `\\d`).
+
+
+## Hallazgos y dictamen (T4–T7)
+
+Pestaña **Hallazgos y dictamen** en `/kernel`; el cliente ve sus dictámenes en `/portal` y cada uno en `/dictamen?id=…`.
+
+1. Captura la **carga patronal del periodo dictaminado** (mes en iguala, ejercicio en niveles A): sin ella no se decide materialidad.
+2. Toda diferencia clasificada como «proceso actual mal» va a una **cédula de hallazgo** (criterio, condición, causa, efecto, riesgo, recomendación, responsable, fecha). El efecto se deriva de sus diferencias.
+3. **Calcular propuesta**: semáforo por módulo y opinión según el árbol (D13: sin XML originales no hay opinión).
+4. **Emitir**: el dictamen queda sellado con su huella y no cambia. Un reproceso emite la versión siguiente con motivo y quién lo pidió; los hallazgos de la anterior pasan a confirmado, superado o resuelto por reproceso. Pasados 60 días del cierre del encargo, una corrección abre un encargo nuevo.
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `POST /api/kernel/encargo/config` | admin | Carga patronal, materialidad, piso, recurrencia, tolerancia |
+| `GET/POST /api/kernel/hallazgos` · `GET /api/kernel/hallazgos/pendientes` | admin | Cédulas y diferencias de proceso sin cédula |
+| `GET/POST /api/kernel/hallazgo` | admin | Detalle con bitácora; actualizar cédula y estatus |
+| `GET/POST /api/kernel/dictamen/propuesta` · `POST /api/kernel/dictamen/emitir` | admin | Opinión propuesta, bloqueos; emisión |
+| `POST /api/kernel/encargo/cerrar` | admin | Cierra el encargo (plazo de 60 días para versiones) |
+| `GET/POST /api/kernel/grupos` · `POST /api/kernel/encargos-grupo` · `POST /api/kernel/dictamen/consolidado` | admin | Grupo multi-RFC y su consolidado |
+| `GET /api/dictamenes` · `GET /api/dictamen?id=` | cliente y admin | Dictámenes de la empresa, versiones e integridad |

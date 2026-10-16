@@ -56,6 +56,15 @@ ${CSS}
 .frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;margin-top:10px}
 .frm label{display:block;font-size:10px;font-weight:700;color:#8ba5b2;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
 .frm .k-in,.frm .k-sel{width:100%}
+.sem{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 14px}
+.sem div{border:1px solid #e3eef2;border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.35;background:#fbfdfe}
+.sem b{display:block;font-size:12px;color:#1a2e3a}
+.sem .verde{border-left:4px solid #11795a}.sem .amarillo{border-left:4px solid #e0a100}.sem .rojo{border-left:4px solid #b42318}
+.sem .gris{border-left:4px solid #8ba5b2;background:#f3f6f7}.sem .fuera{border-left:4px dashed #c8d6dc;color:#8ba5b2}
+.op{border:1px solid #d4e5eb;border-radius:12px;padding:14px 16px;margin:10px 0;background:#f8fbfc}
+.op .t{font-size:18px;font-weight:700;color:#0D2B31}
+.op .r{font-size:12px;color:#5a7a8a;margin-top:4px}
+.blq li{font-size:12px;color:#7a1c13;margin:3px 0 3px 18px}
 .oculto{display:none}
 .drop{border:2px dashed #c8dfe8;border-radius:12px;padding:16px;text-align:center;font-size:12px;color:#5a7a8a;background:#f8fbfc}
 .drop.on{border-color:#1a8a8a;background:#eef8f8}
@@ -92,6 +101,7 @@ ${CSS}
   <div class="k-tabs" id="tabs">
     <div class="k-tab act" data-t="archivos">Archivos</div>
     <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
+    <div class="k-tab" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
     <div class="k-tab" data-t="calendario">Calendario</div>
     <div class="k-tab" data-t="registros">Registros patronales</div>
     <div class="k-tab" data-t="criterios">Criterios</div>
@@ -128,6 +138,73 @@ ${CSS}
       </div>
       <h3>Casos del grupo</h3>
       <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Kernel</th><th class="num">Nómina</th><th class="num">Diferencia</th><th>Origen</th><th></th></tr></thead><tbody id="tbCasos"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="t-dictamen" class="oculto">
+    <div class="k-card">
+      <h2>Materialidad y tolerancia del encargo</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a">El umbral se mide sobre la carga patronal del periodo dictaminado: un mes en iguala, el ejercicio en los niveles A (T5). La tolerancia nunca aplica a entero (T4).</div>
+      <div class="frm">
+        <div><label>Carga patronal del periodo</label><input id="mCar" class="k-in" placeholder="27,756,000.00"></div>
+        <div style="grid-column:span 2"><label>Fuente de la carga</label><input id="mFue" class="k-in" placeholder="SUA + ISN declarado, agosto 2026"></div>
+        <div><label>Materialidad %</label><input id="mBp" class="k-in" placeholder="0.50"></div>
+        <div><label>Piso</label><input id="mPis" class="k-in" placeholder="10,000.00"></div>
+        <div><label>Recurrencia (periodos)</label><input id="mRec" class="k-in" placeholder="3"></div>
+        <div><label>Tolerancia por colaborador</label><input id="mTol" class="k-in" placeholder="0.50"></div>
+        <div><button class="k-btn" onclick="guardarConfig()">Guardar</button></div>
+      </div>
+      <div id="msgCfg"></div>
+    </div>
+
+    <div class="k-card">
+      <h2>Diferencias de proceso sin cédula</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Cada diferencia clasificada como «proceso actual mal» tiene que quedar en una cédula de hallazgo antes de emitir.</div>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>Regla</th><th>Rubro</th><th>Motivo</th><th class="num">Casos</th><th class="num">Colaboradores</th><th class="num">Efecto</th><th></th></tr></thead><tbody id="tbPenH"></tbody></table></div>
+    </div>
+
+    <div class="k-card oculto" id="frmHal">
+      <h2 id="frmHalT">Nueva cédula de hallazgo</h2>
+      <div class="frm">
+        <div style="grid-column:span 2"><label>Título</label><input id="hTit" class="k-in"></div>
+        <div><label>Módulo</label><select id="hMod" class="k-sel"></select></div>
+        <div><label>Tipo</label><select id="hTip" class="k-sel" onchange="document.getElementById('hMotW').classList.toggle('oculto',this.value!=='cualitativo')"><option value="cuantitativo">Cuantitativo</option><option value="cualitativo">Cualitativo (siempre material)</option></select></div>
+        <div id="hMotW" class="oculto"><label>Motivo cualitativo</label><select id="hMot" class="k-sel"></select></div>
+        <div><label>Riesgo</label><select id="hRie" class="k-sel"><option value="alto">Alto</option><option value="medio" selected>Medio</option><option value="bajo">Bajo</option></select></div>
+        <div style="grid-column:1/-1"><label>Criterio (fundamento legal)</label><input id="hCri" class="k-in"></div>
+        <div style="grid-column:1/-1"><label>Condición (lo encontrado, con el dato)</label><input id="hCon" class="k-in"></div>
+        <div style="grid-column:span 2"><label>Causa</label><input id="hCau" class="k-in"></div>
+        <div style="grid-column:span 2"><label>Recomendación ejecutable</label><input id="hRec" class="k-in" placeholder="Pantalla, campo o parámetro a corregir"></div>
+        <div><label>Responsable</label><input id="hRes" class="k-in"></div>
+        <div><label>Fecha compromiso</label><input id="hFec" class="k-in" type="date"></div>
+        <div><label>Efecto mínimo</label><input id="hEmi" class="k-in" placeholder="Opcional"></div>
+        <div><label>Efecto máximo</label><input id="hEma" class="k-in" placeholder="Sin diferencias: obligatorio"></div>
+        <div><label>A nivel neto</label><select id="hNet" class="k-sel"><option value="0">No</option><option value="1">Sí (CFDI ↔ nómina)</option></select></div>
+        <div><button class="k-btn" onclick="crearHallazgo()">Guardar cédula</button></div>
+      </div>
+      <div id="hFil" class="sub" style="font-size:12px;color:#5a7a8a;margin-top:8px"></div>
+      <div id="msgHal"></div>
+    </div>
+
+    <div class="k-card">
+      <div class="k-row" style="justify-content:space-between"><h2 style="margin:0">Hallazgos</h2><button class="k-btn sec peq" onclick="nuevaCedula(null)">Hallazgo sin diferencias</button></div>
+      <div id="umbralTxt" class="sub" style="font-size:12px;color:#5a7a8a;margin:8px 0"></div>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>#</th><th>Hallazgo</th><th>Módulo</th><th class="num">Efecto máx.</th><th>Materialidad</th><th>Riesgo</th><th>Estatus</th></tr></thead><tbody id="tbHal"></tbody></table></div>
+    </div>
+
+    <div class="k-card oculto" id="detHal"></div>
+
+    <div class="k-card">
+      <h2>Dictamen</h2>
+      <div class="frm">
+        <div style="grid-column:span 2"><label>Ejecución sellada</label><select id="dEj" class="k-sel"></select></div>
+        <div style="grid-column:span 2"><label>Limitaciones declaradas (módulo, motivo; una por renglón)</label><textarea id="dLim" class="k-in" style="min-height:38px" placeholder="4.11, Finiquitos, liquidaciones y PTU sin regla en la versión 1"></textarea></div>
+        <div><button class="k-btn" onclick="proponer()">Calcular propuesta</button></div>
+      </div>
+      <div id="dProp"></div>
+      <h3>Versiones emitidas</h3>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>Versión</th><th>Opinión</th><th>Emitido</th><th>Motivo de la versión</th><th>Huella</th><th></th></tr></thead><tbody id="tbDic"></tbody></table></div>
+      <div class="k-row" style="margin-top:10px"><button class="k-btn sec peq" onclick="cerrarEncargo()">Cerrar encargo</button><span class="sub" style="font-size:11px;color:#8ba5b2">Después del cierre hay 60 días para emitir versiones; pasado ese plazo una corrección abre un encargo nuevo.</span></div>
     </div>
   </section>
 
@@ -195,8 +272,9 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','diferencias','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','diferencias','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
+  if(t.dataset.t==='dictamen')cargarDictamen();
   if(t.dataset.t==='calendario')cargarCalendario();
   if(t.dataset.t==='registros')cargarRegistros();
   if(t.dataset.t==='criterios')cargarCriterios();
@@ -407,6 +485,151 @@ function cargarCriterios(){
       return '<tr><td><b>'+esc(c.id)+'</b></td><td>'+esc(c.tema)+'</td><td style="max-width:520px">'+esc(c.decision)+(c.observaciones?'<div style="font-size:11px;color:#8ba5b2;margin-top:3px">'+esc(c.observaciones)+'</div>':'')+'</td><td><span class="b '+(est[c.estado]||'b-neu')+'">'+esc(c.estado.replace('_',' '))+'</span></td><td style="font-size:11px">'+esc(c.quien)+'</td></tr>';
     }).join('');
   });
+}
+
+// ── Hallazgos y dictamen (T4–T7)
+var OPS={conforme:'Conforme',conforme_con_observaciones:'Conforme con observaciones',con_salvedades:'Con salvedades',adverso:'Adverso',sin_opinion:'Sin opinión'};
+var ESTH={abierto:'Abierto',en_correccion:'En corrección',corregido:'Corregido',confirmado:'Confirmado',resuelto_por_reproceso:'Resuelto por reproceso',superado:'Superado'};
+var MODS={},MOTC={},FILTRO=null,PROP=null,HAL=null;
+// Pesos escritos → centavos sin pasar por float.
+function aCent(t){t=String(t||'').replace(/[\\s$,]/g,'');if(!t)return null;var m=t.match(/^(-?)(\\d+)(?:\\.(\\d{1,2}))?$/);if(!m)return NaN;return (m[1]?-1:1)*(Number(m[2])*100+Number(((m[3]||'')+'00').slice(0,2)))}
+function centTxt(c){return c==null?'':(c<0?'-':'')+Math.floor(Math.abs(c)/100)+'.'+String(Math.abs(c)%100).padStart(2,'0')}
+function bpTxt(b){return b==null?'':(b/100).toFixed(2)}
+function cargarDictamen(){
+  if(!ENC)return;
+  document.getElementById('mCar').value=ENC.carga_patronal_c==null?'':centTxt(ENC.carga_patronal_c);
+  document.getElementById('mFue').value=ENC.carga_patronal_fuente||'';
+  document.getElementById('mBp').value=bpTxt(ENC.materialidad_bp);document.getElementById('mPis').value=centTxt(ENC.materialidad_piso_c);
+  document.getElementById('mRec').value=ENC.recurrencia_periodos||3;document.getElementById('mTol').value=centTxt(ENC.tolerancia_individual_c);
+  cargarHallazgos();cargarPendH();cargarDictamenes();
+  api('GET','/api/kernel/ejecuciones?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var l=(r.ejecuciones||[]).filter(function(e){return e.sello});
+    document.getElementById('dEj').innerHTML=l.length?l.map(function(e){return '<option value="'+esc(e.id)+'">'+esc(fecha(e.calculado_en)+' · '+Number(e.n_calculos||0).toLocaleString('es-MX')+' cálculos · '+e.id)+'</option>'}).join(''):'<option value="">Sin ejecuciones selladas</option>';
+    if(ING&&ING.ejecucion_id&&l.some(function(e){return e.id===ING.ejecucion_id}))document.getElementById('dEj').value=ING.ejecucion_id;
+  });
+}
+function guardarConfig(){
+  var bp=String(document.getElementById('mBp').value).trim(),b={encargo_id:ENC.id,carga_patronal_c:aCent(document.getElementById('mCar').value),carga_patronal_fuente:document.getElementById('mFue').value.trim()||null,
+    materialidad_piso_c:aCent(document.getElementById('mPis').value),recurrencia_periodos:Number(document.getElementById('mRec').value||3),tolerancia_individual_c:aCent(document.getElementById('mTol').value)};
+  var bpc=aCent(bp);if(bpc!=null)b.materialidad_bp=bpc;
+  if([b.carga_patronal_c,b.materialidad_piso_c,b.tolerancia_individual_c,b.materialidad_bp].some(function(x){return typeof x==='number'&&isNaN(x)})){aviso('msgCfg','Escribe los importes como 1234.56','err');return}
+  if(b.carga_patronal_c!=null&&!b.carga_patronal_fuente){aviso('msgCfg','Indica de dónde sale la carga patronal','err');return}
+  ['materialidad_piso_c','tolerancia_individual_c'].forEach(function(k){if(b[k]==null)delete b[k]});
+  api('POST','/api/kernel/encargo/config',b).then(function(r){
+    ENCS=ENCS.map(function(e){return e.id===ENC.id?r.encargo:e});ENC=r.encargo;
+    aviso('msgCfg',r.umbral.umbral_c==null?'Guardado. Falta la carga patronal para calcular el umbral.':'Guardado. Umbral de materialidad: '+pesos(r.umbral.umbral_c)+' (manda '+(r.umbral.manda==='piso'?'el piso':'el porcentaje')+').','ok');cargarHallazgos();
+  }).catch(function(e){aviso('msgCfg',e.message,'err')});
+}
+function cargarPendH(){
+  api('GET','/api/kernel/hallazgos/pendientes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var l=r.pendientes||[];window.PENH=l;
+    document.getElementById('tbPenH').innerHTML=l.length?l.map(function(g,i){return '<tr><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+'</td><td>'+esc(g.rubro)+'</td><td>'+esc(g.motivo)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.colaboradores+'</td><td class="num">'+pesos(g.suma_abs_c)+'</td><td><button class="k-btn peq" data-i="'+i+'">Crear cédula</button></td></tr>'}).join('')
+      :'<tr><td colspan="7" class="vacio">Ninguna: toda diferencia de proceso ya está en una cédula.</td></tr>';
+    document.querySelectorAll('#tbPenH button').forEach(function(b){b.addEventListener('click',function(){nuevaCedula(l[Number(b.dataset.i)])})});
+  });
+}
+function nuevaCedula(g){
+  FILTRO=g?{regla_id:g.regla_id,rubro:g.rubro,motivo:g.motivo}:null;
+  var f=document.getElementById('frmHal');f.classList.remove('oculto');
+  document.getElementById('hMod').innerHTML=Object.keys(MODS).map(function(k){return '<option value="'+k+'">'+k+' · '+esc(MODS[k])+'</option>'}).join('');
+  document.getElementById('hMot').innerHTML=Object.keys(MOTC).map(function(k){return '<option value="'+k+'">'+esc(MOTC[k])+'</option>'}).join('');
+  ['hTit','hCri','hCon','hCau','hRec','hRes','hFec','hEmi','hEma'].forEach(function(id){document.getElementById(id).value=''});
+  if(g){
+    var mod=/^CALC-(IMSS|RCV)/.test(g.regla_id)?'4.5':/^CALC-INF/.test(g.regla_id)?'4.7':/^CALC-ISN/.test(g.regla_id)?'4.8':'4.3';
+    document.getElementById('hMod').value=mod;document.getElementById('hTit').value=g.motivo||'';document.getElementById('hCri').value=g.fundamento||'';
+    document.getElementById('hCon').value=g.n+' diferencias en '+g.colaboradores+' colaboradores; suma '+pesos(g.suma_c)+' (de '+pesos(g.min_c)+' a '+pesos(g.max_c)+' por caso).';
+    document.getElementById('hFil').textContent='Se ligan las '+g.n+' diferencias de '+(REGLAS[g.regla_id]||g.regla_id)+' · '+g.rubro+' con el motivo «'+g.motivo+'». El efecto se deriva de ellas.';
+  } else document.getElementById('hFil').textContent='Sin diferencias ligadas: el efecto máximo valuado es obligatorio en un hallazgo cuantitativo.';
+  document.getElementById('frmHalT').textContent=g?'Nueva cédula desde diferencias':'Nueva cédula sin diferencias';
+  aviso('msgHal','');f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function crearHallazgo(){
+  var v=function(id){return document.getElementById(id).value.trim()};
+  var b={encargo_id:ENC.id,titulo:v('hTit'),modulo:v('hMod'),tipo:v('hTip'),riesgo:v('hRie'),criterio:v('hCri'),condicion:v('hCon'),causa:v('hCau'),recomendacion:v('hRec'),
+    responsable:v('hRes'),fecha_compromiso:v('hFec')||null,efecto_min_c:aCent(v('hEmi')),efecto_max_c:aCent(v('hEma')),alcance_neto:v('hNet')==='1'};
+  if(b.tipo==='cualitativo')b.motivo_cualitativo=v('hMot');
+  if(FILTRO){b.diferencias=FILTRO;b.regla_id=FILTRO.regla_id;b.rubro=FILTRO.rubro}
+  if(isNaN(b.efecto_min_c)||isNaN(b.efecto_max_c)){aviso('msgHal','Efecto: escribe el importe como 1234.56','err');return}
+  api('POST','/api/kernel/hallazgos',b).then(function(r){aviso('msgHal','Cédula '+r.id+' guardada'+(r.diferencias?' con '+r.diferencias+' diferencias':'')+'.','ok');
+    document.getElementById('frmHal').classList.add('oculto');cargarHallazgos();cargarPendH()}).catch(function(e){aviso('msgHal',e.message,'err')});
+}
+function cargarHallazgos(){
+  api('GET','/api/kernel/hallazgos?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    MODS=r.modulos||{};MOTC=r.motivos_cualitativos||{};
+    var u=r.umbral;document.getElementById('umbralTxt').innerHTML=u.umbral_c==null?'<span class="b b-lim">Sin umbral</span> Captura la carga patronal del periodo para decidir materialidad.':
+      'Umbral de materialidad <b>'+pesos(u.umbral_c)+'</b> · '+(u.bp/100).toFixed(2)+'% de la carga = '+pesos(u.porcentaje_c)+' · piso '+pesos(u.piso_c)+'. Cualitativos y recurrentes son materiales siempre.';
+    var l=r.hallazgos||[];document.getElementById('nHal').textContent=l.filter(function(h){return ['abierto','en_correccion','confirmado'].indexOf(h.estatus)>=0}).length;
+    var rie={alto:'b-lim',medio:'b-par',bajo:'b-neu'};
+    document.getElementById('tbHal').innerHTML=l.length?l.map(function(h){
+      var mat=h.indeterminado?'<span class="b b-neu">Por decidir</span>':h.material?'<span class="b b-lim">Material</span> <span style="font-size:11px;color:#5a7a8a">'+esc(h.motivos_material.join(' · '))+'</span>':'<span class="b b-ok">No material</span>';
+      return '<tr class="click" data-id="'+esc(h.id)+'"><td class="num">'+h.numero+'</td><td><b>'+esc(h.titulo)+'</b>'+(h.diferencias?'<div style="font-size:11px;color:#8ba5b2">'+h.diferencias+' diferencias'+(h.periodos>1?' · '+h.periodos+' periodos':'')+'</div>':'')+'</td><td>'+esc(h.modulo+' · '+(MODS[h.modulo]||''))+'</td><td class="num">'+pesos(h.efecto_max_c)+'</td><td>'+mat+'</td><td><span class="b '+(rie[h.riesgo]||'b-neu')+'">'+esc(h.riesgo)+'</span></td><td>'+esc(ESTH[h.estatus]||h.estatus)+'</td></tr>';
+    }).join(''):'<tr><td colspan="7" class="vacio">Sin hallazgos en este encargo.</td></tr>';
+    document.querySelectorAll('#tbHal tr.click').forEach(function(tr){tr.addEventListener('click',function(){verHallazgo(tr.dataset.id)})});
+  });
+}
+function verHallazgo(id){
+  api('GET','/api/kernel/hallazgo?id='+encodeURIComponent(id)).then(function(r){
+    HAL=r.hallazgo;var h=HAL,d=document.getElementById('detHal');d.classList.remove('oculto');
+    var x='<div class="k-row" style="justify-content:space-between"><h2 style="margin:0">Hallazgo '+h.numero+' · '+esc(h.titulo)+'</h2><span class="mono" style="color:#8ba5b2">'+esc(h.id)+'</span></div>';
+    x+='<div style="font-size:12px;color:#3d5a6b;margin:8px 0"><b>Criterio:</b> '+esc(h.criterio)+'<br><b>Condición:</b> '+esc(h.condicion)+'</div>';
+    x+='<div class="frm"><div><label>Estatus</label><select id="xEst" class="k-sel">'+['abierto','en_correccion','corregido'].map(function(k){return '<option value="'+k+'"'+(h.estatus===k?' selected':'')+'>'+ESTH[k]+'</option>'}).join('')+(['abierto','en_correccion','corregido'].indexOf(h.estatus)<0?'<option selected value="">'+esc(ESTH[h.estatus])+'</option>':'')+'</select></div>'+
+      '<div style="grid-column:span 2"><label>Causa</label><input id="xCau" class="k-in" value="'+esc(h.causa||'')+'"></div>'+
+      '<div style="grid-column:span 2"><label>Recomendación</label><input id="xRec" class="k-in" value="'+esc(h.recomendacion||'')+'"></div>'+
+      '<div><label>Responsable</label><input id="xRes" class="k-in" value="'+esc(h.responsable||'')+'"></div>'+
+      '<div><label>Fecha compromiso</label><input id="xFec" type="date" class="k-in" value="'+esc(h.fecha_compromiso||'')+'"></div>'+
+      '<div style="grid-column:span 2"><label>Motivo del cambio</label><input id="xMot" class="k-in" placeholder="Obligatorio al cerrar: evidencia de la corrección"></div>'+
+      '<div><button class="k-btn" onclick="guardarHallazgo()">Guardar</button></div></div><div id="msgX"></div>';
+    if(r.muestra.length)x+='<h3>Casos (los 50 mayores)</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Kernel</th><th class="num">Nómina</th><th class="num">Diferencia</th></tr></thead><tbody>'+
+      r.muestra.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_id)+'</td><td>'+esc(m.corrida_id)+'</td><td class="num">'+pesos(m.kernel_c)+'</td><td class="num">'+pesos(m.cliente_c)+'</td><td class="num">'+pesos(m.diferencia_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
+    x+='<h3>Bitácora</h3><div class="scroll"><table class="k-tbl"><thead><tr><th>Cuándo</th><th>Quién</th><th>Campo</th><th>Antes</th><th>Después</th><th>Motivo</th></tr></thead><tbody>'+
+      r.bitacora.map(function(b){return '<tr><td>'+fecha(b.en)+'</td><td>'+esc(b.quien)+'</td><td>'+esc(b.campo)+'</td><td>'+esc(b.antes||'')+'</td><td>'+esc(b.despues||'')+'</td><td>'+esc(b.motivo||'')+'</td></tr>'}).join('')+'</tbody></table></div>';
+    d.innerHTML=x;d.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+}
+function guardarHallazgo(){
+  var v=function(id){return document.getElementById(id).value.trim()};
+  var b={id:HAL.id,causa:v('xCau'),recomendacion:v('xRec'),responsable:v('xRes'),fecha_compromiso:v('xFec')||null,motivo:v('xMot')||undefined};
+  if(v('xEst'))b.estatus=v('xEst');
+  api('POST','/api/kernel/hallazgo',b).then(function(r){aviso('msgX',r.cambios?'Guardado ('+r.cambios+' cambios en bitácora).':'Sin cambios.','ok');cargarHallazgos();verHallazgo(HAL.id)}).catch(function(e){aviso('msgX',e.message,'err')});
+}
+function limitacionesDeclaradas(){
+  return document.getElementById('dLim').value.split('\\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){var i=l.indexOf(',');return {modulo:(i<0?l:l.slice(0,i)).trim(),motivo:(i<0?'Limitación declarada por el revisor':l.slice(i+1)).trim()}});
+}
+function proponer(){
+  var ej=document.getElementById('dEj').value;if(!ej){aviso('dProp','Primero sella una ejecución (sube el archivo del periodo).','err');return}
+  api('POST','/api/kernel/dictamen/propuesta',{encargo_id:ENC.id,ejecucion_id:ej,limitaciones:limitacionesDeclaradas()}).then(function(r){PROP=r;pintarPropuesta()}).catch(function(e){aviso('dProp',e.message,'err')});
+}
+function pintarPropuesta(){
+  var r=PROP,p=r.propuesta,x='';
+  x+='<div class="sem">'+r.modulos.map(function(m){var s=p.semaforo[m.modulo];return '<div class="'+s.color+'"><b>'+m.modulo+' · '+esc(m.nombre)+'</b>'+esc(s.etiqueta)+'</div>'}).join('')+'</div>';
+  var reglas={1:'Falta la nómina o los XML originales (D13)',2:'Hallazgos materiales generalizados',3:'Hallazgo material o limitación en un rubro',4:'Hallazgos sobre tolerancia, ninguno material',5:'Sin hallazgos sobre tolerancia'};
+  x+='<div class="op"><div class="t">Opinión propuesta: '+esc(OPS[p.opinion])+'</div><div class="r">Regla '+p.regla+': '+esc(reglas[p.regla])+(p.faltan_fuentes.length?' · falta '+esc(p.faltan_fuentes.join(', ')):'')+'</div>'+
+    (p.salvedades.length?'<div class="r">Salvedades: '+p.salvedades.map(function(s){return esc(s.modulo+' '+(s.titulo||s.nombre||''))+(s.tipo==='universo_parcial'?' (cobertura '+s.efectivo+' de '+s.esperado+')':'')}).join(' · ')+'</div>':'')+'</div>';
+  if(r.bloqueos.length)x+='<div class="aviso err"><b>Todavía no se puede emitir:</b><ul class="blq">'+r.bloqueos.map(function(b){return '<li>'+esc(b)+'</li>'}).join('')+'</ul></div>';
+  var sig=r.anterior?r.anterior.version+1:1;
+  x+='<div class="frm">'+(p.opinion==='sin_opinion'?'':'<div><label>Opinión a emitir</label><select id="dOp" class="k-sel">'+Object.keys(OPS).filter(function(k){return k!=='sin_opinion'}).map(function(k){return '<option value="'+k+'"'+(k===p.opinion?' selected':'')+'>'+OPS[k]+'</option>'}).join('')+'</select></div>'+
+    '<div style="grid-column:span 2"><label>Motivo si cambias la propuesta</label><input id="dMot" class="k-in"></div>')+
+    (r.anterior?'<div style="grid-column:span 2"><label>Qué cambió y por qué (versión '+sig+')</label><input id="dMv" class="k-in"></div><div><label>Lo dispara</label><select id="dDis" class="k-sel"><option value="cliente">El cliente (información nueva)</option><option value="hrm">HRM (error propio)</option></select></div>':'')+
+    '<div><button class="k-btn" '+(r.bloqueos.length?'disabled':'')+' onclick="emitir()">Emitir versión '+sig+'</button></div></div><div id="msgEm"></div>';
+  document.getElementById('dProp').innerHTML=x;
+}
+function emitir(){
+  var b={encargo_id:ENC.id,ejecucion_id:document.getElementById('dEj').value,limitaciones:limitacionesDeclaradas()};
+  var op=document.getElementById('dOp');if(op&&op.value!==PROP.propuesta.opinion){b.opinion=op.value;b.motivo_cambio=document.getElementById('dMot').value.trim()}
+  if(PROP.anterior){b.motivo_version=document.getElementById('dMv').value.trim();b.disparado_por=document.getElementById('dDis').value}
+  if(!confirm('Un dictamen emitido no se puede modificar: una corrección será una versión nueva. ¿Emitir?'))return;
+  api('POST','/api/kernel/dictamen/emitir',b).then(function(r){aviso('msgEm','Emitido '+r.id+' · '+OPS[r.opinion],'ok');cargarDictamenes();cargarHallazgos()}).catch(function(e){aviso('msgEm',e.message,'err')});
+}
+function cargarDictamenes(){
+  api('GET','/api/kernel/dictamenes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var l=r.dictamenes||[];
+    document.getElementById('tbDic').innerHTML=l.length?l.map(function(d){return '<tr><td><b>v'+d.version+'</b></td><td>'+esc(OPS[d.opinion])+(d.opinion!==d.opinion_propuesta?' <span class="b b-par">cambiada por el revisor</span>':'')+'</td><td>'+fecha(d.emitido_en)+'</td><td>'+esc(d.motivo_version||'—')+(d.disparado_por?' <span class="b b-neu">'+esc(d.disparado_por)+'</span>':'')+'</td><td class="mono">'+esc(d.huella_contenido.slice(0,12))+'…</td><td><a class="k-btn peq sec" href="/dictamen?id='+encodeURIComponent(d.id)+'" target="_blank" rel="noopener" style="text-decoration:none">Ver</a></td></tr>'}).join('')
+      :'<tr><td colspan="6" class="vacio">Sin dictamen emitido.</td></tr>';
+  });
+}
+function cerrarEncargo(){
+  if(!confirm('Cerrar el encargo inicia el plazo de 60 días para versiones. No se reabre. ¿Cerrar?'))return;
+  api('POST','/api/kernel/encargo/cerrar',{encargo_id:ENC.id}).then(function(r){alert('Cerrado. Versiones posibles hasta '+r.reproceso_hasta.slice(0,10)+'.')}).catch(function(e){alert(e.message)});
 }
 
 cargarEstado();cargarEncargos();

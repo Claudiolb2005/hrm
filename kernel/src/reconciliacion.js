@@ -40,7 +40,7 @@ export function reconciliar(calculos, cliente, { tolerancia_c = 0 } = {}) {
     if (c.limitado) limitados.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref });
     const d = m.valor_c - c.valor_calculado_c;
     if (Math.abs(d) <= tolerancia_c) { if (c.limitado) coincidencias_limitadas += 1; else coincidencias += 1; continue; }
-    diferencias.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref, colaborador_id: c.colaborador_id, rubro: c.rubro,
+    diferencias.push({ calculo_kernel_id: c.id, movimiento_ref: m.movimiento_ref, colaborador_id: c.colaborador_id, rubro: c.rubro, corrida_id: c.corrida_id || null,
       kernel_c: c.valor_calculado_c, cliente_c: m.valor_c, diferencia_c: d, limitado: !!c.limitado, cubeta: null });
   }
   const sin_par_kernel = cliente.filter(m => !usados.has(llave(m))).map(m => m.movimiento_ref);
