@@ -1,2 +1,2 @@
 // Generado por scripts/huella.mjs — no editar a mano.
-export const KERNEL_HUELLA = "krn-d6d299b2ec85fce2";
+export const KERNEL_HUELLA = "krn-8f90b45da6d49b8f";

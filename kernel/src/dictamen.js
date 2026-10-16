@@ -311,6 +311,8 @@ export function armarContenido(e) {
       fuentes: e.fuentes,
       modulos: e.modulos.map(m => ({ modulo: m.modulo, nombre: m.nombre, estado: m.estado, esperado: m.esperado, efectivo: m.efectivo, motivos: m.motivos })),
       tolerancia: e.tolerancia, materialidad: e.materialidad, cfdi: e.cfdi || null,
+      // Limitación al alcance: el documento, quién lo entrega y la fecha en que se pidió (glosario, módulo 1).
+      requerimiento_pendiente: e.requerimiento || [],
     },
     s2_base_normativa: e.base_normativa,
     s3_resumen: { semaforo: e.propuesta.semaforo, exposicion_max_c: exposicion, hallazgos: e.hallazgos.length, materiales: e.hallazgos.filter(h => h.material).length },

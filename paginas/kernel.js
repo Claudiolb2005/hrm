@@ -100,6 +100,7 @@ ${CSS}
 
   <div class="k-tabs" id="tabs">
     <div class="k-tab act" data-t="archivos">Archivos</div>
+    <div class="k-tab" data-t="requerimiento">Requerimiento <span class="n" id="nReq">0</span></div>
     <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
     <div class="k-tab" data-t="cfdi">Nómina ↔ CFDI <span class="n" id="nCru">0</span></div>
     <div class="k-tab" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
@@ -149,6 +150,16 @@ ${CSS}
       </div>
       <h3>Casos</h3>
       <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Nómina</th><th class="num">CFDI</th><th>UUID</th><th></th></tr></thead><tbody id="tbCruC"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="t-requerimiento" class="oculto">
+    <div class="k-card">
+      <div class="k-row" style="justify-content:space-between"><h2 style="margin:0">Requerimiento de información</h2><a class="k-btn sec peq" id="verCliente" target="_blank" rel="noopener" style="text-decoration:none">Ver como el cliente</a></div>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin:8px 0">La lista sale de la matriz regla ↔ fuente: se pide lo que las reglas del encargo necesitan. La prenómina y los XML se marcan solos al leerse.</div>
+      <div class="frm" id="frmGen"><div style="grid-column:span 2"><label>Responsable del cliente</label><input id="qRes" class="k-in" placeholder="Nombre y puesto"></div><div><label>Entrega comprometida</label><input id="qFec" class="k-in" type="date"></div><div><button class="k-btn" onclick="generarReq()">Generar requerimiento</button></div></div>
+      <div id="msgReq"></div>
+      <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Documento</th><th>Estado</th><th>Responsable</th><th>Compromiso</th><th>Archivos del cliente</th><th></th></tr></thead><tbody id="tbReq"></tbody></table></div>
     </div>
   </section>
 
@@ -304,8 +315,9 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','diferencias','cfdi','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
+  if(t.dataset.t==='requerimiento')cargarReq();
   if(t.dataset.t==='cfdi')cargarPaquetes();
   if(t.dataset.t==='dictamen')cargarDictamen();
   if(t.dataset.t==='calendario')cargarCalendario();
@@ -518,6 +530,41 @@ function cargarCriterios(){
       return '<tr><td><b>'+esc(c.id)+'</b></td><td>'+esc(c.tema)+'</td><td style="max-width:520px">'+esc(c.decision)+(c.observaciones?'<div style="font-size:11px;color:#8ba5b2;margin-top:3px">'+esc(c.observaciones)+'</div>':'')+'</td><td><span class="b '+(est[c.estado]||'b-neu')+'">'+esc(c.estado.replace('_',' '))+'</span></td><td style="font-size:11px">'+esc(c.quien)+'</td></tr>';
     }).join('');
   });
+}
+
+// ── Requerimiento de información (módulo 23)
+var ESTR={pendiente:['b-par','Pendiente'],entregada:['b-run','Entregada'],completa:['b-ok','Completa'],incompleta:['b-lim','Incompleta'],no_aplica:['b-neu','No aplica']};
+var REQ=[];
+function cargarReq(){
+  if(!ENC)return;
+  document.getElementById('verCliente').href='/encargo?id='+encodeURIComponent(ENC.id);
+  api('GET','/api/kernel/requerimiento?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    REQ=r.requerimiento||[];
+    document.getElementById('nReq').textContent=REQ.filter(function(x){return x.estado_efectivo==='pendiente'||x.estado_efectivo==='incompleta'||x.archivos.some(function(a){return !a.revision})}).length;
+    document.getElementById('tbReq').innerHTML=REQ.length?REQ.map(function(x,i){
+      var e=ESTR[x.estado_efectivo]||['b-neu',x.estado_efectivo];
+      var ar=x.archivos.map(function(a){return '<div style="margin:2px 0">'+esc(a.nombre)+' <span style="color:#8ba5b2">'+fecha(a.subido_en)+'</span> '+
+        (a.revision?'<span class="b '+(a.revision==='aceptado'?'b-ok':'b-lim')+'">'+a.revision+'</span>':((x.fuente_clave==='prenomina'||x.fuente_clave==='xml_nomina')?'<button class="k-btn peq" data-p="'+esc(a.id)+'">Procesar</button> ':'')+'<button class="k-btn peq sec" data-a="'+esc(a.id)+'">Aceptar</button> <button class="k-btn peq sec" data-r="'+esc(a.id)+'">Rechazar</button>')+
+        (a.ingesta_id?' <span class="mono" style="color:#8ba5b2">'+esc(a.ingesta_id)+'</span>':'')+'</div>'}).join('');
+      return '<tr><td><b>'+esc(x.descripcion)+'</b>'+(x.esencial?' <span class="b b-lim">indispensable</span>':x.obligatoria?'':' <span class="b b-neu">opcional</span>')+'<div class="mono" style="color:#8ba5b2">'+esc(x.fuente_clave)+'</div>'+
+        (x.evidencia?'<div style="font-size:11px;color:#5a7a8a">'+esc(x.evidencia.por)+(x.evidencia.detalle&&x.evidencia.detalle.length?': '+esc(x.evidencia.detalle.join('; ')):'')+'</div>':'')+'</td>'+
+        '<td><span class="b '+e[0]+'">'+e[1]+'</span>'+(x.vencida?' <span class="b b-lim">vencida</span>':'')+'<div style="margin-top:4px"><select class="k-sel" data-e="'+i+'" style="padding:4px 6px;font-size:11px">'+['pendiente','entregada','completa','incompleta','no_aplica'].map(function(k){return '<option value="'+k+'"'+(x.estado===k?' selected':'')+'>'+ESTR[k][1]+'</option>'}).join('')+'</select></div></td>'+
+        '<td><input class="k-in" data-res="'+i+'" value="'+esc(x.responsable||'')+'" style="width:150px"></td><td><input class="k-in" type="date" data-fec="'+i+'" value="'+esc(x.fecha_compromiso||'')+'"></td><td>'+(ar||'<span style="color:#8ba5b2">—</span>')+'</td>'+
+        '<td><button class="k-btn peq sec" data-g="'+i+'">Guardar</button></td></tr>'}).join(''):'<tr><td colspan="6" class="vacio">Sin requerimiento: genéralo con el responsable y la fecha comprometida.</td></tr>';
+    document.querySelectorAll('#tbReq [data-g]').forEach(function(b){b.addEventListener('click',function(){guardarReq(Number(b.dataset.g))})});
+    document.querySelectorAll('#tbReq [data-p]').forEach(function(b){b.addEventListener('click',function(){api('POST','/api/kernel/requerimiento/archivo/procesar',{id:b.dataset.p,llave:document.getElementById('cLla').value}).then(function(r){aviso('msgReq','Procesando: '+r.ingesta_id+'. Sigue el avance en Archivos.','ok');cargarReq();cargarIngestas();cargarCfdi()}).catch(function(e){aviso('msgReq',e.message,'err')})})});
+    document.querySelectorAll('#tbReq [data-a]').forEach(function(b){b.addEventListener('click',function(){api('POST','/api/kernel/requerimiento/archivo/revisar',{id:b.dataset.a,revision:'aceptado'}).then(cargarReq)})});
+    document.querySelectorAll('#tbReq [data-r]').forEach(function(b){b.addEventListener('click',function(){var n=prompt('¿Por qué se rechaza? (lo verá el cliente)');if(!n)return;api('POST','/api/kernel/requerimiento/archivo/revisar',{id:b.dataset.r,revision:'rechazado',nota:n}).then(cargarReq).catch(function(e){alert(e.message)})})});
+  });
+}
+function generarReq(){
+  api('POST','/api/kernel/requerimiento/generar',{encargo_id:ENC.id,responsable:document.getElementById('qRes').value.trim()||null,fecha_compromiso:document.getElementById('qFec').value||null})
+    .then(function(){aviso('msgReq','Requerimiento listo. El cliente lo ve en su portal.','ok');cargarReq()}).catch(function(e){aviso('msgReq',e.message,'err')});
+}
+function guardarReq(i){
+  var x=REQ[i],b={encargo_id:ENC.id,fuente_clave:x.fuente_clave,estado:document.querySelector('[data-e="'+i+'"]').value,responsable:document.querySelector('[data-res="'+i+'"]').value.trim(),fecha_compromiso:document.querySelector('[data-fec="'+i+'"]').value||null};
+  if(b.estado==='no_aplica'&&!x.nota){var n=prompt('¿Por qué no aplica?');if(!n)return;b.nota=n}
+  api('POST','/api/kernel/requerimiento/item',b).then(function(){aviso('msgReq','Guardado','ok');cargarReq()}).catch(function(e){aviso('msgReq',e.message,'err')});
 }
 
 // ── XML de nómina, metadata del SAT y cruce (módulo 4.2)

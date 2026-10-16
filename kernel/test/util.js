@@ -32,12 +32,12 @@ export function r2Local() {
   const obj = (u8) => ({ size: u8.length, body: new ReadableStream({ start(c) { c.enqueue(u8); c.close(); } }),
     arrayBuffer: async () => u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.length), text: async () => new TextDecoder().decode(u8) });
   return { mapa: m,
-    async put(k, v) { const u8 = typeof v === 'string' ? new TextEncoder().encode(v) : new Uint8Array(v); m.set(k, u8); return { key: k, size: u8.length }; },
+    async put(k, v) { if (v && typeof v.getReader === 'function') v = await new Response(v).arrayBuffer(); const u8 = typeof v === 'string' ? new TextEncoder().encode(v) : new Uint8Array(v); m.set(k, u8); return { key: k, size: u8.length }; },
     async head(k) { return m.has(k) ? { key: k, size: m.get(k).length } : null; },
     async get(k, o) { if (!m.has(k)) return null; let u8 = m.get(k); if (o?.range) u8 = u8.subarray(o.range.offset, o.range.offset + o.range.length); return obj(u8); } };
 }
 
-export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql']) {
+export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql', '0008_requerimiento.sql']) {
   const RAIZ = new URL('../../', import.meta.url);
   const db = d1Local();
   db.raw.exec(readFileSync(new URL('schema.sql', RAIZ), 'utf8'));

@@ -1,6 +1,8 @@
 import { rutasKernel } from "./api/kernel.js";
 import { rutasDictamen } from "./api/dictamen.js";
 import { rutasCfdi } from "./api/cfdi.js";
+import { rutasRequerimiento } from "./api/requerimiento.js";
+import { paginaEncargo } from "./paginas/encargo.js";
 import { avanzarCfdi } from "./ingesta/cfdi.js";
 import { avanzar as avanzarIngestas } from "./ingesta/trabajos.js";
 import { paginaKernel } from "./paginas/kernel.js";
@@ -38,6 +40,10 @@ var worker_default = {
         if (p.startsWith("/api/kernel/") || p === "/api/dictamenes" || p === "/api/dictamen") {
           const rd = await rutasDictamen(request, env, u, C, J);
           if (rd) return rd;
+        }
+        if (p.startsWith("/api/kernel/requerimiento") || p === "/api/encargos" || p.startsWith("/api/encargo")) {
+          const rq = await rutasRequerimiento(request, env, u, C, J, ctx);
+          if (rq) return rq;
         }
         if (p.startsWith("/api/kernel/cfdi") || p.startsWith("/api/kernel/cruces")) {
           const rc = await rutasCfdi(request, env, u, C, J, ctx);
@@ -80,6 +86,7 @@ var worker_default = {
       if (p === "/portal") return H(pagePortal());
       if (p === "/reporte") return H(pageReporte());
       if (p === "/dictamen") return H(paginaDictamen({ CSS, LOGO, LOGOUT_FN }));
+      if (p === "/encargo") return H(paginaEncargo({ CSS, LOGO, LOGOUT_FN }));
       return new Response("Not found", { status: 404 });
     } catch (e) {
       return J({ error: e.message }, 500, C);
@@ -3439,17 +3446,18 @@ function render(){
   paintImpIcons();
 }
 load();
-// Dictámenes emitidos para la empresa (la última versión de cada encargo, con acceso a las anteriores).
+// Revisiones de la empresa: lo que falta entregar y el último dictamen de cada periodo.
 (async function(){
   try{
-    var r=await fetch('/api/dictamenes',{headers:tk_h});if(!r.ok)return;
-    var l=(await r.json()).dictamenes||[];if(!l.length)return;
+    var r=await fetch('/api/encargos',{headers:tk_h});if(!r.ok)return;
+    var l=(await r.json()).encargos||[];if(!l.length)return;
     var OP={conforme:'Conforme',conforme_con_observaciones:'Conforme con observaciones',con_salvedades:'Con salvedades',adverso:'Adverso',sin_opinion:'Sin opinión'};
-    var vistos={},ult=l.filter(function(d){if(vistos[d.encargo_id])return false;vistos[d.encargo_id]=1;return true});
     var e=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
-    document.getElementById('dicts').innerHTML='<h2 style="font-size:15px;font-weight:650;margin:0 0 10px">Dictámenes</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:28px">'+
-      ult.map(function(d){return '<a href="/dictamen?id='+encodeURIComponent(d.id)+'" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #DCE5E3;border-radius:12px;padding:14px 16px">'+
-        '<div style="font-size:12px;color:#5E7479">'+e(d.periodo_desde)+' a '+e(d.periodo_hasta)+' · versión '+d.version+'</div><div style="font-size:18px;font-weight:650;margin-top:4px;color:#0D2B31">'+e(OP[d.opinion]||d.opinion)+'</div></a>'}).join('')+'</div>';
+    document.getElementById('dicts').innerHTML='<h2 style="font-size:15px;font-weight:650;margin:0 0 10px">Tus revisiones</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:28px">'+
+      l.map(function(x){var mes=new Date(x.periodo_desde+'T12:00:00').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+        return '<a href="/encargo?id='+encodeURIComponent(x.id)+'" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #DCE5E3;border-radius:12px;padding:14px 16px">'+
+        '<div style="font-size:12px;color:#5E7479;text-transform:none">'+e(mes)+'</div><div style="font-size:18px;font-weight:650;margin-top:4px;color:#0D2B31">'+(x.dictamen?e(OP[x.dictamen.opinion]):'En revisión')+'</div>'+
+        '<div style="font-size:12.5px;margin-top:6px;color:'+(x.pendientes?'#7a5600':'#0d5c44')+'">'+(x.pendientes?x.pendientes+(x.pendientes===1?' documento pendiente':' documentos pendientes'):'Todo lo pedido está entregado')+'</div></a>'}).join('')+'</div>';
   }catch(x){}
 })();
 // Load impuestos docs once and paint PDF icons on cards

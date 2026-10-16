@@ -5,6 +5,7 @@
 // Cualquier usuario autenticado, limitado a su empresa: /api/dictamenes, /api/dictamen
 //
 // La propuesta se calcula al vuelo; lo emitido se congela con su huella y no cambia (la base lo impide).
+import { requerimientoDe } from './requerimiento.js';
 import { REGLAS_V1, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
   transicionHallazgos, armarContenido, huellaContenido, verificarDictamen, consolidarOpiniones, MODULOS_FRENTE1, MOTIVOS_CUALITATIVOS, OPINIONES,
   NOTA_ALCANCE } from '../kernel/src/index.js';
@@ -76,7 +77,9 @@ async function armarPropuesta(db, enc, ejecucion_id, limitaciones = []) {
   if (cruces.sin_clasificar) bloqueos.push(cruces.sin_clasificar + ' cruces nómina ↔ CFDI sin clasificar');
   if (cruces.proceso_sin_hallazgo) bloqueos.push(cruces.proceso_sin_hallazgo + ' cruces nómina ↔ CFDI de «proceso actual mal» sin hallazgo');
   if (propuesta.indeterminado) bloqueos.push('Falta la carga patronal del periodo dictaminado: sin ella no se puede decidir si los hallazgos son materiales (T5)');
-  return { ejecucion: ej, fuentes, cfdi, cruces, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
+  const requerimiento = (await requerimientoDe(db, enc.id)).filter(r => !['completa', 'no_aplica'].includes(r.estado_efectivo))
+    .map(r => ({ fuente: r.fuente_clave, descripcion: r.descripcion, esencial: !!r.esencial, estado: r.estado_efectivo, responsable: r.responsable, solicitado_en: r.solicitado_en, fecha_compromiso: r.fecha_compromiso }));
+  return { ejecucion: ej, fuentes, cfdi, cruces, requerimiento, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
     diferencias: { total: pend.n || 0, sin_clasificar: pend.sin_clasificar || 0, proceso_sin_hallazgo: pend.proceso_sin_hallazgo || 0 } };
 }
 
@@ -283,7 +286,7 @@ export async function rutasDictamen(request, env, u, C, J) {
       version: ver.version, anterior_id: r.anterior ? r.anterior.id : null, motivo_version: d.motivo_version || null, disparado_por: r.anterior ? d.disparado_por : null,
       tolerancia: { individual_c: enc.tolerancia_individual_c, agregada_min_c: enc.tolerancia_agregada_min_c, por_colaborador_c: enc.tolerancia_individual_c, aplica_a_entero: false },
       materialidad: { ...r.umbral, carga_patronal_c: enc.carga_patronal_c, carga_patronal_fuente: enc.carga_patronal_fuente, recurrencia_periodos: enc.recurrencia_periodos },
-      base_normativa: baseNormativa(r.modulos), transiciones, cfdi: r.cfdi });
+      base_normativa: baseNormativa(r.modulos), transiciones, cfdi: r.cfdi, requerimiento: r.requerimiento });
     const huella = await huellaContenido(contenido);
     const id = 'dic_' + enc.id + '_v' + ver.version;
     const st = [db.prepare('INSERT INTO dictamen (id, encargo_id, version, dictamen_anterior_id, motivo_version, disparado_por, ejecucion_id, tipo_entregable, opinion_propuesta, opinion, ' +

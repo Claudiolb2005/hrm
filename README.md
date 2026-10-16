@@ -191,3 +191,17 @@ En **Archivos**, sube el `.zip` con los XML originales del periodo y, si lo tien
 | `POST /api/kernel/cfdi` (multipart: `file`, `encargo_id`, `tipo`, `llave`) · `GET /api/kernel/cfdi?encargo_id=` | Sube y lista paquetes de XML y metadata |
 | `GET /api/kernel/cfdi/ingesta?id=` · `POST /api/kernel/cfdi/avanzar` · `POST /api/kernel/cfdi/reintentar` (`recruzar`) | Estado, avance, reintento y nuevo cruce |
 | `GET /api/kernel/cruces/grupos` · `GET /api/kernel/cruces` · `POST /api/kernel/cruces/clasificar` | Cruce vigente agrupado, casos y clasificación en bloque |
+
+
+## Requerimiento de información y portal del cliente (módulos 23, 25 y 27)
+
+- **Requerimiento**: en `/kernel` → pestaña Requerimiento, «Generar requerimiento» crea la lista desde la matriz regla ↔ fuente (la nómina y los XML van como indispensables, D13), con responsable y fecha comprometida. La prenómina y los XML se marcan solos cuando su lectura termina; lo demás se revisa a mano (aceptar o rechazar con motivo). Lo que el cliente sube a la prenómina o a los XML se procesa con un clic.
+- **El dictamen** lista los documentos pedidos que no llegaron completos, con la fecha en que se pidieron y el responsable: así se declara una limitación al alcance.
+- **El cliente** ve «Tus revisiones» en `/portal` y cada encargo en `/encargo?id=…`: lo que falta entregar (sube el archivo ahí mismo), sus hallazgos ya publicados en un dictamen —propone responsable, fecha y avance, que quedan en la bitácora con su nombre; cerrarlos como corregidos es de HRM— y sus dictámenes.
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/kernel/requerimiento?encargo_id=` · `POST …/generar` · `POST …/item` | admin | Lista con estado efectivo; generar; editar estado, responsable, fecha, nota |
+| `POST /api/kernel/requerimiento/archivo/revisar` · `POST …/archivo/procesar` | admin | Aceptar o rechazar (con motivo); mandar a lectura |
+| `GET /api/encargos` · `GET /api/encargo?id=` | cliente y admin | Revisiones de la empresa; detalle del encargo |
+| `POST /api/encargo/archivo` (multipart) · `POST /api/encargo/hallazgo` | cliente y admin | Subir un documento; responsable, fecha y comentario de un hallazgo |
