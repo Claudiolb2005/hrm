@@ -37,7 +37,7 @@ export function r2Local() {
     async get(k, o) { if (!m.has(k)) return null; let u8 = m.get(k); if (o?.range) u8 = u8.subarray(o.range.offset, o.range.offset + o.range.length); return obj(u8); } };
 }
 
-export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql']) {
+export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql']) {
   const RAIZ = new URL('../../', import.meta.url);
   const db = d1Local();
   db.raw.exec(readFileSync(new URL('schema.sql', RAIZ), 'utf8'));
@@ -59,6 +59,11 @@ export function xlsx(hojas) {
       return typeof v === 'number' ? '<c r="' + ref + '"><v>' + v + '</v></c>' : '<c r="' + ref + '" t="inlineStr"><is><t>' + esc(v) + '</t></is></c>';
     }).join('') + '</row>').join('') + '</sheetData><rowBreaks count="0"/></worksheet>';
   });
+  return zipArchivos(archivos);
+}
+
+/** ZIP deflate mínimo de { nombre: texto } (sin dependencias). */
+export function zipArchivos(archivos) {
   const partes = [], central = [];
   let off = 0;
   for (const [nombre, texto] of Object.entries(archivos)) {

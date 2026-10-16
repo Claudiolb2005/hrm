@@ -101,6 +101,7 @@ ${CSS}
   <div class="k-tabs" id="tabs">
     <div class="k-tab act" data-t="archivos">Archivos</div>
     <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
+    <div class="k-tab" data-t="cfdi">Nómina ↔ CFDI <span class="n" id="nCru">0</span></div>
     <div class="k-tab" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
     <div class="k-tab" data-t="calendario">Calendario</div>
     <div class="k-tab" data-t="registros">Registros patronales</div>
@@ -118,6 +119,37 @@ ${CSS}
       <div class="scroll"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Estado</th><th>Avance</th><th class="num">Renglones</th><th>Actualizado</th><th></th></tr></thead><tbody id="tbIng"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detIng"></div>
+    <div class="k-card">
+      <h2>XML de nómina y estado ante el SAT</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Los XML originales del periodo en un .zip (no el export de One Facture) y, para saber cuáles siguen vigentes, el .txt de metadata de la descarga masiva del SAT. Sin los XML el dictamen sale sin opinión (D13).</div>
+      <div class="frm" style="margin:0 0 10px"><div><label>Cruzar por</label><select id="cLla" class="k-sel"><option value="num_empleado">Número de empleado</option><option value="rfc">RFC del receptor</option></select></div></div>
+      <div class="drop" id="dropC">Arrastra aquí el .zip de XML o el .txt de metadata, o <a href="#" onclick="document.getElementById('fCfdi').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>.<input type="file" id="fCfdi" accept=".zip,.txt" class="oculto" onchange="subirCfdi(this.files[0])"></div>
+      <div id="msgCfdi"></div>
+      <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num">Entradas</th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
+    </div>
+    <div class="k-card oculto" id="detCfdi"></div>
+  </section>
+
+  <section id="t-cfdi" class="oculto">
+    <div class="k-card">
+      <h2>Cruce nómina ↔ CFDI</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Percepciones, ISR retenido y neto del CFDI contra la nómina, por colaborador y corrida, al centavo (criterio C11). Lo que coincide no aparece.</div>
+      <div id="aceptC"></div>
+      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Paquete</label><select id="selCf" class="k-sel" onchange="cargarCruces()"></select></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Tipo</th><th>Rubro</th><th class="num">CFDI − nómina</th><th>Corrida</th><th class="num">Casos</th><th class="num">Pendientes</th><th>Cubeta</th></tr></thead><tbody id="tbCru"></tbody></table></div>
+    </div>
+    <div class="k-card oculto" id="clasC">
+      <h2 id="clasCT">Clasificar</h2>
+      <div class="frm">
+        <div><label>Cubeta</label><select id="xCub" class="k-sel" onchange="document.getElementById('xCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
+          <option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="explicada">Explicada (no es incumplimiento)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
+        <div id="xCritW" class="oculto"><label>Criterio de la bitácora</label><select id="xCrit" class="k-sel"></select></div>
+        <div style="grid-column:span 2"><label>Motivo</label><input id="xMotC" class="k-in" placeholder="Ej. ISR timbrado distinto del retenido"></div>
+        <div><button class="k-btn" onclick="clasificarCruces()">Clasificar grupo</button></div>
+      </div>
+      <h3>Casos</h3>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Nómina</th><th class="num">CFDI</th><th>UUID</th><th></th></tr></thead><tbody id="tbCruC"></tbody></table></div>
+    </div>
   </section>
 
   <section id="t-diferencias" class="oculto">
@@ -272,8 +304,9 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','diferencias','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','diferencias','cfdi','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
+  if(t.dataset.t==='cfdi')cargarPaquetes();
   if(t.dataset.t==='dictamen')cargarDictamen();
   if(t.dataset.t==='calendario')cargarCalendario();
   if(t.dataset.t==='registros')cargarRegistros();
@@ -309,7 +342,7 @@ function cambiarEncargo(){
   var id=document.getElementById('selEnc').value;ENC=ENCS.filter(function(e){return e.id===id})[0]||null;
   try{if(ENC)localStorage.setItem('hrm_kernel_enc',ENC.id)}catch(x){}
   ING=null;document.getElementById('detIng').classList.add('oculto');
-  cargarIngestas();
+  cargarIngestas();cargarCfdi();
   var act=document.querySelector('.k-tab.act');if(act&&act.dataset.t!=='archivos')act.click();
 }
 function crearEncargo(){
@@ -487,6 +520,107 @@ function cargarCriterios(){
   });
 }
 
+// ── XML de nómina, metadata del SAT y cruce (módulo 4.2)
+var CFI=null,POLLC=null,GCRU=null;
+var TIPOC={diferencia:'Diferencia',sin_cfdi:'Pago sin CFDI',sin_nomina:'CFDI sin nómina'};
+var CUBC={proceso_mal:'Hallazgo',explicada:'Explicada',criterio_sin_resolver:'Criterio'};
+var dropC=document.getElementById('dropC');
+['dragenter','dragover'].forEach(function(e){dropC.addEventListener(e,function(ev){ev.preventDefault();dropC.classList.add('on')})});
+['dragleave','drop'].forEach(function(e){dropC.addEventListener(e,function(ev){ev.preventDefault();dropC.classList.remove('on')})});
+dropC.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirCfdi(ev.dataTransfer.files[0])});
+function subirCfdi(f){
+  if(!ENC){aviso('msgCfdi','Primero crea o elige un encargo','err');return}
+  if(!f)return;
+  var tipo=/\\.zip$/i.test(f.name)?'xml_nomina':/\\.(txt|csv)$/i.test(f.name)?'metadata_sat':null;
+  if(!tipo){aviso('msgCfdi','Sube un .zip con los XML o el .txt de metadata del SAT','err');return}
+  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);fd.append('tipo',tipo);fd.append('llave',document.getElementById('cLla').value);
+  aviso('msgCfdi','Subiendo '+f.name+'…');
+  api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi','Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';cargarCfdi(r.id)})
+    .catch(function(e){aviso('msgCfdi',e.message,'err')});
+}
+function badgeC(e){var m={pendiente:['b-run','En cola'],leyendo:['b-run','Leyendo'],cruzando:['b-run','Cruzando'],terminado:['b-ok','Terminado'],error:['b-lim','Error']};var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+x[1]+'</span>'}
+function cargarCfdi(abrir){
+  if(!ENC){document.getElementById('tbCfdi').innerHTML='';return}
+  api('GET','/api/kernel/cfdi?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var l=r.ingestas||[];
+    document.getElementById('tbCfdi').innerHTML=l.length?l.map(function(i){var av=i.lotes_total?Math.round(100*i.lotes_hechos/i.lotes_total):0;
+      return '<tr class="click'+(CFI&&CFI.id===i.id?' sel':'')+'" data-id="'+esc(i.id)+'"><td>'+esc(i.archivo_nombre)+'</td><td>'+(i.tipo==='xml_nomina'?'XML de nómina':'Metadata SAT')+'</td><td>'+badgeC(i.estado)+'</td><td><div class="bar"><i style="width:'+av+'%"></i></div></td><td class="num">'+(i.entradas==null?'—':Number(i.entradas).toLocaleString('es-MX'))+'</td><td>'+fecha(i.actualizado_en)+'</td></tr>'}).join('')
+      :'<tr><td colspan="6" class="vacio">Sin XML ni metadata en este encargo.</td></tr>';
+    document.querySelectorAll('#tbCfdi tr.click').forEach(function(tr){tr.addEventListener('click',function(){verCfdi(tr.dataset.id)})});
+    if(abrir)verCfdi(abrir);
+    var activa=l.some(function(i){return ['pendiente','leyendo','cruzando'].indexOf(i.estado)>=0});
+    clearTimeout(POLLC);if(activa)POLLC=setTimeout(function(){cargarCfdi(CFI&&CFI.id)},4000);
+  });
+}
+function verCfdi(id){api('GET','/api/kernel/cfdi/ingesta?id='+encodeURIComponent(id)).then(function(r){CFI=r.ingesta;pintarCfdi();
+  document.querySelectorAll('#tbCfdi tr.click').forEach(function(tr){tr.classList.toggle('sel',tr.dataset.id===id)})})}
+function accionCfdi(ruta,b){api('POST',ruta,b).then(function(){cargarCfdi(CFI.id)}).catch(function(e){alert(e.message)})}
+function pintarCfdi(){
+  var i=CFI,rep=i.reporte||{},d=document.getElementById('detCfdi'),h='';d.classList.remove('oculto');
+  h+='<div class="k-row" style="justify-content:space-between"><h2 style="margin:0">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeC(i.estado)+
+    (['pendiente','leyendo','cruzando'].indexOf(i.estado)>=0?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/avanzar&#39;,{id:CFI.id})">Avanzar ahora</button>':'')+
+    (i.estado==='error'?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/reintentar&#39;,{id:CFI.id})">Reintentar</button>':'')+
+    (i.tipo==='xml_nomina'&&i.lotes_total&&i.lotes_hechos>=i.lotes_total&&['terminado','error'].indexOf(i.estado)>=0?'<button class="k-btn peq sec" onclick="accionCfdi(&#39;/api/kernel/cfdi/reintentar&#39;,{id:CFI.id,recruzar:true})">Volver a cruzar</button>':'')+'</div></div>';
+  h+='<div class="sub mono" style="color:#8ba5b2;margin:4px 0 12px;word-break:break-all">SHA-256 '+esc(i.archivo_sha256||'—')+(i.tipo==='xml_nomina'?' · cruce por '+(i.llave==='rfc'?'RFC':'número de empleado'):'')+'</div>';
+  if(i.error)h+='<div class="aviso err">'+esc(String(i.error).split('\\n')[0])+'</div>';
+  if(i.tipo==='metadata_sat'&&rep.registros!=null){
+    h+='<div class="kpis">'+[['UUID',rep.registros],['Vigentes',rep.vigentes],['Cancelados',rep.cancelados],['Renglones sin leer',rep.lineas_invalidas]].map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
+    h+='<div class="sub" style="font-size:12px;color:#5a7a8a">Para que los paquetes de XML ya cruzados usen este estado, vuelve a cruzarlos.</div>';
+  }
+  if(rep.cruce){
+    var c=rep.cruce,m=rep.modulo_4_2||{};
+    h+='<div class="kpis">'+[['Comprobantes',rep.comprobantes],['Válidos',rep.validos],['Cancelados (fuera)',rep.cancelados],['Repetidos',rep.duplicados],['Sin estado SAT',rep.sin_estado_sat],['Coinciden',c.coincidencias],['Con diferencia',c.con_diferencia],['Pago sin CFDI',(c.por_tipo||{}).sin_cfdi],['CFDI sin nómina',(c.por_tipo||{}).sin_nomina]]
+      .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
+    h+='<div class="'+(m.estado==='completo'?'aviso ok':'aviso')+'">Módulo 4.2: '+(m.estado==='completo'?'universo completo':'universo parcial — '+esc((m.motivos||[]).join('; ')))+'</div>';
+    var sc=Object.keys(rep.sin_corrida||{});
+    if(sc.length)h+='<h3>Fuera del calendario o inválidos</h3><div class="chipl">'+sc.map(function(k){return '<span>'+esc(k)+' · '+rep.sin_corrida[k]+'</span>'}).join('')+'</div>';
+    var pc=c.por_corrida||{};
+    h+='<h3>Por corrida</h3><div class="scroll"><table class="k-tbl"><thead><tr><th>Corrida</th><th class="num">Nómina</th><th class="num">CFDI</th><th class="num">Diferencias</th><th class="num">Pago sin CFDI</th><th class="num">CFDI sin nómina</th></tr></thead><tbody>'+
+      Object.keys(pc).sort().map(function(k){var x=pc[k];return '<tr><td><b>'+esc(k)+'</b></td><td class="num">'+x.nomina+'</td><td class="num">'+x.cfdi+'</td><td class="num">'+x.diferencias+'</td><td class="num">'+x.sin_cfdi+'</td><td class="num">'+x.sin_nomina+'</td></tr>'}).join('')+'</tbody></table></div>';
+    if(rep.muestra_errores&&rep.muestra_errores.length)h+='<h3>Comprobantes que no cuadran por dentro</h3><div style="font-size:12px;color:#5a7a8a">'+rep.muestra_errores.map(function(e){return esc(e.archivo+': '+e.errores.join('; '))}).join('<br>')+'</div>';
+    h+='<button class="k-btn sec" style="margin-top:10px" onclick="document.querySelector(&#39;.k-tab[data-t=cfdi]&#39;).click()">Clasificar el cruce →</button>';
+  }
+  d.innerHTML=h;
+}
+function cargarPaquetes(){
+  if(!ENC)return;
+  Promise.all([api('GET','/api/kernel/cfdi?encargo_id='+encodeURIComponent(ENC.id)),api('GET','/api/kernel/criterios')]).then(function(r){
+    var l=(r[0].ingestas||[]).filter(function(i){return i.tipo==='xml_nomina'&&i.estado==='terminado'});
+    document.getElementById('xCrit').innerHTML=(r[1].criterios||[]).map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
+    var s=document.getElementById('selCf');
+    s.innerHTML=l.length?l.map(function(i){return '<option value="'+esc(i.id)+'">'+esc(i.archivo_nombre+' · '+fecha(i.actualizado_en))+'</option>'}).join(''):'<option value="">Sin paquetes de XML cruzados</option>';
+    if(CFI&&l.some(function(i){return i.id===CFI.id}))s.value=CFI.id;
+    cargarCruces();
+  });
+}
+function cargarCruces(){
+  var id=document.getElementById('selCf').value;document.getElementById('clasC').classList.add('oculto');GCRU=null;
+  if(!id){document.getElementById('tbCru').innerHTML='<tr><td colspan="7" class="vacio">Sube el .zip de XML en Archivos.</td></tr>';document.getElementById('aceptC').innerHTML='';return}
+  api('GET','/api/kernel/cruces/grupos?ingesta_cfdi_id='+encodeURIComponent(id)).then(function(r){
+    var a=r.aceptacion;document.getElementById('nCru').textContent=a.sin_clasificar;
+    document.getElementById('aceptC').innerHTML=r.total===0?'<div class="aviso ok">La nómina y los CFDI coinciden en todo lo cruzado.</div>':(a.aceptado?'<div class="aviso ok">Todo el cruce está clasificado.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.</div>');
+    document.getElementById('tbCru').innerHTML=(r.grupos||[]).map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(TIPOC[g.tipo])+'</td><td>'+esc(g.rubro)+'</td><td class="num">'+(g.dif_c==null?'—':pesos(g.dif_c))+'</td><td>'+esc(g.corrida_id||'—')+'</td><td class="num">'+g.n+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBC[g.cubeta])+'</span>':'—')+'</td></tr>'}).join('')||'<tr><td colspan="7" class="vacio">Sin cruces pendientes.</td></tr>';
+    document.querySelectorAll('#tbCru tr.click').forEach(function(tr){tr.addEventListener('click',function(){abrirCruce(r.grupos[Number(tr.dataset.i)],tr)})});
+  });
+}
+function filtroGrupoC(g){var f={ingesta_cfdi_id:document.getElementById('selCf').value,tipo:g.tipo,rubro:g.rubro};if(g.dif_c!=null)f.dif_c=g.dif_c;if(g.corrida_id)f.corrida_id=g.corrida_id;return f}
+function abrirCruce(g,tr){
+  GCRU=g;document.querySelectorAll('#tbCru tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
+  document.getElementById('clasC').classList.remove('oculto');
+  document.getElementById('clasCT').textContent='Clasificar · '+TIPOC[g.tipo]+' · '+g.rubro+(g.dif_c!=null?' · '+pesos(g.dif_c):'')+(g.corrida_id?' · '+g.corrida_id:'')+' · '+(g.pendientes||0)+' pendientes de '+g.n;
+  var f=filtroGrupoC(g),q=Object.keys(f).map(function(k){return k+'='+encodeURIComponent(f[k])}).join('&');
+  api('GET','/api/kernel/cruces?'+q).then(function(r){
+    document.getElementById('tbCruC').innerHTML=r.cruces.map(function(x){return '<tr><td class="mono">'+esc(x.colaborador_llave)+'</td><td>'+esc(x.corrida_id)+'</td><td class="num">'+pesos(x.nomina_c)+'</td><td class="num">'+pesos(x.cfdi_c)+'</td><td class="mono" style="max-width:260px">'+esc(x.uuids||'—')+'</td><td>'+(x.cubeta?'<span class="b b-neu">'+esc(CUBC[x.cubeta])+'</span>':'')+'</td></tr>'}).join('');
+  });
+}
+function clasificarCruces(){
+  if(!GCRU)return;
+  var b=filtroGrupoC(GCRU);b.cubeta=document.getElementById('xCub').value;b.motivo=document.getElementById('xMotC').value.trim();
+  if(b.cubeta==='criterio_sin_resolver')b.criterio_id=document.getElementById('xCrit').value;
+  if(!b.motivo){alert('Escribe el motivo');return}
+  api('POST','/api/kernel/cruces/clasificar',b).then(function(){document.getElementById('xMotC').value='';cargarCruces()}).catch(function(e){alert(e.message)});
+}
+
 // ── Hallazgos y dictamen (T4–T7)
 var OPS={conforme:'Conforme',conforme_con_observaciones:'Conforme con observaciones',con_salvedades:'Con salvedades',adverso:'Adverso',sin_opinion:'Sin opinión'};
 var ESTH={abierto:'Abierto',en_correccion:'En corrección',corregido:'Corregido',confirmado:'Confirmado',resuelto_por_reproceso:'Resuelto por reproceso',superado:'Superado'};
@@ -522,23 +656,24 @@ function guardarConfig(){
 }
 function cargarPendH(){
   api('GET','/api/kernel/hallazgos/pendientes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
-    var l=r.pendientes||[];window.PENH=l;
-    document.getElementById('tbPenH').innerHTML=l.length?l.map(function(g,i){return '<tr><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+'</td><td>'+esc(g.rubro)+'</td><td>'+esc(g.motivo)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.colaboradores+'</td><td class="num">'+pesos(g.suma_abs_c)+'</td><td><button class="k-btn peq" data-i="'+i+'">Crear cédula</button></td></tr>'}).join('')
+    var l=(r.pendientes||[]).concat((r.cruces||[]).map(function(c){return {cruce:true,ingesta_cfdi_id:c.ingesta_cfdi_id,regla_id:'Cruce nómina ↔ CFDI',rubro:c.rubro,motivo:c.motivo,tipo:c.tipo,n:c.n,colaboradores:c.colaboradores,suma_abs_c:c.suma_abs_c,suma_c:c.suma_c}}));window.PENH=l;
+    document.getElementById('tbPenH').innerHTML=l.length?l.map(function(g,i){return '<tr><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+(g.cruce?' · '+esc(TIPOC[g.tipo]):'')+'</td><td>'+esc(g.rubro)+'</td><td>'+esc(g.motivo)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.colaboradores+'</td><td class="num">'+pesos(g.suma_abs_c)+'</td><td><button class="k-btn peq" data-i="'+i+'">Crear cédula</button></td></tr>'}).join('')
       :'<tr><td colspan="7" class="vacio">Ninguna: toda diferencia de proceso ya está en una cédula.</td></tr>';
     document.querySelectorAll('#tbPenH button').forEach(function(b){b.addEventListener('click',function(){nuevaCedula(l[Number(b.dataset.i)])})});
   });
 }
 function nuevaCedula(g){
-  FILTRO=g?{regla_id:g.regla_id,rubro:g.rubro,motivo:g.motivo}:null;
+  FILTRO=g?(g.cruce?{cruces:{ingesta_cfdi_id:g.ingesta_cfdi_id,tipo:g.tipo,rubro:g.rubro,motivo:g.motivo}}:{diferencias:{regla_id:g.regla_id,rubro:g.rubro,motivo:g.motivo}}):null;
   var f=document.getElementById('frmHal');f.classList.remove('oculto');
   document.getElementById('hMod').innerHTML=Object.keys(MODS).map(function(k){return '<option value="'+k+'">'+k+' · '+esc(MODS[k])+'</option>'}).join('');
   document.getElementById('hMot').innerHTML=Object.keys(MOTC).map(function(k){return '<option value="'+k+'">'+esc(MOTC[k])+'</option>'}).join('');
   ['hTit','hCri','hCon','hCau','hRec','hRes','hFec','hEmi','hEma'].forEach(function(id){document.getElementById(id).value=''});
   if(g){
-    var mod=/^CALC-(IMSS|RCV)/.test(g.regla_id)?'4.5':/^CALC-INF/.test(g.regla_id)?'4.7':/^CALC-ISN/.test(g.regla_id)?'4.8':'4.3';
+    var mod=g.cruce?'4.2':/^CALC-(IMSS|RCV)/.test(g.regla_id)?'4.5':/^CALC-INF/.test(g.regla_id)?'4.7':/^CALC-ISN/.test(g.regla_id)?'4.8':'4.3';
     document.getElementById('hMod').value=mod;document.getElementById('hTit').value=g.motivo||'';document.getElementById('hCri').value=g.fundamento||'';
-    document.getElementById('hCon').value=g.n+' diferencias en '+g.colaboradores+' colaboradores; suma '+pesos(g.suma_c)+' (de '+pesos(g.min_c)+' a '+pesos(g.max_c)+' por caso).';
-    document.getElementById('hFil').textContent='Se ligan las '+g.n+' diferencias de '+(REGLAS[g.regla_id]||g.regla_id)+' · '+g.rubro+' con el motivo «'+g.motivo+'». El efecto se deriva de ellas.';
+    document.getElementById('hCon').value=g.cruce?g.n+' casos ('+TIPOC[g.tipo]+', '+g.rubro+') en '+g.colaboradores+' colaboradores; efecto '+pesos(g.suma_abs_c)+'.':g.n+' diferencias en '+g.colaboradores+' colaboradores; suma '+pesos(g.suma_c)+' (de '+pesos(g.min_c)+' a '+pesos(g.max_c)+' por caso).';
+    if(g.cruce&&g.tipo==='sin_cfdi'){document.getElementById('hTip').value='cualitativo';document.getElementById('hMotW').classList.remove('oculto');document.getElementById('hMot').value='pago_sin_cfdi';}
+    document.getElementById('hFil').textContent='Se ligan los '+g.n+' casos de '+(g.cruce?'cruce nómina ↔ CFDI':(REGLAS[g.regla_id]||g.regla_id))+' · '+g.rubro+' con el motivo «'+g.motivo+'». El efecto se deriva de ellos.';
   } else document.getElementById('hFil').textContent='Sin diferencias ligadas: el efecto máximo valuado es obligatorio en un hallazgo cuantitativo.';
   document.getElementById('frmHalT').textContent=g?'Nueva cédula desde diferencias':'Nueva cédula sin diferencias';
   aviso('msgHal','');f.scrollIntoView({behavior:'smooth',block:'start'});
@@ -548,9 +683,10 @@ function crearHallazgo(){
   var b={encargo_id:ENC.id,titulo:v('hTit'),modulo:v('hMod'),tipo:v('hTip'),riesgo:v('hRie'),criterio:v('hCri'),condicion:v('hCon'),causa:v('hCau'),recomendacion:v('hRec'),
     responsable:v('hRes'),fecha_compromiso:v('hFec')||null,efecto_min_c:aCent(v('hEmi')),efecto_max_c:aCent(v('hEma')),alcance_neto:v('hNet')==='1'};
   if(b.tipo==='cualitativo')b.motivo_cualitativo=v('hMot');
-  if(FILTRO){b.diferencias=FILTRO;b.regla_id=FILTRO.regla_id;b.rubro=FILTRO.rubro}
+  if(FILTRO&&FILTRO.diferencias){b.diferencias=FILTRO.diferencias;b.regla_id=FILTRO.diferencias.regla_id;b.rubro=FILTRO.diferencias.rubro}
+  if(FILTRO&&FILTRO.cruces){b.cruces=FILTRO.cruces;b.rubro=FILTRO.cruces.rubro}
   if(isNaN(b.efecto_min_c)||isNaN(b.efecto_max_c)){aviso('msgHal','Efecto: escribe el importe como 1234.56','err');return}
-  api('POST','/api/kernel/hallazgos',b).then(function(r){aviso('msgHal','Cédula '+r.id+' guardada'+(r.diferencias?' con '+r.diferencias+' diferencias':'')+'.','ok');
+  api('POST','/api/kernel/hallazgos',b).then(function(r){aviso('msgHal','Cédula '+r.id+' guardada'+(r.diferencias||r.cruces?' con '+((r.diferencias||0)+(r.cruces||0))+' casos ligados':'')+'.','ok');
     document.getElementById('frmHal').classList.add('oculto');cargarHallazgos();cargarPendH()}).catch(function(e){aviso('msgHal',e.message,'err')});
 }
 function cargarHallazgos(){
@@ -581,6 +717,8 @@ function verHallazgo(id){
       '<div><button class="k-btn" onclick="guardarHallazgo()">Guardar</button></div></div><div id="msgX"></div>';
     if(r.muestra.length)x+='<h3>Casos (los 50 mayores)</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Kernel</th><th class="num">Nómina</th><th class="num">Diferencia</th></tr></thead><tbody>'+
       r.muestra.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_id)+'</td><td>'+esc(m.corrida_id)+'</td><td class="num">'+pesos(m.kernel_c)+'</td><td class="num">'+pesos(m.cliente_c)+'</td><td class="num">'+pesos(m.diferencia_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
+    if(r.muestra_cruces&&r.muestra_cruces.length)x+='<h3>Cruces nómina ↔ CFDI (los 50 mayores)</h3><div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th>Tipo</th><th class="num">Nómina</th><th class="num">CFDI</th></tr></thead><tbody>'+
+      r.muestra_cruces.map(function(m){return '<tr><td class="mono">'+esc(m.colaborador_llave)+'</td><td>'+esc(m.corrida_id)+'</td><td>'+esc(TIPOC[m.tipo]+' · '+m.rubro)+'</td><td class="num">'+pesos(m.nomina_c)+'</td><td class="num">'+pesos(m.cfdi_c)+'</td></tr>'}).join('')+'</tbody></table></div>';
     x+='<h3>Bitácora</h3><div class="scroll"><table class="k-tbl"><thead><tr><th>Cuándo</th><th>Quién</th><th>Campo</th><th>Antes</th><th>Después</th><th>Motivo</th></tr></thead><tbody>'+
       r.bitacora.map(function(b){return '<tr><td>'+fecha(b.en)+'</td><td>'+esc(b.quien)+'</td><td>'+esc(b.campo)+'</td><td>'+esc(b.antes||'')+'</td><td>'+esc(b.despues||'')+'</td><td>'+esc(b.motivo||'')+'</td></tr>'}).join('')+'</tbody></table></div>';
     d.innerHTML=x;d.scrollIntoView({behavior:'smooth',block:'start'});

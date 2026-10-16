@@ -95,7 +95,7 @@ export async function itemsDeRenglon(r, ctx, archivo_sha256, ingesta_id) {
   for (const [rubro, valor_c] of Object.entries(r.movimientos)) {
     if (rubro === 'isn' || rubro === 'isr_separacion') continue; // ISN se agrega por registro y mes
     movimientos.push({ id: await idMovimiento(ingesta_id, r.corrida_id, r.colaborador_id, rubro), encargo_id: ctx.encargo_id, ingesta_id,
-      corrida_id: r.corrida_id, colaborador_id: r.colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen: 'fila ' + r.fila });
+      corrida_id: r.corrida_id, colaborador_id: r.colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen: 'fila ' + r.fila, rfc: r.rfc || null });
   }
   return { items, movimientos };
 }

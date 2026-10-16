@@ -13,6 +13,7 @@ import { itemsDeRenglon, itemsMensuales, ultimasDelMes } from './items.js';
 import { abrirEjecucion, calcularLote, cerrarEjecucion } from '../kernel/src/ejecutar.js';
 import { reconciliar } from '../kernel/src/reconciliacion.js';
 import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
+import { RUBROS_CRUCE } from './cruce.js';
 import { cargarCatalogo, persistirApertura, sentenciasLote, leerLotes, persistirCierre, insertarMultiple, verificarArranque } from '../kernel/src/d1.js';
 import { sha256Hex, nuevoId } from '../kernel/src/sello.js';
 import prime from './perfiles/prime.js';
@@ -21,7 +22,7 @@ export const PERFILES = { prime };
 export const RENGLONES_POR_LOTE = 250;
 const LOTES_POR_PASO = 6;
 const CANDADO_MS = 120000;
-const MOV_COLS = 'id, encargo_id, ingesta_id, corrida_id, colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen';
+const MOV_COLS = 'id, encargo_id, ingesta_id, corrida_id, colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen, rfc';
 const RUBROS_CONCILIADOS = ['isr', 'isn'];
 // Rubros de entero (retenido contra enterado, cuotas pagadas contra determinadas, ISN declarado contra calculado):
 // la tolerancia no aplica. Ninguno se concilia todavía en la ingesta; quedan declarados para cuando entren.
@@ -201,12 +202,12 @@ async function faseCalculando(env, ing, hasta) {
     for (const r of renglones) {
       const x = await itemsDeRenglon(r, ctx, ing.archivo_sha256, ing.id);
       items.push(...x.items);
-      movimientos.push(...x.movimientos.filter(m => RUBROS_CONCILIADOS.includes(m.rubro)));
+      movimientos.push(...x.movimientos.filter(m => RUBROS_CONCILIADOS.includes(m.rubro) || RUBROS_CRUCE.includes(m.rubro)));
     }
     const res = await calcularLote({ catalogo, ejecucion, fuentes: reporte.fuentes, items, lote: lote.n, ahora: ejecucion.abierta_en });
     await ejecutarLotes(db, [
       ...sentenciasLote(db, res, { ejecucion_id: ejecucion.id, ejercicio: ctx.encargo.ejercicio }),
-      ...insertarMultiple(db, 'movimiento_nomina', MOV_COLS, movimientos.map(m => [m.id, m.encargo_id, m.ingesta_id, m.corrida_id, m.colaborador_id, m.rubro, m.valor_c, m.archivo_sha256, m.renglon_origen])),
+      ...insertarMultiple(db, 'movimiento_nomina', MOV_COLS, movimientos.map(m => [m.id, m.encargo_id, m.ingesta_id, m.corrida_id, m.colaborador_id, m.rubro, m.valor_c, m.archivo_sha256, m.renglon_origen, m.rfc || null])),
       db.prepare("UPDATE ingesta_lote SET estado = 'hecho' WHERE ingesta_id = ?1 AND n = ?2").bind(ing.id, lote.n),
       db.prepare("UPDATE ingesta SET lotes_hechos = (SELECT count(*) FROM ingesta_lote WHERE ingesta_id = ?1 AND estado = 'hecho'), actualizado_en = datetime('now') WHERE id = ?1").bind(ing.id),
     ]);
@@ -234,7 +235,7 @@ async function faseMensual(env, ing) {
   const res = await calcularLote({ catalogo, ejecucion, fuentes, items: m.items, lote: n, ahora: ejecucion.abierta_en });
   await ejecutarLotes(db, [
     ...sentenciasLote(db, res, { ejecucion_id: ejecucion.id, ejercicio: ctx.encargo.ejercicio }),
-    ...insertarMultiple(db, 'movimiento_nomina', MOV_COLS, m.movimientos.map(x => [x.id, x.encargo_id, x.ingesta_id, x.corrida_id, x.colaborador_id, x.rubro, x.valor_c, x.archivo_sha256, x.renglon_origen])),
+    ...insertarMultiple(db, 'movimiento_nomina', MOV_COLS, m.movimientos.map(x => [x.id, x.encargo_id, x.ingesta_id, x.corrida_id, x.colaborador_id, x.rubro, x.valor_c, x.archivo_sha256, x.renglon_origen, null])),
     db.prepare("UPDATE ingesta SET estado = 'cerrando', reporte_json = ?2, actualizado_en = datetime('now') WHERE id = ?1").bind(ing.id, JSON.stringify(reporte)),
   ]);
   return 'cerrando';
@@ -257,7 +258,8 @@ async function faseCerrando(env, ing) {
   const ph = RUBROS_CONCILIADOS.map((_, i) => '?' + (i + 2)).join(',');
   const { results: calcs } = await db.prepare('SELECT id, colaborador_id, rubro, corrida_id, valor_calculado_c, limitado, regla_id FROM calculo_kernel WHERE ejecucion_id = ?1 AND rubro IN (' + ph + ')')
     .bind(ejecucion.id, ...RUBROS_CONCILIADOS).all();
-  const { results: movs } = await db.prepare('SELECT id, colaborador_id, rubro, corrida_id, valor_c FROM movimiento_nomina WHERE ingesta_id = ?1').bind(ing.id).all();
+  const { results: movs } = await db.prepare('SELECT id, colaborador_id, rubro, corrida_id, valor_c FROM movimiento_nomina WHERE ingesta_id = ?1 AND rubro IN (' + ph + ')')
+    .bind(ing.id, ...RUBROS_CONCILIADOS).all();
   const rec = reconciliar(calcs.map(c => ({ ...c, limitado: c.limitado === 1 })), movs.map(m => ({ ...m, movimiento_ref: m.id })));
   // T4: tolerancia por rubro y corrida con la configuración del encargo; nunca sobre rubros de entero.
   const enc = await db.prepare('SELECT tolerancia_individual_c, tolerancia_agregada_min_c FROM encargo WHERE id = ?1').bind(ing.encargo_id).first();

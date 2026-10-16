@@ -28,7 +28,9 @@ async function hallazgosEvaluados(db, enc, ejecucion_id) {
   if (ejecucion_id) {
     const { results: conEj } = await db.prepare('SELECT DISTINCT x.hallazgo_id FROM hallazgo_diferencia x JOIN v_diferencia v ON v.id = x.diferencia_id ' +
       'JOIN hallazgo h ON h.id = x.hallazgo_id WHERE h.encargo_id = ?1 AND v.ejecucion_id = ?2').bind(enc.id, ejecucion_id).all();
-    const s = new Set(conEj.map(r => r.hallazgo_id));
+    const { results: conCruce } = await db.prepare('SELECT DISTINCT x.hallazgo_id FROM hallazgo_cruce x JOIN cruce_cfdi c ON c.id = x.cruce_id JOIN ingesta_cfdi i ON i.id = c.ingesta_cfdi_id ' +
+      'WHERE c.encargo_id = ?1 AND i.ejecucion_id = ?2 AND c.corte = i.corte_actual').bind(enc.id, ejecucion_id).all();
+    const s = new Set([...conEj, ...conCruce].map(r => r.hallazgo_id));
     aplican = results.filter(h => !['resuelto_por_reproceso', 'superado'].includes(h.estatus) && (h.diferencias === 0 || s.has(h.id)));
   }
   const umbral = umbralMaterialidad({ carga_patronal_c: enc.carga_patronal_c, bp: enc.materialidad_bp, piso_c: enc.materialidad_piso_c });
@@ -47,8 +49,22 @@ async function armarPropuesta(db, enc, ejecucion_id, limitaciones = []) {
   if (ej.estado !== 'sellada') return { error: 'La ejecución sigue abierta: sólo se dictamina sobre una ejecución sellada', status: 409 };
   const { results: rr } = await db.prepare('SELECT regla_id, estado, universo_esperado, universo_efectivo FROM resultado_regla WHERE ejecucion_id = ?1 ORDER BY regla_id').bind(ej.id).all();
   const entradas = JSON.parse(ej.entradas_sha256_json || '{}');
-  const fuentes = { prenomina: !!entradas.prenomina, xml_nomina: !!entradas.xml_nomina };
-  const modulos = estadoModulos(rr, limitaciones);
+  // XML de nómina (B3): el paquete cruzado contra la prenómina de esta misma ejecución.
+  const cf = await db.prepare("SELECT id, archivo_sha256, corte_actual, reporte_json FROM ingesta_cfdi WHERE encargo_id = ?1 AND tipo = 'xml_nomina' AND estado = 'terminado' AND ejecucion_id = ?2 ORDER BY actualizado_en DESC LIMIT 1")
+    .bind(enc.id, ej.id).first();
+  const fuentes = { prenomina: !!entradas.prenomina, xml_nomina: !!entradas.xml_nomina || !!cf };
+  const extras = [];
+  let cfdi = null, cruces = { total: 0, sin_clasificar: 0, proceso_sin_hallazgo: 0 };
+  if (cf) {
+    const rep = JSON.parse(cf.reporte_json || '{}');
+    const m42 = rep.modulo_4_2 || { estado: 'universo_parcial', motivos: ['Cruce sin reporte'] };
+    extras.push({ modulo: '4.2', estado: m42.estado, esperado: m42.esperado, efectivo: m42.efectivo, motivos: m42.motivos });
+    cfdi = { ingesta_id: cf.id, sha256: cf.archivo_sha256, corte: cf.corte_actual, comprobantes: rep.comprobantes, validos: rep.validos, cancelados: rep.cancelados, sin_estado_sat: rep.sin_estado_sat };
+    const t = await db.prepare("SELECT count(*) AS n, sum(cubeta IS NULL) AS p, sum(cubeta = 'proceso_mal' AND id NOT IN (SELECT cruce_id FROM hallazgo_cruce)) AS sh FROM cruce_cfdi WHERE ingesta_cfdi_id = ?1 AND corte = ?2")
+      .bind(cf.id, cf.corte_actual).first();
+    cruces = { total: t.n || 0, sin_clasificar: t.p || 0, proceso_sin_hallazgo: t.sh || 0 };
+  } else if (!entradas.xml_nomina) extras.push({ modulo: '4.2', estado: 'limitacion_alcance', motivos: ['Sin XML de nómina del periodo (B3)'] });
+  const modulos = estadoModulos(rr, limitaciones, extras);
   const { hallazgos, umbral } = await hallazgosEvaluados(db, enc, ej.id);
   const propuesta = proponerOpinion({ fuentes, modulos, hallazgos });
   const pend = await db.prepare('SELECT count(*) AS n, sum(cubeta IS NULL) AS sin_clasificar, sum(cubeta = \'proceso_mal\' AND id NOT IN (SELECT diferencia_id FROM hallazgo_diferencia)) AS proceso_sin_hallazgo ' +
@@ -57,8 +73,10 @@ async function armarPropuesta(db, enc, ejecucion_id, limitaciones = []) {
   const bloqueos = [];
   if ((pend.sin_clasificar || 0) > 0) bloqueos.push(pend.sin_clasificar + ' diferencias sin clasificar: el criterio de aceptación es cero sin clasificar (T1)');
   if ((pend.proceso_sin_hallazgo || 0) > 0) bloqueos.push(pend.proceso_sin_hallazgo + ' diferencias de «proceso actual mal» sin hallazgo: cada una debe quedar en una cédula');
+  if (cruces.sin_clasificar) bloqueos.push(cruces.sin_clasificar + ' cruces nómina ↔ CFDI sin clasificar');
+  if (cruces.proceso_sin_hallazgo) bloqueos.push(cruces.proceso_sin_hallazgo + ' cruces nómina ↔ CFDI de «proceso actual mal» sin hallazgo');
   if (propuesta.indeterminado) bloqueos.push('Falta la carga patronal del periodo dictaminado: sin ella no se puede decidir si los hallazgos son materiales (T5)');
-  return { ejecucion: ej, fuentes, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
+  return { ejecucion: ej, fuentes, cfdi, cruces, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
     diferencias: { total: pend.n || 0, sin_clasificar: pend.sin_clasificar || 0, proceso_sin_hallazgo: pend.proceso_sin_hallazgo || 0 } };
 }
 
@@ -140,7 +158,10 @@ export async function rutasDictamen(request, env, u, C, J) {
       "sum(abs(v.diferencia_c)) AS suma_abs_c, min(v.diferencia_c) AS min_c, max(v.diferencia_c) AS max_c, r.fundamento FROM v_diferencia v LEFT JOIN regla r ON r.id = v.regla_id " +
       "WHERE v.encargo_id = ?1 AND v.cubeta = 'proceso_mal' AND v.id NOT IN (SELECT diferencia_id FROM hallazgo_diferencia)" + (ej ? ' AND v.ejecucion_id = ?2' : '') +
       ' GROUP BY v.regla_id, v.rubro, v.motivo ORDER BY suma_abs_c DESC').bind(...(ej ? [enc, ej] : [enc])).all();
-    return J({ pendientes: results }, 200, C);
+    const { results: cr } = await db.prepare("SELECT c.ingesta_cfdi_id, c.tipo, c.rubro, c.motivo, count(*) AS n, count(DISTINCT c.colaborador_llave) AS colaboradores, " +
+      "sum(coalesce(c.cfdi_c, 0) - coalesce(c.nomina_c, 0)) AS suma_c, sum(abs(coalesce(c.cfdi_c, 0) - coalesce(c.nomina_c, 0))) AS suma_abs_c FROM cruce_cfdi c JOIN ingesta_cfdi i ON i.id = c.ingesta_cfdi_id " +
+      "WHERE c.encargo_id = ?1 AND c.corte = i.corte_actual AND c.cubeta = 'proceso_mal' AND c.id NOT IN (SELECT cruce_id FROM hallazgo_cruce) GROUP BY 1, 2, 3, 4 ORDER BY suma_abs_c DESC").bind(enc).all();
+    return J({ pendientes: results, cruces: cr }, 200, C);
   }
   if (p === '/api/kernel/hallazgos' && m === 'POST') {
     const d = await cuerpo(request);
@@ -160,7 +181,17 @@ export async function rutasDictamen(request, env, u, C, J) {
     if (f && fa.length === 1) return J({ error: 'Para ligar diferencias pon al menos un filtro (regla, rubro, motivo…)' }, 400, C);
     const ligar = f ? (await db.prepare('SELECT id FROM v_diferencia WHERE ' + filtros.join(' AND ')).bind(...fa).all()).results.map(r => r.id) : [];
     if (f && !ligar.length) return J({ error: 'Ninguna diferencia de «proceso actual mal» sin hallazgo cumple el filtro' }, 400, C);
-    if (d.tipo === 'cuantitativo' && !ligar.length && ef[1] === null) return J({ error: 'Un hallazgo cuantitativo sin diferencias ligadas lleva su efecto máximo valuado' }, 400, C);
+    // Cruces nómina ↔ CFDI (módulo 4.2) del último corte de cada paquete.
+    const fc = d.cruces || null;
+    let ligarCr = [];
+    if (fc) {
+      const cf = ["c.encargo_id = ?1", "c.cubeta = 'proceso_mal'", 'c.corte = i.corte_actual', 'c.id NOT IN (SELECT cruce_id FROM hallazgo_cruce)'], ca = [enc.id];
+      for (const k of ['ingesta_cfdi_id', 'tipo', 'rubro', 'motivo', 'corrida_id']) if (fc[k] !== undefined && fc[k] !== null && fc[k] !== '') { ca.push(fc[k]); cf.push('c.' + k + ' = ?' + ca.length); }
+      if (ca.length === 1) return J({ error: 'Para ligar cruces pon al menos un filtro (tipo, rubro, motivo…)' }, 400, C);
+      ligarCr = (await db.prepare('SELECT c.id FROM cruce_cfdi c JOIN ingesta_cfdi i ON i.id = c.ingesta_cfdi_id WHERE ' + cf.join(' AND ')).bind(...ca).all()).results.map(r => r.id);
+      if (!ligarCr.length) return J({ error: 'Ningún cruce de «proceso actual mal» sin hallazgo cumple el filtro' }, 400, C);
+    }
+    if (d.tipo === 'cuantitativo' && !ligar.length && !ligarCr.length && ef[1] === null) return J({ error: 'Un hallazgo cuantitativo sin diferencias ligadas lleva su efecto máximo valuado' }, 400, C);
     const n = ((await db.prepare('SELECT max(numero) AS n FROM hallazgo WHERE encargo_id = ?1').bind(enc.id).first()).n || 0) + 1;
     const id = enc.id + '-H' + String(n).padStart(2, '0');
     const clave = d.clave_recurrencia || [d.modulo, d.regla_id || '', d.rubro || '', String(d.titulo).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)].join('|');
@@ -171,10 +202,11 @@ export async function rutasDictamen(request, env, u, C, J) {
         d.tipo === 'cualitativo' ? d.motivo_cualitativo : null, d.es_entero ? 1 : 0, d.alcance_neto ? 1 : 0, ef[0], ef[1], d.valuacion_nota || null, d.riesgo,
         d.recomendacion || null, d.responsable || null, d.fecha_compromiso || null, d.supera_a || null, u.id),
       db.prepare('INSERT INTO hallazgo_bitacora (hallazgo_id, campo, despues, motivo, usuario_id, quien) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
-        .bind(id, 'alta', d.titulo, ligar.length ? ligar.length + ' diferencias ligadas' : 'sin diferencias ligadas', u.id, u.nombre || u.email)];
+        .bind(id, 'alta', d.titulo, ligar.length + ligarCr.length ? (ligar.length ? ligar.length + ' diferencias del kernel' : '') + (ligar.length && ligarCr.length ? ' y ' : '') + (ligarCr.length ? ligarCr.length + ' cruces nómina ↔ CFDI' : '') + ' ligados' : 'sin diferencias ligadas', u.id, u.nombre || u.email)];
     await db.batch(st);
-    await lotes(db, ligar.map(x => db.prepare('INSERT INTO hallazgo_diferencia (hallazgo_id, diferencia_id) VALUES (?1, ?2)').bind(id, x)));
-    return J({ ok: true, id, numero: n, diferencias: ligar.length }, 201, C);
+    await lotes(db, [...ligar.map(x => db.prepare('INSERT INTO hallazgo_diferencia (hallazgo_id, diferencia_id) VALUES (?1, ?2)').bind(id, x)),
+      ...ligarCr.map(x => db.prepare('INSERT INTO hallazgo_cruce (hallazgo_id, cruce_id) VALUES (?1, ?2)').bind(id, x))]);
+    return J({ ok: true, id, numero: n, diferencias: ligar.length, cruces: ligarCr.length }, 201, C);
   }
   if (p === '/api/kernel/hallazgo' && m === 'GET') {
     const h = await db.prepare('SELECT * FROM v_hallazgo WHERE id = ?1').bind(url.searchParams.get('id') || '').first();
@@ -182,7 +214,9 @@ export async function rutasDictamen(request, env, u, C, J) {
     const { results: bit } = await db.prepare('SELECT campo, antes, despues, motivo, quien, en FROM hallazgo_bitacora WHERE hallazgo_id = ?1 ORDER BY id').bind(h.id).all();
     const { results: muestra } = await db.prepare('SELECT v.colaborador_id, v.corrida_id, v.rubro, v.kernel_c, v.cliente_c, v.diferencia_c, v.regla_id FROM hallazgo_diferencia x ' +
       'JOIN v_diferencia v ON v.id = x.diferencia_id WHERE x.hallazgo_id = ?1 ORDER BY abs(v.diferencia_c) DESC LIMIT 50').bind(h.id).all();
-    return J({ hallazgo: h, bitacora: bit, muestra }, 200, C);
+    const { results: muestraCruces } = await db.prepare('SELECT c.colaborador_llave, c.corrida_id, c.tipo, c.rubro, c.nomina_c, c.cfdi_c, c.uuids FROM hallazgo_cruce x JOIN cruce_cfdi c ON c.id = x.cruce_id ' +
+      'WHERE x.hallazgo_id = ?1 ORDER BY abs(coalesce(c.nomina_c,0) - coalesce(c.cfdi_c,0)) DESC LIMIT 50').bind(h.id).all();
+    return J({ hallazgo: h, bitacora: bit, muestra, muestra_cruces: muestraCruces }, 200, C);
   }
   if (p === '/api/kernel/hallazgo' && m === 'POST') {
     const d = await cuerpo(request);
@@ -249,7 +283,7 @@ export async function rutasDictamen(request, env, u, C, J) {
       version: ver.version, anterior_id: r.anterior ? r.anterior.id : null, motivo_version: d.motivo_version || null, disparado_por: r.anterior ? d.disparado_por : null,
       tolerancia: { individual_c: enc.tolerancia_individual_c, agregada_min_c: enc.tolerancia_agregada_min_c, por_colaborador_c: enc.tolerancia_individual_c, aplica_a_entero: false },
       materialidad: { ...r.umbral, carga_patronal_c: enc.carga_patronal_c, carga_patronal_fuente: enc.carga_patronal_fuente, recurrencia_periodos: enc.recurrencia_periodos },
-      base_normativa: baseNormativa(r.modulos), transiciones });
+      base_normativa: baseNormativa(r.modulos), transiciones, cfdi: r.cfdi });
     const huella = await huellaContenido(contenido);
     const id = 'dic_' + enc.id + '_v' + ver.version;
     const st = [db.prepare('INSERT INTO dictamen (id, encargo_id, version, dictamen_anterior_id, motivo_version, disparado_por, ejecucion_id, tipo_entregable, opinion_propuesta, opinion, ' +

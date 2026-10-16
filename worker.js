@@ -1,5 +1,7 @@
 import { rutasKernel } from "./api/kernel.js";
 import { rutasDictamen } from "./api/dictamen.js";
+import { rutasCfdi } from "./api/cfdi.js";
+import { avanzarCfdi } from "./ingesta/cfdi.js";
 import { avanzar as avanzarIngestas } from "./ingesta/trabajos.js";
 import { paginaKernel } from "./paginas/kernel.js";
 import { paginaDictamen } from "./paginas/dictamen.js";
@@ -11,7 +13,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 var worker_default = {
   async scheduled(event, env, ctx) {
     // Cola de ingesta del kernel (T8): avanza el trabajo pendiente más antiguo.
-    ctx.waitUntil(avanzarIngestas(env, { presupuesto_ms: 25000 }));
+    // Primero la prenómina (el cruce con los XML la necesita terminada), luego los comprobantes.
+    ctx.waitUntil(avanzarIngestas(env, { presupuesto_ms: 12000 }).then(() => avanzarCfdi(env, { presupuesto_ms: 12000 })));
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -35,6 +38,10 @@ var worker_default = {
         if (p.startsWith("/api/kernel/") || p === "/api/dictamenes" || p === "/api/dictamen") {
           const rd = await rutasDictamen(request, env, u, C, J);
           if (rd) return rd;
+        }
+        if (p.startsWith("/api/kernel/cfdi") || p.startsWith("/api/kernel/cruces")) {
+          const rc = await rutasCfdi(request, env, u, C, J, ctx);
+          if (rc) return rc;
         }
         if (p.startsWith("/api/kernel/")) return await rutasKernel(request, env, u, C, J, ctx);
         if (p === "/api/reset-password" && m === "POST") return await apiResetPassword(request, env, u, C);

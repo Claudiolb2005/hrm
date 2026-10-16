@@ -3,6 +3,23 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.4.0 — 2026-10-15
+
+XML de nómina (B3) y cruce nómina ↔ CFDI (módulo 4.2; D5, D13). No cambia ninguna regla de cálculo.
+
+- `ingesta/cfdi-xml.js`: lector de CFDI 3.3/4.0 con nómina 1.2 sin dependencias; resuelve prefijos por espacio de
+  nombres; importes exactos; reporta los cuadres internos que fallan (Total, SubTotal, Descuento, gravado + exento,
+  ISR retenido). Asignación de corrida por FechaFinalPago y periodicidad (D5); sin coincidencia única no se adivina.
+  Metadata del SAT (descarga masiva) para el estado vigente/cancelado.
+- `ingesta/cfdi.js`: cola en D1 para el ZIP de XML (una lectura por rango de R2 por lote de 250) y para la metadata;
+  huella del paquete en streaming; cruce contra la última prenómina terminada del encargo.
+- `ingesta/cruce.js`: percepciones, ISR retenido y neto por colaborador y corrida, al centavo (criterio C11); pago
+  sin CFDI, CFDI sin nómina. Repetidos y cancelados fuera; lo que no se pudo cruzar deja el módulo en universo parcial.
+- La prenómina guarda percepciones, neto y RFC por renglón para el cruce.
+- `estadoModulos` recibe módulos que salen de un cruce de fuentes (4.2). La propuesta de opinión toma el paquete
+  cruzado como fuente B3; los cruces sin clasificar o de proceso sin cédula bloquean la emisión.
+- Migración 0007.
+
 ## 0.3.0 — 2026-10-15
 
 Del resultado a la opinión: hallazgos, tolerancia, materialidad y dictamen (T4, T5, T6, T7; D2, D7, D13).

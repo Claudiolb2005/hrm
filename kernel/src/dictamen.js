@@ -133,7 +133,7 @@ export function moduloDeRegla(regla_id) {
  * en la versión es fuera_de_alcance (se declara; no es salvedad). Limitaciones declaradas
  * por el revisor se suman (p. ej. finiquitos y PTU sin regla en la v1).
  */
-export function estadoModulos(resultados, limitaciones = []) {
+export function estadoModulos(resultados, limitaciones = [], extras = []) {
   const rango = { completo: 0, universo_parcial: 1, limitacion_alcance: 2 };
   const out = Object.fromEntries(Object.entries(MODULOS_FRENTE1).map(([k, nombre]) => [k, { modulo: k, nombre, estado: 'fuera_de_alcance', reglas: [], esperado: 0, efectivo: 0, motivos: [] }]));
   for (const r of resultados) {
@@ -144,6 +144,12 @@ export function estadoModulos(resultados, limitaciones = []) {
     m.esperado += r.esperado ?? r.universo_esperado ?? 0;
     m.efectivo += r.efectivo ?? r.universo_efectivo ?? 0;
     if (m.estado === 'fuera_de_alcance' || rango[r.estado] > rango[m.estado]) m.estado = r.estado;
+  }
+  // Módulos que no salen de una regla CALC sino de un cruce de fuentes (4.2 nómina ↔ CFDI).
+  for (const x of extras) {
+    const m = out[x.modulo];
+    if (!m) throw new Error('Módulo desconocido: ' + x.modulo);
+    m.estado = x.estado; m.esperado = x.esperado || 0; m.efectivo = x.efectivo || 0; m.motivos.push(...(x.motivos || []));
   }
   for (const l of limitaciones) {
     const m = out[l.modulo];
@@ -304,7 +310,7 @@ export function armarContenido(e) {
     s1_alcance: {
       fuentes: e.fuentes,
       modulos: e.modulos.map(m => ({ modulo: m.modulo, nombre: m.nombre, estado: m.estado, esperado: m.esperado, efectivo: m.efectivo, motivos: m.motivos })),
-      tolerancia: e.tolerancia, materialidad: e.materialidad,
+      tolerancia: e.tolerancia, materialidad: e.materialidad, cfdi: e.cfdi || null,
     },
     s2_base_normativa: e.base_normativa,
     s3_resumen: { semaforo: e.propuesta.semaforo, exposicion_max_c: exposicion, hallazgos: e.hallazgos.length, materiales: e.hallazgos.filter(h => h.material).length },

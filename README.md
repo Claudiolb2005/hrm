@@ -180,3 +180,14 @@ Pestaña **Hallazgos y dictamen** en `/kernel`; el cliente ve sus dictámenes en
 | `POST /api/kernel/encargo/cerrar` | admin | Cierra el encargo (plazo de 60 días para versiones) |
 | `GET/POST /api/kernel/grupos` · `POST /api/kernel/encargos-grupo` · `POST /api/kernel/dictamen/consolidado` | admin | Grupo multi-RFC y su consolidado |
 | `GET /api/dictamenes` · `GET /api/dictamen?id=` | cliente y admin | Dictámenes de la empresa, versiones e integridad |
+
+
+## XML de nómina y cruce con la nómina (módulo 4.2)
+
+En **Archivos**, sube el `.zip` con los XML originales del periodo y, si lo tienes, el `.txt` de metadata de la descarga masiva del SAT (para saber qué CFDI siguen vigentes). Se leen en el servidor (lotes de 250 XML por lectura de R2) y se cruzan con la última prenómina terminada del encargo: percepciones, ISR retenido y neto por colaborador y corrida, al centavo. La corrida de cada comprobante sale de su `FechaFinalPago` contra el calendario (D5). En la pestaña **Nómina ↔ CFDI** se clasifica lo que no coincide: proceso actual mal (va a cédula), explicada o criterio sin resolver. Si llega la metadata o una prenómina nueva, **Volver a cruzar** conserva la clasificación de lo que vuelve a encontrar.
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/kernel/cfdi` (multipart: `file`, `encargo_id`, `tipo`, `llave`) · `GET /api/kernel/cfdi?encargo_id=` | Sube y lista paquetes de XML y metadata |
+| `GET /api/kernel/cfdi/ingesta?id=` · `POST /api/kernel/cfdi/avanzar` · `POST /api/kernel/cfdi/reintentar` (`recruzar`) | Estado, avance, reintento y nuevo cruce |
+| `GET /api/kernel/cruces/grupos` · `GET /api/kernel/cruces` · `POST /api/kernel/cruces/clasificar` | Cruce vigente agrupado, casos y clasificación en bloque |

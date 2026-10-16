@@ -102,7 +102,8 @@ function pintar(r){
     a.modulos.filter(function(m){return m.estado!=='fuera_de_alcance'}).map(function(m){return '<tr><td>'+esc(m.modulo+' · '+m.nombre)+'</td><td>'+esc(ESTM[m.estado]||m.estado)+'</td><td class="num">'+(m.esperado?m.efectivo.toLocaleString('es-MX')+' de '+m.esperado.toLocaleString('es-MX'):'—')+'</td><td>'+esc((m.motivos||[]).join('; '))+'</td></tr>'}).join('')+
     '</tbody></table><div class="sub" style="margin-top:10px">Fuera del alcance de esta versión: '+esc(a.modulos.filter(function(m){return m.estado==='fuera_de_alcance'}).map(function(m){return m.nombre}).join(', ')||'ninguno')+'.</div>'+
     '<div class="sub">Materialidad: '+(mat.umbral_c!=null?pesos(mat.umbral_c)+' ('+(mat.bp/100).toFixed(2)+'% de la carga patronal del periodo, '+pesos(mat.carga_patronal_c)+', con piso de '+pesos(mat.piso_c)+')':'—')+
-    '. Los hallazgos cualitativos y los que se repiten en '+esc(mat.recurrencia_periodos||3)+' o más periodos son materiales siempre. Tolerancia de redondeo: '+pesos((a.tolerancia||{}).individual_c)+' por colaborador; no aplica a importes enterados.</div></section>';
+    '.'+(a.cfdi?' XML de nómina: '+Number(a.cfdi.validos||0).toLocaleString('es-MX')+' comprobantes válidos de '+Number(a.cfdi.comprobantes||0).toLocaleString('es-MX')+' recibidos'+(a.cfdi.cancelados?', '+a.cfdi.cancelados+' cancelados ante el SAT fuera del cruce':'')+(a.cfdi.sin_estado_sat?', '+a.cfdi.sin_estado_sat+' sin estado ante el SAT verificado':'')+'.':'')+
+    ' Los hallazgos cualitativos y los que se repiten en '+esc(mat.recurrencia_periodos||3)+' o más periodos son materiales siempre. Tolerancia de redondeo: '+pesos((a.tolerancia||{}).individual_c)+' por colaborador; no aplica a importes enterados.</div></section>';
 
   // Cédulas
   h+='<section class="d-sec"><h2 id="cedulas">Cédulas de hallazgo</h2>'+(c.s6_cedulas.length?c.s6_cedulas.map(function(x){
@@ -126,6 +127,7 @@ function pintar(r){
     '<tr><td style="width:200px">Integridad del documento</td><td>'+(r.integro?'<span class="integro si">La huella coincide: no cambió desde su emisión</span>':'<span class="integro no">La huella no coincide</span>')+'</td></tr>'+
     '<tr><td>Huella SHA-256</td><td class="mono">'+esc(d.huella_contenido)+'</td></tr>'+
     '<tr><td>Ejecución del kernel</td><td class="mono">'+esc(p.ejecucion_id)+'<br>sello '+esc(p.sello_ejecucion)+'</td></tr>'+
+    (a.cfdi?'<tr><td>Paquete de XML</td><td class="mono">'+esc(a.cfdi.sha256)+'</td></tr>':'')+
     '<tr><td>Versiones</td><td class="mono">kernel '+esc(p.kernel_version)+' · reglas '+esc(p.version_catalogo_reglas)+' · parámetros '+esc(p.version_parametros)+'</td></tr></tbody></table>'+
     '<div class="d-acc"><button class="d-btn" onclick="window.print()">Imprimir o guardar PDF</button></div></section>';
   document.getElementById('raiz').innerHTML=h;

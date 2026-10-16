@@ -159,6 +159,9 @@ export function renglonCanonico(fila, numero, mapa, perfil) {
     if (!idxs.length) continue;
     movimientos[rubro] = idxs.reduce((s, j) => s + cent(fila[j], rubro), 0);
   }
+  // Lados del cruce con el CFDI (módulo 4.2): total de percepciones y neto, tal como vienen.
+  movimientos.percepciones = total;
+  if (mapa.cols.neto !== undefined) movimientos.neto = cent(v('neto'), 'NETO');
   const colaborador_id = String(colab).trim().replace(/\.0+$/, '');
   const domingos = v('domingos');
   return {
