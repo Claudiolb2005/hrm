@@ -6,7 +6,8 @@
 //
 // La propuesta se calcula al vuelo; lo emitido se congela con su huella y no cambia (la base lo impide).
 import { requerimientoDe } from './requerimiento.js';
-import { REGLAS_V1, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
+import { cargarCatalogo } from '../kernel/src/d1.js';
+import { REGLAS_V1, valuarOmision, sumarValuaciones, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
   transicionHallazgos, armarContenido, huellaContenido, verificarDictamen, consolidarOpiniones, MODULOS_FRENTE1, MOTIVOS_CUALITATIVOS, OPINIONES,
   NOTA_ALCANCE } from '../kernel/src/index.js';
 
@@ -23,7 +24,7 @@ const entero = (x) => x === null || x === undefined || x === '' ? null : Number.
 async function lotes(db, st) { for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50)); }
 
 /** Hallazgos del encargo con su efecto y materialidad evaluada. Si se pasa ejecución, sólo los que aplican a ella. */
-async function hallazgosEvaluados(db, enc, ejecucion_id) {
+async function hallazgosEvaluados(db, enc, ejecucion_id, fecha_calculo) {
   const { results } = await db.prepare('SELECT * FROM v_hallazgo WHERE encargo_id = ?1 ORDER BY numero').bind(enc.id).all();
   let aplican = results;
   if (ejecucion_id) {
@@ -37,7 +38,20 @@ async function hallazgosEvaluados(db, enc, ejecucion_id) {
     aplican = results.filter(h => !['resuelto_por_reproceso', 'superado'].includes(h.estatus) && (h.diferencias === 0 || s.has(h.id)));
   }
   const umbral = umbralMaterialidad({ carga_patronal_c: enc.carga_patronal_c, bp: enc.materialidad_bp, piso_c: enc.materialidad_piso_c });
+  // Módulo 18: contribución omitida (lo que el kernel calcula de más sobre lo que retuvo o pagó el cliente),
+  // por rubro y mes de pago, valuada a la fecha de hoy.
+  const { results: om } = await db.prepare("SELECT x.hallazgo_id, v.rubro, coalesce(substr(cal.fecha_pago, 1, 7), ?2) AS periodo, " +
+    "sum(CASE WHEN v.kernel_c > v.cliente_c THEN v.kernel_c - v.cliente_c ELSE 0 END) AS omision_c FROM hallazgo_diferencia x JOIN v_diferencia v ON v.id = x.diferencia_id " +
+    "LEFT JOIN calendario_nomina cal ON cal.encargo_id = v.encargo_id AND cal.corrida_id = v.corrida_id WHERE v.encargo_id = ?1 GROUP BY 1, 2, 3").bind(enc.id, String(enc.periodo_hasta).slice(0, 7)).all();
+  const catalogo = om.length ? await cargarCatalogo(db) : null;
+  const hoy = (fecha_calculo || new Date().toISOString()).slice(0, 10);
+  const val = new Map();
+  for (const o of om) {
+    if (!val.has(o.hallazgo_id)) val.set(o.hallazgo_id, []);
+    val.get(o.hallazgo_id).push(valuarOmision({ catalogo, omision_c: o.omision_c, rubro: o.rubro, periodo: o.periodo, fecha_calculo: hoy }));
+  }
   const hallazgos = aplican.map(h => {
+    if (val.has(h.id)) h = { ...h, valuacion: sumarValuaciones(val.get(h.id)) };
     const ef = efectoHallazgo(h);
     const m = evaluarMaterialidad({ ...h, ...ef }, { umbral_c: umbral.umbral_c, periodos: h.periodos || 1, recurrencia_periodos: enc.recurrencia_periodos });
     return { ...h, alcance_neto: h.alcance_neto === 1, es_entero: h.es_entero === 1, ...ef, material: m.material, motivos_material: m.motivos, indeterminado: m.indeterminado };
@@ -46,7 +60,8 @@ async function hallazgosEvaluados(db, enc, ejecucion_id) {
 }
 
 /** Todo lo que necesita la opinión, sin escribir nada. */
-async function armarPropuesta(db, enc, ejecucion_id, limitaciones = []) {
+async function armarPropuesta(db, enc, ejecucion_id, limitaciones = [], fecha_calculo = null) {
+  if (fecha_calculo && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_calculo)) return { error: 'fecha_calculo: AAAA-MM-DD', status: 400 };
   const ej = await db.prepare('SELECT * FROM ejecucion WHERE id = ?1').bind(ejecucion_id).first();
   if (!ej || ej.encargo_id !== enc.id) return { error: 'La ejecución no existe o es de otro encargo', status: 404 };
   if (ej.estado !== 'sellada') return { error: 'La ejecución sigue abierta: sólo se dictamina sobre una ejecución sellada', status: 409 };
@@ -79,7 +94,7 @@ async function armarPropuesta(db, enc, ejecucion_id, limitaciones = []) {
     afiliacion = { total: t.n || 0, sin_clasificar: t.p || 0, proceso_sin_hallazgo: t.sh || 0 };
   }
   const modulos = estadoModulos(rr, limitaciones, extras);
-  const { hallazgos, umbral } = await hallazgosEvaluados(db, enc, ej.id);
+  const { hallazgos, umbral } = await hallazgosEvaluados(db, enc, ej.id, fecha_calculo);
   const propuesta = proponerOpinion({ fuentes, modulos, hallazgos });
   const pend = await db.prepare('SELECT count(*) AS n, sum(cubeta IS NULL) AS sin_clasificar, sum(cubeta = \'proceso_mal\' AND id NOT IN (SELECT diferencia_id FROM hallazgo_diferencia)) AS proceso_sin_hallazgo ' +
     'FROM v_diferencia WHERE ejecucion_id = ?1').bind(ej.id).first();
@@ -165,7 +180,7 @@ export async function rutasDictamen(request, env, u, C, J) {
   if (p === '/api/kernel/hallazgos' && m === 'GET') {
     const enc = await leerEncargo(url.searchParams.get('encargo_id'));
     if (!enc) return J({ error: 'Encargo no existe' }, 404, C);
-    const r = await hallazgosEvaluados(db, enc, null);
+    const r = await hallazgosEvaluados(db, enc, null, url.searchParams.get('fecha_calculo'));
     return J({ ...r, modulos: MODULOS_FRENTE1, motivos_cualitativos: MOTIVOS_CUALITATIVOS }, 200, C);
   }
   // Diferencias de «proceso actual mal» que todavía no están en una cédula, agrupadas por regla, rubro y motivo.
@@ -280,11 +295,11 @@ export async function rutasDictamen(request, env, u, C, J) {
 
   // ── Dictamen ──
   if (p === '/api/kernel/dictamen/propuesta' && (m === 'GET' || m === 'POST')) {
-    const d = m === 'POST' ? (await cuerpo(request)) || {} : { encargo_id: url.searchParams.get('encargo_id'), ejecucion_id: url.searchParams.get('ejecucion_id') };
+    const d = m === 'POST' ? (await cuerpo(request)) || {} : { encargo_id: url.searchParams.get('encargo_id'), ejecucion_id: url.searchParams.get('ejecucion_id'), fecha_calculo: url.searchParams.get('fecha_calculo') };
     const enc = await leerEncargo(d.encargo_id);
     if (!enc) return J({ error: 'Encargo no existe' }, 404, C);
     let r;
-    try { r = await armarPropuesta(db, enc, d.ejecucion_id, d.limitaciones || []); } catch (e) { return J({ error: e.message }, 400, C); }
+    try { r = await armarPropuesta(db, enc, d.ejecucion_id, d.limitaciones || [], d.fecha_calculo || null); } catch (e) { return J({ error: e.message }, 400, C); }
     if (r.error) return J({ error: r.error }, r.status, C);
     const { ejecucion, ...resto } = r;
     return J({ ...resto, ejecucion: { id: ejecucion.id, sello: ejecucion.sello, calculado_en: ejecucion.calculado_en }, encargo: enc, opiniones: OPINIONES, nota_alcance: NOTA_ALCANCE }, 200, C);
@@ -294,7 +309,7 @@ export async function rutasDictamen(request, env, u, C, J) {
     const enc = await leerEncargo(d && d.encargo_id);
     if (!enc) return J({ error: 'Encargo no existe' }, 404, C);
     let r;
-    try { r = await armarPropuesta(db, enc, d.ejecucion_id, d.limitaciones || []); } catch (e) { return J({ error: e.message }, 400, C); }
+    try { r = await armarPropuesta(db, enc, d.ejecucion_id, d.limitaciones || [], d.fecha_calculo || null); } catch (e) { return J({ error: e.message }, 400, C); }
     if (r.error) return J({ error: r.error }, r.status, C);
     if (r.bloqueos.length) return J({ error: 'No se puede emitir todavía', bloqueos: r.bloqueos }, 409, C);
     const ahora = new Date().toISOString();

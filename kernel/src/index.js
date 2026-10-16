@@ -15,3 +15,4 @@ export { TOLERANCIA_DEF, toleranciaAgregada, aplicarTolerancia, toleranciaPorGru
   efectoHallazgo, evaluarMaterialidad, MODULOS_FRENTE1, moduloDeRegla, estadoModulos, OPINIONES, ORDEN_OPINION, proponerOpinion, opinionFinal,
   consolidarOpiniones, LIMITE_REPROCESO_DIAS, validarReproceso, transicionHallazgos, NOTA_ALCANCE, fraseOpinion, armarContenido, huellaContenido,
   verificarDictamen } from './dictamen.js';
+export { CONTRIBUCION_DE_RUBRO, fechaLimite, mesesDeMora, valuarOmision, sumarValuaciones } from './valuacion.js';

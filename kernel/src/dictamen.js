@@ -90,6 +90,11 @@ export function umbralMaterialidad({ carga_patronal_c, bp = MATERIALIDAD_DEF.bp,
 
 /** Efecto de un hallazgo: el derivado de sus diferencias (Σ|d|) o la valuación capturada, el mayor. */
 export function efectoHallazgo(h) {
+  // Valuado (módulo 18): la contingencia es contribución + actualización + recargos (mínimo) y más la multa máxima (máximo).
+  if (h.valuacion && h.valuacion.valuable) {
+    const manual = Number.isInteger(h.efecto_max_c) ? h.efecto_max_c : 0;
+    return { efecto_min_c: h.valuacion.contingencia_min_c, efecto_max_c: Math.max(h.valuacion.contingencia_max_c, manual) };
+  }
   const der = h.efecto_derivado_c ?? null;
   const max = [h.efecto_max_c, der].filter(x => Number.isInteger(x));
   const min = [h.efecto_min_c ?? der].filter(x => Number.isInteger(x));
@@ -321,7 +326,14 @@ export function armarContenido(e) {
     s5_frente2: { estado: 'fuera_de_alcance', nota: 'Proceso y sistema del cliente: fuera del alcance de esta versión.' },
     s6_cedulas: e.hallazgos.map(h => ({ id: h.id, numero: h.numero, titulo: h.titulo, modulo: h.modulo, regla_id: h.regla_id || null,
       criterio: h.criterio, condicion: h.condicion, causa: h.causa || null, efecto_min_c: h.efecto_min_c ?? null, efecto_max_c: h.efecto_max_c ?? null,
-      valuacion: 'Cuota u omisión sin accesorios; actualización, recargos y multas entran en la versión 2.', riesgo: h.riesgo,
+      valuacion: h.valuacion && h.valuacion.valuable ? {
+        omision_c: h.valuacion.omision_c, actualizacion_c: h.valuacion.actualizacion_c, recargos_c: h.valuacion.recargos_c,
+        multa_min_c: h.valuacion.multa_min_c, multa_max_c: h.valuacion.multa_max_c, contingencia_min_c: h.valuacion.contingencia_min_c, contingencia_max_c: h.valuacion.contingencia_max_c,
+        fecha_calculo: (h.valuacion.periodos.find(p => p.valuable) || {}).fecha_calculo || null, no_valuados: h.valuacion.no_valuados,
+        periodos: h.valuacion.periodos.filter(p => p.valuable).map(p => ({ periodo: p.periodo, fecha_limite: p.fecha_limite, factor: p.factor || null, meses_recargos: p.meses_recargos || 0,
+          tasa_acumulada_pct: p.tasa_acumulada_pct || null, multa: p.multa || null, omision_c: p.omision_c })),
+      } : 'Sin valuación de accesorios' + (h.valuacion && h.valuacion.no_valuados && h.valuacion.no_valuados.length ? ': ' + h.valuacion.no_valuados.join('; ') : ' (no es una contribución omitida o no tiene diferencias que valuar)') + '.',
+      riesgo: h.riesgo,
       recomendacion: h.recomendacion || null, responsable: h.responsable || null, fecha_compromiso: h.fecha_compromiso || null, estatus: h.estatus,
       material: h.material, motivos_material: h.motivos_material, diferencias: h.diferencias || 0, supera_a: h.supera_a || null })),
     s7_saldos_a_favor: { estado: 'fuera_de_alcance', nota: 'Saldos a favor y oportunidades de ahorro: versión 2.' },

@@ -91,7 +91,7 @@ function pintar(){
   h+=hs.length?hs.map(function(x){
     var cerrado=['corregido','resuelto_por_reproceso','superado'].indexOf(x.estatus)>=0;
     return '<article class="hz"><div class="t"><b>'+x.numero+'. '+esc(x.titulo)+'</b><span>'+(x.material?'<span class="tag mat">Material</span>':'')+'<span class="tag '+esc(x.riesgo)+'">Riesgo '+esc(x.riesgo)+'</span><span class="tag">'+esc(ESTH[x.estatus])+'</span></span></div>'+
-      '<p><b>Qué encontramos:</b> '+esc(x.condicion)+'</p><p><b>Fundamento:</b> '+esc(x.criterio)+'</p>'+(x.efecto_max_c!=null?'<p><b>Efecto estimado:</b> '+pesos(x.efecto_max_c)+' (sin recargos ni multas)</p>':'')+
+      '<p><b>Qué encontramos:</b> '+esc(x.condicion)+'</p><p><b>Fundamento:</b> '+esc(x.criterio)+'</p>'+(x.efecto_max_c!=null?'<p><b>Contingencia máxima estimada:</b> '+pesos(x.efecto_max_c)+' (con actualización, recargos y multa cuando aplican; el detalle está en el dictamen)</p>':'')+
       (x.recomendacion?'<p><b>Qué recomendamos:</b> '+esc(x.recomendacion)+'</p>':'')+
       (cerrado?'':'<div class="f"><input placeholder="Responsable de la corrección" id="r_'+esc(x.id)+'" value="'+esc(x.responsable||'')+'"><input type="date" id="f_'+esc(x.id)+'" value="'+esc(x.fecha_compromiso||'')+'">'+
         '<textarea placeholder="Comentario para HRM (avance, evidencia que enviarás, dudas)" id="c_'+esc(x.id)+'"></textarea></div>'+

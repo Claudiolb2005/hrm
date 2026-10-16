@@ -78,6 +78,14 @@ else fetch('/api/dictamen?id='+encodeURIComponent(id),{headers:{'Authorization':
   return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'No disponible');return j});
 }).then(function(r){if(r)pintar(r)}).catch(function(e){document.getElementById('raiz').innerHTML='<div class="vacio">'+esc(e.message)+'</div>'});
 
+function valTxt(v){
+  var p=v.periodos||[],m=(p[0]||{}).multa||{};
+  return 'Contribución omitida '+pesos(v.omision_c)+' · actualización '+pesos(v.actualizacion_c)+(p.length===1&&p[0].factor?' (factor '+esc(p[0].factor)+')':'')+
+    ' · recargos '+pesos(v.recargos_c)+(p.length===1&&p[0].meses_recargos?' ('+p[0].meses_recargos+' '+(p[0].meses_recargos===1?'mes':'meses')+', '+esc(p[0].tasa_acumulada_pct)+' %)':'')+
+    ' · multa de '+pesos(v.multa_min_c)+' a '+pesos(v.multa_max_c)+(m.min_pct?' ('+esc(m.min_pct)+'–'+esc(m.max_pct)+' %, '+esc((m.fundamento||'').split(',')[0].split(' (')[0])+')':'')+
+    '. Contingencia: '+pesos(v.contingencia_min_c)+' si se corrige espontáneamente; '+pesos(v.contingencia_max_c)+' si la descubre la autoridad. Valuada al '+esc(v.fecha_calculo||'—')+'.'+
+    (v.no_valuados&&v.no_valuados.length?' Sin valuar: '+esc(v.no_valuados.join('; '))+'.':'');
+}
 function pintar(r){
   var d=r.dictamen,c=d.contenido,p=c.portada,o=c.s9_opinion,ops=r.opiniones,h='';
   document.title=p.titulo+' v'+d.version+' — HRM';
@@ -112,7 +120,7 @@ function pintar(r){
     return '<article class="ced"><div class="h"><b>'+x.numero+'. '+esc(x.titulo)+'</b><span>'+(x.material?'<span class="tag mat">Material</span>':'<span class="tag">No material</span>')+'<span class="tag '+esc(x.riesgo)+'">Riesgo '+esc(x.riesgo)+'</span><span class="tag">'+esc(ESTH[x.estatus]||x.estatus)+'</span></span></div>'+
       '<dl><dt>Módulo</dt><dd>'+esc(x.modulo+' · '+(r.modulos[x.modulo]||''))+'</dd><dt>Criterio</dt><dd>'+esc(x.criterio)+'</dd><dt>Condición</dt><dd>'+esc(x.condicion)+'</dd>'+
       (x.causa?'<dt>Causa</dt><dd>'+esc(x.causa)+'</dd>':'')+
-      '<dt>Efecto</dt><dd>'+(x.efecto_min_c!=null&&x.efecto_min_c!==x.efecto_max_c?pesos(x.efecto_min_c)+' a ':'')+pesos(x.efecto_max_c)+(x.diferencias?' · '+x.diferencias.toLocaleString('es-MX')+' casos':'')+'<div style="font-size:11.5px;color:#5E7479">'+esc(x.valuacion)+'</div></dd>'+
+      '<dt>Efecto</dt><dd>'+(x.efecto_min_c!=null&&x.efecto_min_c!==x.efecto_max_c?pesos(x.efecto_min_c)+' a ':'')+pesos(x.efecto_max_c)+(x.diferencias?' · '+x.diferencias.toLocaleString('es-MX')+' casos':'')+'<div style="font-size:11.5px;color:#5E7479">'+(typeof x.valuacion==='string'?esc(x.valuacion):valTxt(x.valuacion))+'</div></dd>'+
       (x.material?'<dt>Por qué es material</dt><dd>'+esc((x.motivos_material||[]).join('; '))+'</dd>':'')+
       '<dt>Recomendación</dt><dd>'+esc(x.recomendacion||'Por definir con el cliente')+'</dd><dt>Responsable · fecha</dt><dd>'+esc(x.responsable||'Por asignar')+' · '+esc(x.fecha_compromiso||'sin fecha')+'</dd></dl></article>'}).join(''):'<div class="sub">Sin hallazgos sobre tolerancia.</div>')+'</section>';
 

@@ -3,6 +3,19 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.6.0 — 2026-10-15
+
+Valuación de hallazgos (módulo 18; adelanta V3 de la versión 2). No cambia ninguna regla de cálculo.
+
+- `valuacion.js`: contribución omitida por rubro y mes de pago → actualización (CFF 17-A: factor al diezmilésimo,
+  truncado, mínimo 1; último INPC publicado si falta el del mes), recargos (CFF 21: por mes o fracción con la tasa
+  de cada mes, tope 60) y multa (CFF 76 para ISR; LSS 304 para cuotas) sobre la contribución actualizada.
+  Contingencia mínima = corrección espontánea (CFF 73); máxima = con la multa máxima. ISN no se valúa (ley estatal).
+- Parámetros nuevos: INPC dic-2025 a sep-2026 (boletines INEGI, nivel B), recargos 2026 (LIF art. 11 fr. I: 1.38%
+  de prórroga, nivel A → 2.07% de mora, nivel D), recargos 2025 (1.47%, nivel B), multas CFF 76 (55–75%) y LSS 304
+  (40–100%), nivel B. Migración 0010.
+- La materialidad usa la contingencia máxima valuada (D7); la cédula del dictamen trae el desglose.
+
 ## 0.5.0 — 2026-10-15
 
 Requerimiento de información y cruce de afiliación. No cambia ninguna regla de cálculo.

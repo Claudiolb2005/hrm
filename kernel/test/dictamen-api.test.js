@@ -73,10 +73,14 @@ test('del hallazgo al dictamen: bloqueos, cédula, materialidad, opinión, huell
   pr = await llamar('GET', '/api/kernel/dictamen/propuesta?encargo_id=enc1&ejecucion_id=' + ejecucion_id);
   assert.match(pr.json.bloqueos.join(' '), /carga patronal/);
   await llamar('POST', '/api/kernel/encargo/config', { encargo_id: 'enc1', carga_patronal_c: 2775600000, carga_patronal_fuente: 'SUA agosto 2026' });
-  pr = await llamar('GET', '/api/kernel/dictamen/propuesta?encargo_id=enc1&ejecucion_id=' + ejecucion_id);
+  pr = await llamar('GET', '/api/kernel/dictamen/propuesta?encargo_id=enc1&ejecucion_id=' + ejecucion_id + '&fecha_calculo=2026-10-16');
   assert.deepEqual(pr.json.bloqueos, []);
   assert.equal(pr.json.umbral.umbral_c, 13878000);
-  assert.equal(pr.json.hallazgos[0].efecto_max_c, 468);
+  // Módulo 18: 4.68 omitidos de agosto, valuados al 16-oct: actualización 0.02, recargos 0.10, multa máxima 3.52.
+  const v = pr.json.hallazgos[0].valuacion;
+  assert.deepEqual([v.omision_c, v.actualizacion_c, v.recargos_c, v.multa_max_c], [468, 2, 10, 352]);
+  assert.equal(pr.json.hallazgos[0].efecto_min_c, 480);
+  assert.equal(pr.json.hallazgos[0].efecto_max_c, 832);
   assert.equal(pr.json.hallazgos[0].material, false);
   assert.equal(pr.json.propuesta.opinion, 'conforme_con_observaciones');
 

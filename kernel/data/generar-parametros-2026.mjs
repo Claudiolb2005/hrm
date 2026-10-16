@@ -135,6 +135,28 @@ const ISNC = (ent, concepto, trato) => add({ id: 'ISN_CONCEPTO:' + concepto + ':
   fundamento: 'Pendiente por celda (V8)', fuente: 'Cuadro de conceptos de ISN por estado (R. González)', nivel: 'C' });
 for (const c of ['liquidacion', 'indemnizacion', 'prima_antiguedad', 'fondo_ahorro_empresa']) ISNC('CDMX', c, 'exento');
 
+// ── Valuación de hallazgos (módulo 18): actualización, recargos y multas.
+// INPC mensual, base 2a quincena de julio 2018 = 100. Fuente: boletines del INEGI (la publicación en el DOF,
+// que es la que cita el CFF art. 20, está por cotejar) → nivel B.
+const INPC = [['2025-12', '143.042', '8-ene-2026'], ['2026-01', '143.588', '9-feb-2026'], ['2026-02', '144.307', '9-mar-2026'], ['2026-03', '145.544', '9-abr-2026'],
+  ['2026-04', '145.831', '7-may-2026'], ['2026-05', '145.527', '9-jun-2026'], ['2026-06', '145.131', '9-jul-2026'], ['2026-07', '145.169', '7-ago-2026'],
+  ['2026-08', '145.462', '9-sep-2026'], ['2026-09', '146.075', '8-oct-2026']];
+const finMes = (ym) => { const [y, m] = ym.split('-').map(Number); return ym + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0'); };
+for (const [ym, v, pub] of INPC) add({ id: 'INPC@' + ym, clave: 'INPC', tipo: 'escalar', valor: v, vigencia_desde: ym + '-01', vigencia_hasta: finMes(ym),
+  base_temporal: 'mes_causacion', fundamento: 'CFF arts. 17-A y 20', fuente: 'INEGI, boletín del INPC publicado el ' + pub + ' (base 2a qna. jul-2018 = 100)', nivel: 'B',
+  notas: 'Cotejar contra la publicación en el DOF.' });
+add({ id: 'RECARGOS_PRORROGA@2026', clave: 'RECARGOS_PRORROGA_MENSUAL', tipo: 'escalar', valor: '1.38', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
+  base_temporal: 'mes_causacion', fundamento: 'LIF 2026 art. 11 fr. I', fuente: 'Ley de Ingresos de la Federación 2026, DOF 7-nov-2025 (diputados.gob.mx/LeyesBiblio/pdf_mov/Ley_de_Ingresos_2026.pdf)', nivel: 'A' });
+add({ id: 'RECARGOS_MORA@2026', clave: 'RECARGOS_MORA_MENSUAL', tipo: 'escalar', valor: '2.07', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
+  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21: tasa de prórroga de la LIF incrementada en 50%', fuente: REGLAS, nivel: 'D', deriva_de: ['RECARGOS_PRORROGA@2026'] });
+add({ id: 'RECARGOS_MORA@2025', clave: 'RECARGOS_MORA_MENSUAL', tipo: 'escalar', valor: '1.47', vigencia_desde: '2025-01-01', vigencia_hasta: '2025-12-31',
+  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21; LIF 2025 (prórroga 0.98% + 50%)', fuente: REGLAS, nivel: 'B', notas: 'Cotejar la tasa de prórroga contra la LIF 2025.' });
+add({ id: 'MULTA_CFF76@2026', clave: 'MULTA_OMISION_CFF', tipo: 'objeto', valor: { min_pct: '55', max_pct: '75' }, vigencia_desde: '2020-01-01', vigencia_hasta: null,
+  base_temporal: 'fecha_pago', fundamento: 'CFF art. 76, primer párrafo (omisión descubierta por la autoridad); art. 73 (sin multa si se corrige espontáneamente)', fuente: REGLAS, nivel: 'B',
+  notas: 'Sobre la contribución omitida actualizada (CFF art. 70). Reducciones del art. 76 no aplicadas.' });
+add({ id: 'MULTA_LSS304@2026', clave: 'MULTA_OMISION_LSS', tipo: 'objeto', valor: { min_pct: '40', max_pct: '100' }, vigencia_desde: '2020-01-01', vigencia_hasta: null,
+  base_temporal: 'fecha_pago', fundamento: 'LSS art. 304 (omisión total o parcial de cuotas)', fuente: REGLAS, nivel: 'B' });
+
 filas.sort((a, b) => a.id.localeCompare(b.id));
 const out = new URL('./parametros-2026.json', import.meta.url);
 writeFileSync(out, JSON.stringify({ descripcion: 'Semilla del catálogo de parámetros 2026 — ver generar-parametros-2026.mjs', generado: '2026-10-15', filas }, null, 1) + '\n');

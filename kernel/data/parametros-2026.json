@@ -302,6 +302,136 @@
    "nivel": "B"
   },
   {
+   "id": "INPC@2025-12",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "143.042",
+   "vigencia_desde": "2025-12-01",
+   "vigencia_hasta": "2025-12-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 8-ene-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-01",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "143.588",
+   "vigencia_desde": "2026-01-01",
+   "vigencia_hasta": "2026-01-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-feb-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-02",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "144.307",
+   "vigencia_desde": "2026-02-01",
+   "vigencia_hasta": "2026-02-28",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-mar-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-03",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.544",
+   "vigencia_desde": "2026-03-01",
+   "vigencia_hasta": "2026-03-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-abr-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-04",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.831",
+   "vigencia_desde": "2026-04-01",
+   "vigencia_hasta": "2026-04-30",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 7-may-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-05",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.527",
+   "vigencia_desde": "2026-05-01",
+   "vigencia_hasta": "2026-05-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-jun-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-06",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.131",
+   "vigencia_desde": "2026-06-01",
+   "vigencia_hasta": "2026-06-30",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-jul-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-07",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.169",
+   "vigencia_desde": "2026-07-01",
+   "vigencia_hasta": "2026-07-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 7-ago-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-08",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "145.462",
+   "vigencia_desde": "2026-08-01",
+   "vigencia_hasta": "2026-08-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 9-sep-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
+   "id": "INPC@2026-09",
+   "clave": "INPC",
+   "tipo": "escalar",
+   "valor": "146.075",
+   "vigencia_desde": "2026-09-01",
+   "vigencia_hasta": "2026-09-30",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF arts. 17-A y 20",
+   "fuente": "INEGI, boletín del INPC publicado el 8-oct-2026 (base 2a qna. jul-2018 = 100)",
+   "nivel": "B",
+   "notas": "Cotejar contra la publicación en el DOF."
+  },
+  {
    "id": "ISN_ADICIONAL:CHIH@2026",
    "clave": "ISN_ADICIONAL",
    "entidad": "CHIH",
@@ -1172,6 +1302,37 @@
    "notas": "Transcrita del Anexo 8 publicado. Cotejar contra el renglón del catálogo de R. González."
   },
   {
+   "id": "MULTA_CFF76@2026",
+   "clave": "MULTA_OMISION_CFF",
+   "tipo": "objeto",
+   "valor": {
+    "min_pct": "55",
+    "max_pct": "75"
+   },
+   "vigencia_desde": "2020-01-01",
+   "vigencia_hasta": null,
+   "base_temporal": "fecha_pago",
+   "fundamento": "CFF art. 76, primer párrafo (omisión descubierta por la autoridad); art. 73 (sin multa si se corrige espontáneamente)",
+   "fuente": "Reglas v1 · Revisión del maestro v0.3 (14-oct-2026)",
+   "nivel": "B",
+   "notas": "Sobre la contribución omitida actualizada (CFF art. 70). Reducciones del art. 76 no aplicadas."
+  },
+  {
+   "id": "MULTA_LSS304@2026",
+   "clave": "MULTA_OMISION_LSS",
+   "tipo": "objeto",
+   "valor": {
+    "min_pct": "40",
+    "max_pct": "100"
+   },
+   "vigencia_desde": "2020-01-01",
+   "vigencia_hasta": null,
+   "base_temporal": "fecha_pago",
+   "fundamento": "LSS art. 304 (omisión total o parcial de cuotas)",
+   "fuente": "Reglas v1 · Revisión del maestro v0.3 (14-oct-2026)",
+   "nivel": "B"
+  },
+  {
    "id": "PRIMA_RT_RANGO@2026",
    "clave": "PRIMA_RT_RANGO",
    "tipo": "objeto",
@@ -1202,6 +1363,46 @@
    "fundamento": "LSS art. 168",
    "fuente": "Catálogo de parámetros de nómina 2026 (corte 12-oct-2026, rev. R. González 13-oct) citado en Revisión del maestro v0.3",
    "nivel": "B"
+  },
+  {
+   "id": "RECARGOS_MORA@2025",
+   "clave": "RECARGOS_MORA_MENSUAL",
+   "tipo": "escalar",
+   "valor": "1.47",
+   "vigencia_desde": "2025-01-01",
+   "vigencia_hasta": "2025-12-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF art. 21; LIF 2025 (prórroga 0.98% + 50%)",
+   "fuente": "Reglas v1 · Revisión del maestro v0.3 (14-oct-2026)",
+   "nivel": "B",
+   "notas": "Cotejar la tasa de prórroga contra la LIF 2025."
+  },
+  {
+   "id": "RECARGOS_MORA@2026",
+   "clave": "RECARGOS_MORA_MENSUAL",
+   "tipo": "escalar",
+   "valor": "2.07",
+   "vigencia_desde": "2026-01-01",
+   "vigencia_hasta": "2026-12-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "CFF art. 21: tasa de prórroga de la LIF incrementada en 50%",
+   "fuente": "Reglas v1 · Revisión del maestro v0.3 (14-oct-2026)",
+   "nivel": "D",
+   "deriva_de": [
+    "RECARGOS_PRORROGA@2026"
+   ]
+  },
+  {
+   "id": "RECARGOS_PRORROGA@2026",
+   "clave": "RECARGOS_PRORROGA_MENSUAL",
+   "tipo": "escalar",
+   "valor": "1.38",
+   "vigencia_desde": "2026-01-01",
+   "vigencia_hasta": "2026-12-31",
+   "base_temporal": "mes_causacion",
+   "fundamento": "LIF 2026 art. 11 fr. I",
+   "fuente": "Ley de Ingresos de la Federación 2026, DOF 7-nov-2025 (diputados.gob.mx/LeyesBiblio/pdf_mov/Ley_de_Ingresos_2026.pdf)",
+   "nivel": "A"
   },
   {
    "id": "SM_FRONTERA@2026",
