@@ -47,7 +47,7 @@ Worker y en Node. Reemplaza al motor embebido con `String.raw` como fuente de c�
   `bitacora_criterio`, `dictamen` inmutable.
 
 ```bash
-cd kernel && npm test                                                        # 54 pruebas
+cd kernel && npm test                                                        # 55 pruebas
 wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0001_kernel_v1.sql   # aplicar tablas
 ```
 
@@ -61,6 +61,14 @@ El archivo del cliente va a R2, una cola en D1 lo procesa por lotes (cron cada m
 terminar la ejecución queda sellada y reconciliada contra lo que calculó la nómina. Ver
 `ingesta/README.md` (incluye los pasos para correr agosto 2026). Migraciones 0003 y 0004
 aplicadas en producción el 15-oct-2026.
+
+### Panel de auditoría (`/kernel`, sólo admin)
+
+Botón **Auditoría** en el Administrador. Encargos, subida del Excel con avance en vivo,
+reporte de la ingesta (fuentes, corridas sin calendario, conceptos no catalogados, resultado
+por regla, reconciliación), diferencias agrupadas por importe con clasificación en bloque y
+criterio de aceptación, calendario de nómina, registros patronales y bitácora de criterios.
+Página en `paginas/kernel.js`; todo lo que viene de archivos del cliente se escapa.
 
 ### API del kernel en el Worker (`api/kernel.js`, sólo admin)
 
@@ -79,6 +87,7 @@ aplicadas en producción el 15-oct-2026.
 | `GET /api/kernel/ingesta?id=` · `POST /api/kernel/ingesta/avanzar` · `/reintentar` | Avance, reporte y reproceso |
 | `GET/POST /api/kernel/calendario` | Calendario de nómina del encargo (fecha de pago y periodicidad por corrida) |
 | `GET/POST /api/kernel/registros` | Entidad y prima de riesgo por registro patronal |
+| `GET /api/kernel/diferencias/grupos?encargo_id=&ejecucion_id=` | Diferencias agrupadas por regla, rubro e importe |
 | `POST /api/kernel/clasificar-grupo` | Clasifica en bloque las diferencias sin clasificar de un filtro |
 
 Ver `kernel/README.md`.

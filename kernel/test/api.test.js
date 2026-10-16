@@ -131,3 +131,12 @@ test('ingesta por API: crea, arranca sola, avanza, reporta y clasifica en bloque
   assert.equal(dif.json.aceptacion.sin_clasificar, 0);
   assert.equal((await llamar('POST', '/api/kernel/clasificar-grupo', { encargo_id: 'enc1', cubeta: 'proceso_mal', motivo: 'x' })).status, 400, 'sin filtro no se clasifica todo');
 });
+
+test('página /kernel: un solo <script>, JS del navegador sin errores de sintaxis, todo lo dinámico pasa por esc()', async () => {
+  const { paginaKernel } = await import('../../paginas/kernel.js');
+  const html = paginaKernel({ CSS: '', LOGO: 'x', AUTH_ADMIN: 'var tk=1,U={};', LOGOUT_FN: 'function logout(){}' });
+  assert.equal((html.match(/<\/script>/g) || []).length, 1);
+  const js = html.split('<script>')[1].split('</script>')[0];
+  assert.doesNotThrow(() => new Function(js));
+  assert.ok(!/innerHTML\s*=\s*[^;]*\+\s*(i|x|c|g|r)\.(archivo_nombre|colaborador_id|motivo|fuente|tema)\s*\+/.test(js), 'campos del cliente sin esc()');
+});

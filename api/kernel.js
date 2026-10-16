@@ -130,10 +130,29 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   }
 
   if (p === '/api/kernel/diferencias' && m === 'GET') {
+    const q = url.searchParams;
+    const enc = q.get('encargo_id');
+    if (!enc) return J({ error: 'encargo_id requerido' }, 400, C);
+    const filtros = ['encargo_id = ?1'], args = [enc];
+    for (const k of ['ejecucion_id', 'regla_id', 'rubro', 'corrida_id']) if (q.get(k)) { args.push(q.get(k)); filtros.push(k + ' = ?' + args.length); }
+    if (q.get('diferencia_c')) { args.push(Number(q.get('diferencia_c'))); filtros.push('diferencia_c = ?' + args.length); }
+    if (q.get('pendientes') === '1') filtros.push('cubeta IS NULL');
+    const lim = Math.min(Number(q.get('limit') || 500), 2000);
+    const { results } = await db.prepare('SELECT * FROM v_diferencia WHERE ' + filtros.join(' AND ') + ' ORDER BY abs(diferencia_c) DESC LIMIT ' + lim).bind(...args).all();
+    const tot = await db.prepare('SELECT count(*) AS n, sum(cubeta IS NULL) AS pendientes FROM v_diferencia WHERE ' + filtros.filter(f => f !== 'cubeta IS NULL').join(' AND ')).bind(...args).first();
+    return J({ diferencias: results, total: tot.n, aceptacion: { aceptado: (tot.pendientes || 0) === 0, sin_clasificar: tot.pendientes || 0 } }, 200, C);
+  }
+
+  // Diferencias agrupadas por regla, rubro e importe: así se clasifican en bloque.
+  if (p === '/api/kernel/diferencias/grupos' && m === 'GET') {
     const enc = url.searchParams.get('encargo_id');
     if (!enc) return J({ error: 'encargo_id requerido' }, 400, C);
-    const { results } = await db.prepare('SELECT * FROM v_diferencia WHERE encargo_id = ?1 ORDER BY abs(diferencia_c) DESC LIMIT 1000').bind(enc).all();
-    return J({ diferencias: results, aceptacion: aceptacion(results) }, 200, C);
+    const ej = url.searchParams.get('ejecucion_id');
+    const { results } = await db.prepare('SELECT regla_id, rubro, diferencia_c, count(*) AS n, sum(cubeta IS NULL) AS pendientes, sum(limitado) AS limitados, ' +
+      'min(cubeta) AS cubeta, min(motivo) AS motivo, min(criterio_id) AS criterio_id FROM v_diferencia WHERE encargo_id = ?1' + (ej ? ' AND ejecucion_id = ?2' : '') +
+      ' GROUP BY regla_id, rubro, diferencia_c ORDER BY pendientes DESC, n DESC LIMIT 500').bind(...(ej ? [enc, ej] : [enc])).all();
+    const tot = await db.prepare('SELECT count(*) AS n, sum(cubeta IS NULL) AS pendientes FROM v_diferencia WHERE encargo_id = ?1' + (ej ? ' AND ejecucion_id = ?2' : '')).bind(...(ej ? [enc, ej] : [enc])).first();
+    return J({ grupos: results, total: tot.n || 0, aceptacion: { aceptado: (tot.pendientes || 0) === 0, sin_clasificar: tot.pendientes || 0 } }, 200, C);
   }
 
   if (p === '/api/kernel/clasificar' && m === 'POST') {
@@ -152,6 +171,7 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     const args = [d.encargo_id];
     for (const k of ['regla_id', 'rubro', 'corrida_id', 'diferencia_c']) if (d[k] !== undefined && d[k] !== null && d[k] !== '') { args.push(d[k]); filtros.push(k + ' = ?' + args.length); }
     if (filtros.length === 2) return J({ error: 'Pon al menos un filtro (regla, rubro, corrida o importe)' }, 400, C);
+    if (d.ejecucion_id) { args.push(d.ejecucion_id); filtros.push('ejecucion_id = ?' + args.length); }
     const n0 = args.length;
     const r = await db.prepare('UPDATE diferencia SET cubeta = ?' + (n0 + 1) + ', motivo = ?' + (n0 + 2) + ', quien = ?' + (n0 + 3) + ', clasificado_por_usuario_id = ?' + (n0 + 4) +
       ', criterio_id = ?' + (n0 + 5) + ', clasificado_en = ?' + (n0 + 6) + ' WHERE id IN (SELECT id FROM v_diferencia WHERE ' + filtros.join(' AND ') + ')')
@@ -188,7 +208,7 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   if (p === '/api/kernel/ingestas' && m === 'GET') {
     const enc = url.searchParams.get('encargo_id');
     if (!enc) return J({ error: 'encargo_id requerido' }, 400, C);
-    const { results } = await db.prepare('SELECT id, archivo_nombre, estado, lotes_total, lotes_hechos, renglones, ejecucion_id, error, creado_en, actualizado_en FROM ingesta WHERE encargo_id = ?1 ORDER BY creado_en DESC').bind(enc).all();
+    const { results } = await db.prepare('SELECT id, archivo_nombre, estado, lotes_total, lotes_hechos, renglones, ejecucion_id, substr(error, 1, 300) AS error, creado_en, actualizado_en FROM ingesta WHERE encargo_id = ?1 ORDER BY creado_en DESC').bind(enc).all();
     return J({ ingestas: results }, 200, C);
   }
   if (p === '/api/kernel/ingesta' && m === 'GET') {
