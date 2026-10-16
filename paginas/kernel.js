@@ -110,6 +110,7 @@ html body .k-row>label input{width:auto;margin:0}
     <div class="k-tab" data-t="registros">Registros patronales</div>
     <div class="k-tab" data-t="criterios">Criterios</div>
     <div class="k-tab" data-t="cotizador">Cotizador</div>
+    <div class="k-tab" data-t="expediente">Expediente</div>
   </div>
 
   <section id="t-archivos">
@@ -315,6 +316,18 @@ html body .k-row>label input{width:auto;margin:0}
     <div class="k-card"><h2>Cotizaciones guardadas</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>Fecha</th><th>Cliente</th><th class="num">Iguala mensual</th><th class="num">Diagnóstico</th><th>Tarifa</th></tr></thead><tbody id="tbCot"></tbody></table></div></div>
   </section>
 
+  <section id="t-expediente" class="oculto">
+    <div class="k-card">
+      <h2>Expediente de defensa</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin:4px 0 10px">Los papeles de trabajo del sistema se conservan siempre. Los archivos que entrega el cliente se guardan cinco años después de la última declaración del ejercicio, o más si el contrato lo pide (N6).</div>
+      <div class="frm"><div><label>El contrato pide conservar hasta</label><input id="xCon" class="k-in" type="date"></div><div><button class="k-btn sec" onclick="guardarRetencion()">Guardar plazo del contrato</button></div></div>
+      <div id="msgExp"></div>
+      <div id="resExp"></div>
+    </div>
+    <div class="k-card"><h2>Archivos fuente</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th class="num">Tamaño</th><th>Subido</th><th>Conservar hasta</th></tr></thead><tbody id="tbExp"></tbody></table></div></div>
+    <div class="k-card"><h2>Datos personales que trata el sistema</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>Categoría</th><th>Datos</th><th>Dónde</th><th>Plazo</th></tr></thead><tbody id="tbInv"></tbody></table></div></div>
+  </section>
+
   <section id="t-criterios" class="oculto">
     <div class="k-card"><h2>Bitácora de criterios</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>#</th><th>Tema</th><th>Decisión</th><th>Estado</th><th>Quién</th></tr></thead><tbody id="tbCrit"></tbody></table></div></div>
   </section>
@@ -348,7 +361,7 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios','cotizador'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios','cotizador','expediente'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
   if(t.dataset.t==='requerimiento')cargarReq();
   if(t.dataset.t==='cfdi')cargarPaquetes();
@@ -357,6 +370,7 @@ document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('clic
   if(t.dataset.t==='registros')cargarRegistros();
   if(t.dataset.t==='criterios')cargarCriterios();
   if(t.dataset.t==='cotizador')cargarCotizaciones();
+  if(t.dataset.t==='expediente')cargarExpediente();
 })});
 
 var drop=document.getElementById('drop');
@@ -638,6 +652,27 @@ function cargarCotizaciones(){
   });
 }
 
+// ── Expediente de defensa (N6) e inventario de datos (N7.3)
+var CATX={prenomina:'Prenómina',xml_y_metadata:'XML y metadata SAT',maestro_empleados:'Maestro de empleados',entregado_por_el_cliente:'Entregado en el requerimiento',renglones_canonicos:'Renglones normalizados',otro:'Otro'};
+var PAPX={ejecuciones:'Ejecuciones selladas',calculos:'Cálculos',diferencias:'Diferencias',cruces_cfdi:'Cruces con CFDI',comprobantes:'Comprobantes leídos',casos_afiliacion:'Casos de afiliación',hallazgos:'Hallazgos',bitacora_hallazgos:'Movimientos de hallazgos',dictamenes:'Versiones de dictamen'};
+function tam(b){b=Number(b||0);return b>1048576?(b/1048576).toFixed(1)+' MB':b>1024?Math.round(b/1024)+' KB':b+' B'}
+function cargarExpediente(){
+  if(!ENC)return;
+  api('GET','/api/kernel/expediente?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var a=r.archivos_fuente,pp=r.papeles_de_trabajo.conteos;
+    document.getElementById('xCon').value=r.encargo.retencion_contrato_hasta||'';
+    document.getElementById('resExp').innerHTML='<div class="op"><div class="t">Archivos fuente: conservar hasta el '+esc(a.conservar_hasta)+'</div><div class="r">'+esc(a.regla)+'</div>'+
+      '<div class="r">'+a.total+' archivos'+(a.vencidos?' · '+a.vencidos+' ya cumplieron su plazo':'')+' · '+Object.keys(a.por_categoria).map(function(k){var c=a.por_categoria[k];return esc(CATX[k]||k)+': '+c.archivos+' ('+tam(c.bytes)+')'}).join(' · ')+'</div></div>'+
+      '<h3>Papeles de trabajo (permanentes)</h3><div style="font-size:12.5px">'+Object.keys(pp).map(function(k){return esc(PAPX[k]||k)+': '+Number(pp[k]).toLocaleString('es-MX')}).join(' · ')+'</div>';
+    document.getElementById('tbExp').innerHTML=a.archivos.map(function(f){return '<tr><td class="mono" style="font-size:11px">'+esc(f.key.split('/').pop())+'</td><td>'+esc(CATX[f.categoria]||f.categoria)+'</td><td class="num">'+tam(f.tamano)+'</td><td>'+fecha(f.subido)+'</td><td>'+esc(f.conservar_hasta)+'</td></tr>'}).join('')||'<tr><td colspan="5" class="vacio">Sin archivos en este encargo.</td></tr>';
+    document.getElementById('tbInv').innerHTML=r.inventario.map(function(i){return '<tr><td><b>'+esc(i.categoria)+'</b></td><td>'+esc(i.datos)+'</td><td>'+esc(i.donde)+'</td><td>'+esc(i.plazo)+'</td></tr>'}).join('');
+  }).catch(function(e){aviso('msgExp',e.message,'err')});
+}
+function guardarRetencion(){
+  if(!ENC)return;
+  api('POST','/api/kernel/expediente/retencion',{encargo_id:ENC.id,retencion_contrato_hasta:document.getElementById('xCon').value||null}).then(function(){aviso('msgExp','Plazo guardado.','ok');cargarExpediente()}).catch(function(e){aviso('msgExp',e.message,'err')});
+}
+
 // ── Maestro de empleados y afiliación
 var TIPOA={pago_despues_de_baja:'Pago después de la baja',pago_antes_de_alta:'Pago antes del alta'};
 var MAE=null;
@@ -912,6 +947,8 @@ function pintarPropuesta(){
   var reglas={1:'Falta la nómina o los XML originales (D13)',2:'Hallazgos materiales generalizados',3:'Hallazgo material o limitación en un rubro',4:'Hallazgos sobre tolerancia, ninguno material',5:'Sin hallazgos sobre tolerancia'};
   x+='<div class="op"><div class="t">Opinión propuesta: '+esc(OPS[p.opinion])+'</div><div class="r">Regla '+p.regla+': '+esc(reglas[p.regla])+(p.faltan_fuentes.length?' · falta '+esc(p.faltan_fuentes.join(', ')):'')+'</div>'+
     (p.salvedades.length?'<div class="r">Salvedades: '+p.salvedades.map(function(s){return esc(s.modulo+' '+(s.titulo||s.nombre||''))+(s.tipo==='universo_parcial'?' (cobertura '+s.efectivo+' de '+s.esperado+')':'')}).join(' · ')+'</div>':'')+'</div>';
+  if(r.saldos&&r.saldos.partidas&&r.saldos.partidas.length)x+='<div class="r" style="font-size:12.5px;margin:6px 0">Saldos a favor: '+r.saldos.partidas.map(function(s){return esc(s.descripcion)+' '+pesos(s.importe_c)}).join(' · ')+'</div>';
+  if(r.seguimiento&&r.seguimiento.length)x+='<div class="r" style="font-size:12.5px;margin:6px 0">Abiertos de periodos anteriores: '+r.seguimiento.length+(r.seguimiento.filter(function(s){return s.vencido}).length?' ('+r.seguimiento.filter(function(s){return s.vencido}).length+' con fecha vencida)':'')+'. Van al dictamen en «Seguimiento».</div>';
   if(r.bloqueos.length)x+='<div class="aviso err"><b>Todavía no se puede emitir:</b><ul class="blq">'+r.bloqueos.map(function(b){return '<li>'+esc(b)+'</li>'}).join('')+'</ul></div>';
   var sig=r.anterior?r.anterior.version+1:1;
   x+='<div class="frm">'+(p.opinion==='sin_opinion'?'':'<div><label>Opinión a emitir</label><select id="dOp" class="k-sel">'+Object.keys(OPS).filter(function(k){return k!=='sin_opinion'}).map(function(k){return '<option value="'+k+'"'+(k===p.opinion?' selected':'')+'>'+OPS[k]+'</option>'}).join('')+'</select></div>'+

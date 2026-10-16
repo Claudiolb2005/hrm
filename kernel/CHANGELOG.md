@@ -3,6 +3,17 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.7.0 — 2026-10-15
+
+Secciones 7 y 11 del dictamen y conservación (N6). No cambia ninguna regla de cálculo.
+
+- `saldosAFavor`: lo pagado de más por rubro (cliente > kernel), quién lo recupera, cuánto depende de un criterio
+  pendiente y cuánto falta clasificar. Lo que se clasificó como error del kernel no cuenta.
+- Sección 11 (módulo 25): los hallazgos de periodos anteriores de la misma empresa que siguen abiertos se reportan
+  en cada dictamen, con su responsable y si la fecha compromiso ya venció.
+- El contenido del dictamen dice hasta cuándo se conservan los archivos fuente (cinco años después de la anual del
+  ejercicio, o el plazo del contrato si es mayor). Migración 0012.
+
 ## 0.6.0 — 2026-10-15
 
 Valuación de hallazgos (módulo 18; adelanta V3 de la versión 2). No cambia ninguna regla de cálculo.

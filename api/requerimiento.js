@@ -11,6 +11,7 @@ import { listaPBC, FUENTES } from '../kernel/src/index.js';
 import { crearIngesta, avanzar } from '../ingesta/trabajos.js';
 import { crearIngestaCfdi, avanzarCfdi } from '../ingesta/cfdi.js';
 import { nuevoId } from '../kernel/src/sello.js';
+import { metadatosFuente } from '../servicio/expediente.js';
 
 // Sin estas dos no hay opinión (D13), aunque ninguna regla las marque como obligatorias.
 export const ESENCIALES = ['prenomina', 'xml_nomina'];
@@ -127,7 +128,7 @@ export async function rutasRequerimiento(request, env, u, C, J, ctx) {
     if (e.cerrado_en) return J({ error: 'El encargo está cerrado: una corrección abre un encargo nuevo' }, 409, C);
     const id = nuevoId('pbc');
     const r2_key = 'encargos/' + e.id + '/pbc/' + fuente + '/' + Date.now() + '_' + f.name.replace(/[^\w.\- ]+/g, '_');
-    await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' } });
+    await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' }, customMetadata: await metadatosFuente(db, e.id, 'pbc:' + fuente) });
     await db.prepare('INSERT INTO requerimiento_archivo (id, encargo_id, fuente_clave, r2_key, nombre, tamano, subido_por) VALUES (?1,?2,?3,?4,?5,?6,?7)')
       .bind(id, e.id, fuente, r2_key, f.name, f.size, u.id).run();
     return J({ ok: true, id }, 201, C);

@@ -146,7 +146,7 @@ async function faseLeyendo(env, ing, hasta) {
         const llave = fatal ? null : ing.llave === 'rfc' ? c.rfc_receptor : c.num_empleado;
         filas.push([ing.id, e.nombre, ing.encargo_id, c.uuid || null, llave, asig.corrida_id, asig.motivo || null, c.tipo_nomina || null, c.periodicidad_pago || null,
           c.fecha_pago || null, c.fecha_final_pago || null, c.registro_patronal || null, c.rfc_receptor || null, c.num_empleado || null,
-          c.total_percepciones_c ?? null, c.isr_retenido_c ?? null, c.total_c ?? null, (c.errores || []).length, JSON.stringify(c)]);
+          c.total_percepciones_c ?? null, c.isr_retenido_c ?? null, c.total_c ?? null, (c.errores || []).length, JSON.stringify({ ...c, curp: undefined, nss: undefined })]); // N7: sin CURP ni NSS
       }
       st = insertarMultiple(db, 'comprobante', COMP_COLS, filas);
     }

@@ -272,6 +272,33 @@ export function transicionHallazgos(anteriores, actuales) {
     despues: vivos.has(h.id) ? 'confirmado' : superados.has(h.id) ? 'superado' : 'resuelto_por_reproceso' }));
 }
 
+// ── Saldos a favor y oportunidades de ahorro (sección 7) ─────────────
+// La otra dirección de la misma resta: lo que el cliente retuvo o pagó DE MÁS contra lo que manda la ley.
+// No cuenta lo que el kernel calculó mal (cubeta kernel_mal); lo que depende de un criterio se marca.
+const SALDOS = {
+  isr: { descripcion: 'ISR retenido de más a trabajadores', recupera: 'El trabajador: se le devuelve o se compensa en el cálculo anual (LISR art. 97)' },
+  subsidio: { descripcion: 'Subsidio entregado de menos', recupera: 'El trabajador' },
+  isn: { descripcion: 'ISN pagado de más', recupera: 'La empresa: saldo a favor ante la entidad (devolución o compensación según su ley)' },
+  imss: { descripcion: 'Cuotas IMSS pagadas de más', recupera: 'La empresa: devolución o compensación ante el IMSS (LSS art. 299)' },
+  rcv: { descripcion: 'RCV pagado de más', recupera: 'La empresa: devolución o compensación ante el IMSS (LSS art. 299)' },
+  infonavit: { descripcion: 'Aportaciones INFONAVIT pagadas de más', recupera: 'La empresa' },
+};
+export function saldosAFavor(grupos) {
+  const partidas = [];
+  for (const g of grupos) {
+    if (g.cubeta === 'kernel_mal' || !(g.exceso_c > 0)) continue;
+    const d = SALDOS[g.rubro] || { descripcion: 'Pagado de más en ' + g.rubro, recupera: '—' };
+    const p = partidas.find(x => x.rubro === g.rubro);
+    if (p) { p.importe_c += g.exceso_c; p.casos += g.n; p.sujeto_a_criterio_c += g.cubeta === 'criterio_sin_resolver' ? g.exceso_c : 0; p.sin_clasificar_c += g.cubeta ? 0 : g.exceso_c; }
+    else partidas.push({ rubro: g.rubro, descripcion: d.descripcion, quien_recupera: d.recupera, importe_c: g.exceso_c, casos: g.n,
+      sujeto_a_criterio_c: g.cubeta === 'criterio_sin_resolver' ? g.exceso_c : 0, sin_clasificar_c: g.cubeta ? 0 : g.exceso_c });
+  }
+  partidas.sort((a, b) => b.importe_c - a.importe_c);
+  return { estado: 'calculado', partidas, total_empresa_c: partidas.filter(p => /^La empresa/.test(p.quien_recupera)).reduce((s, p) => s + p.importe_c, 0),
+    total_trabajadores_c: partidas.filter(p => /^El trabajador/.test(p.quien_recupera)).reduce((s, p) => s + p.importe_c, 0),
+    nota: 'Importes sin actualización. Lo sujeto a criterio depende de una decisión pendiente en la bitácora.' };
+}
+
 // ── Contenido del dictamen ──────────────────────────────────────────
 export const NOTA_ALCANCE = 'Este informe es una revisión independiente de carácter privado sobre el cumplimiento de obligaciones en materia de nómina, ' +
   'contratada por el cliente. No constituye ni sustituye el dictamen fiscal previsto en el Código Fiscal de la Federación ni el dictamen sobre el ' +
@@ -336,7 +363,7 @@ export function armarContenido(e) {
       riesgo: h.riesgo,
       recomendacion: h.recomendacion || null, responsable: h.responsable || null, fecha_compromiso: h.fecha_compromiso || null, estatus: h.estatus,
       material: h.material, motivos_material: h.motivos_material, diferencias: h.diferencias || 0, supera_a: h.supera_a || null })),
-    s7_saldos_a_favor: { estado: 'fuera_de_alcance', nota: 'Saldos a favor y oportunidades de ahorro: versión 2.' },
+    s7_saldos_a_favor: e.saldos || { estado: 'sin_datos', partidas: [], nota: 'Sin diferencias a favor en los rubros revisados.' },
     s8_analitica: { estado: 'en_el_informe', nota: 'La analítica de gestión sigue en el informe mensual del portal.' },
     s9_opinion: { propuesta: e.propuesta.opinion, regla_aplicada: e.propuesta.regla, opinion: e.final.opinion, cambiada_por_revisor: e.final.cambiada,
       motivo_cambio: e.final.motivo, frase: fraseOpinion({ opinion: e.final.opinion, tipo_entregable: tipo, cliente, periodo, salvedades: e.propuesta.salvedades,
@@ -344,6 +371,11 @@ export function armarContenido(e) {
       salvedades: e.propuesta.salvedades, generalizado: e.propuesta.generalizado },
     s10_plan: e.hallazgos.filter(h => !['corregido', 'resuelto_por_reproceso', 'superado'].includes(h.estatus))
       .map(h => ({ hallazgo_id: h.id, titulo: h.titulo, recomendacion: h.recomendacion || null, responsable: h.responsable || null, fecha_compromiso: h.fecha_compromiso || null })),
+    // Módulo 25: lo abierto de periodos anteriores se reporta en cada dictamen hasta que se cierra.
+    s11_seguimiento: (e.seguimiento || []).map(h => ({ hallazgo_id: h.id, periodo: h.periodo, titulo: h.titulo, estatus: h.estatus, riesgo: h.riesgo,
+      responsable: h.responsable || null, fecha_compromiso: h.fecha_compromiso || null, vencido: !!h.vencido })),
+    // N6: papeles de trabajo permanentes; archivos fuente hasta la fecha que se indica.
+    conservacion: e.conservacion || null,
     transiciones: e.transiciones || [],
   };
 }

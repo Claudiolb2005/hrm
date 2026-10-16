@@ -7,9 +7,10 @@
 // La propuesta se calcula al vuelo; lo emitido se congela con su huella y no cambia (la base lo impide).
 import { requerimientoDe } from './requerimiento.js';
 import { cargarCatalogo } from '../kernel/src/d1.js';
-import { REGLAS_V1, valuarOmision, sumarValuaciones, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
+import { REGLAS_V1, valuarOmision, sumarValuaciones, saldosAFavor, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
   transicionHallazgos, armarContenido, huellaContenido, verificarDictamen, consolidarOpiniones, MODULOS_FRENTE1, MOTIVOS_CUALITATIVOS, OPINIONES,
   NOTA_ALCANCE } from '../kernel/src/index.js';
+import { conservarHasta } from '../servicio/expediente.js';
 
 const RIESGOS = ['alto', 'medio', 'bajo'];
 const ESTATUS_MANUALES = ['abierto', 'en_correccion', 'corregido'];
@@ -107,9 +108,20 @@ async function armarPropuesta(db, enc, ejecucion_id, limitaciones = [], fecha_ca
   if (afiliacion.sin_clasificar) bloqueos.push(afiliacion.sin_clasificar + ' pagos a personas sin alta o ya dadas de baja sin clasificar');
   if (afiliacion.proceso_sin_hallazgo) bloqueos.push(afiliacion.proceso_sin_hallazgo + ' pagos de afiliación de «proceso actual mal» sin hallazgo');
   if (propuesta.indeterminado) bloqueos.push('Falta la carga patronal del periodo dictaminado: sin ella no se puede decidir si los hallazgos son materiales (T5)');
+  // Sección 7: lo pagado o retenido de más (la otra dirección de la resta).
+  const { results: ex } = await db.prepare('SELECT rubro, cubeta, count(*) AS n, sum(cliente_c - kernel_c) AS exceso_c FROM v_diferencia WHERE ejecucion_id = ?1 AND cliente_c > kernel_c GROUP BY rubro, cubeta')
+    .bind(ej.id).all();
+  const saldos = saldosAFavor(ex);
+  // Módulo 25: hallazgos de periodos anteriores del mismo cliente que siguen abiertos.
+  const hoyS = new Date().toISOString().slice(0, 10);
+  const { results: seg } = await db.prepare("SELECT h.id, h.titulo, h.estatus, h.riesgo, h.responsable, h.fecha_compromiso, e2.periodo_desde || ' a ' || e2.periodo_hasta AS periodo " +
+    "FROM hallazgo h JOIN encargo e2 ON e2.id = h.encargo_id WHERE e2.empresa_id = ?1 AND e2.id <> ?2 AND e2.periodo_hasta < ?3 " +
+    "AND h.estatus IN ('abierto','en_correccion','confirmado') AND EXISTS (SELECT 1 FROM dictamen_hallazgo x WHERE x.hallazgo_id = h.id) ORDER BY e2.periodo_hasta, h.numero")
+    .bind(enc.empresa_id, enc.id, enc.periodo_desde).all();
+  const seguimiento = seg.map(h => ({ ...h, vencido: !!(h.fecha_compromiso && h.fecha_compromiso < hoyS) }));
   const requerimiento = (await requerimientoDe(db, enc.id)).filter(r => !['completa', 'no_aplica'].includes(r.estado_efectivo))
     .map(r => ({ fuente: r.fuente_clave, descripcion: r.descripcion, esencial: !!r.esencial, estado: r.estado_efectivo, responsable: r.responsable, solicitado_en: r.solicitado_en, fecha_compromiso: r.fecha_compromiso }));
-  return { ejecucion: ej, fuentes, cfdi, cruces, afiliacion, maestro, requerimiento, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
+  return { ejecucion: ej, fuentes, cfdi, cruces, afiliacion, maestro, requerimiento, saldos, seguimiento, modulos, hallazgos, umbral, propuesta, anterior: anterior || null, bloqueos,
     diferencias: { total: pend.n || 0, sin_clasificar: pend.sin_clasificar || 0, proceso_sin_hallazgo: pend.proceso_sin_hallazgo || 0 } };
 }
 
@@ -331,7 +343,8 @@ export async function rutasDictamen(request, env, u, C, J) {
       version: ver.version, anterior_id: r.anterior ? r.anterior.id : null, motivo_version: d.motivo_version || null, disparado_por: r.anterior ? d.disparado_por : null,
       tolerancia: { individual_c: enc.tolerancia_individual_c, agregada_min_c: enc.tolerancia_agregada_min_c, por_colaborador_c: enc.tolerancia_individual_c, aplica_a_entero: false },
       materialidad: { ...r.umbral, carga_patronal_c: enc.carga_patronal_c, carga_patronal_fuente: enc.carga_patronal_fuente, recurrencia_periodos: enc.recurrencia_periodos },
-      base_normativa: baseNormativa(r.modulos), transiciones, cfdi: r.cfdi, maestro: r.maestro, requerimiento: r.requerimiento });
+      base_normativa: baseNormativa(r.modulos), transiciones, cfdi: r.cfdi, maestro: r.maestro, requerimiento: r.requerimiento, saldos: r.saldos, seguimiento: r.seguimiento,
+      conservacion: { papeles_de_trabajo: 'permanente', archivos_fuente_hasta: conservarHasta(enc.ejercicio, enc.retencion_contrato_hasta) } });
     const huella = await huellaContenido(contenido);
     const id = 'dic_' + enc.id + '_v' + ver.version;
     const st = [db.prepare('INSERT INTO dictamen (id, encargo_id, version, dictamen_anterior_id, motivo_version, disparado_por, ejecucion_id, tipo_entregable, opinion_propuesta, opinion, ' +

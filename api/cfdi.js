@@ -7,6 +7,7 @@
 // /api/kernel/cruces/grupos         GET ?ingesta_cfdi_id
 // /api/kernel/cruces                GET ?ingesta_cfdi_id&tipo&rubro&dif_c&corrida_id
 // /api/kernel/cruces/clasificar     POST { ingesta_cfdi_id, tipo, rubro, dif_c?, corrida_id?, cubeta, motivo, criterio_id? }
+import { metadatosFuente } from '../servicio/expediente.js';
 import { crearIngestaCfdi, avanzarCfdi, estadoIngestaCfdi, reintentarCfdi } from '../ingesta/cfdi.js';
 
 export const CUBETAS_CRUCE = ['proceso_mal', 'explicada', 'criterio_sin_resolver'];
@@ -36,7 +37,7 @@ export async function rutasCfdi(request, env, u, C, J, ctx) {
     if (tipo === 'metadata_sat' && !/\.(txt|csv)$/i.test(f.name)) return J({ error: 'La metadata del SAT es el .txt de la descarga masiva' }, 400, C);
     if (f.size > 95 * 1024 * 1024) return J({ error: 'El archivo excede 95MB: parte el paquete en varios ZIP' }, 413, C);
     const r2_key = 'encargos/' + encargo_id + '/cfdi/' + Date.now() + '_' + f.name.replace(/[^\w.\- ]+/g, '_');
-    await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' } });
+    await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' }, customMetadata: await metadatosFuente(db, encargo_id, tipo) });
     let id;
     try { id = await crearIngestaCfdi(env, { encargo_id, tipo, r2_key, archivo_nombre: f.name, llave: fd.get('llave') || 'num_empleado', usuario_id: u.id }); }
     catch (e) { return J({ error: e.message }, 400, C); }

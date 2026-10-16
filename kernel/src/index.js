@@ -16,3 +16,4 @@ export { TOLERANCIA_DEF, toleranciaAgregada, aplicarTolerancia, toleranciaPorGru
   consolidarOpiniones, LIMITE_REPROCESO_DIAS, validarReproceso, transicionHallazgos, NOTA_ALCANCE, fraseOpinion, armarContenido, huellaContenido,
   verificarDictamen } from './dictamen.js';
 export { CONTRIBUCION_DE_RUBRO, fechaLimite, mesesDeMora, valuarOmision, sumarValuaciones } from './valuacion.js';
+export { saldosAFavor } from './dictamen.js';

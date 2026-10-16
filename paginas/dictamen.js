@@ -130,6 +130,16 @@ function pintar(r){
   h+='<section class="d-sec"><h2 id="plan">Plan de corrección</h2>'+(c.s10_plan.length?'<table class="tb"><thead><tr><th>Hallazgo</th><th>Recomendación</th><th>Responsable</th><th>Fecha compromiso</th></tr></thead><tbody>'+
     c.s10_plan.map(function(x){return '<tr><td>'+esc(x.titulo)+'</td><td>'+esc(x.recomendacion||'Por definir')+'</td><td>'+esc(x.responsable||'Por asignar')+'</td><td>'+esc(x.fecha_compromiso||'—')+'</td></tr>'}).join('')+'</tbody></table>':'<div class="sub">Nada pendiente.</div>')+'</section>';
 
+  var sf=c.s7_saldos_a_favor||{partidas:[]};
+  h+='<section class="d-sec"><h2 id="saldos">Saldos a favor y oportunidades de ahorro</h2>'+(sf.partidas&&sf.partidas.length?'<table class="tb"><thead><tr><th>Concepto</th><th>Quién lo recupera</th><th class="num">Casos</th><th class="num">Importe</th><th class="num">Sujeto a criterio</th></tr></thead><tbody>'+
+    sf.partidas.map(function(x){return '<tr><td>'+esc(x.descripcion)+(x.sin_clasificar_c?'<div style="font-size:11.5px;color:#5E7479">'+pesos(x.sin_clasificar_c)+' todavía sin clasificar</div>':'')+'</td><td>'+esc(x.quien_recupera)+'</td><td class="num">'+Number(x.casos||0).toLocaleString('es-MX')+'</td><td class="num">'+pesos(x.importe_c)+'</td><td class="num">'+(x.sujeto_a_criterio_c?pesos(x.sujeto_a_criterio_c):'—')+'</td></tr>'}).join('')+
+    '</tbody></table><div class="sub" style="margin-top:8px">Recuperable por la empresa: '+pesos(sf.total_empresa_c)+' · por los trabajadores: '+pesos(sf.total_trabajadores_c)+'. '+esc(sf.nota||'')+'</div>':'<div class="sub">'+esc(sf.nota||'Sin diferencias a favor en los rubros revisados.')+'</div>')+'</section>';
+
+  var sg=c.s11_seguimiento||[];
+  h+='<section class="d-sec"><h2 id="seguimiento">Seguimiento de periodos anteriores</h2>'+(sg.length?'<table class="tb"><thead><tr><th>Periodo</th><th>Hallazgo</th><th>Estado</th><th>Responsable</th><th>Fecha compromiso</th></tr></thead><tbody>'+
+    sg.map(function(x){return '<tr><td>'+esc(x.periodo||'—')+'</td><td>'+esc(x.titulo)+' <span class="tag '+esc(x.riesgo||'')+'">Riesgo '+esc(x.riesgo||'—')+'</span></td><td>'+esc(ESTH[x.estatus]||x.estatus)+'</td><td>'+esc(x.responsable||'Por asignar')+'</td><td>'+esc(x.fecha_compromiso||'—')+(x.vencido?' <span class="tag mat">Vencido</span>':'')+'</td></tr>'}).join('')+
+    '</tbody></table>':'<div class="sub">No hay hallazgos abiertos de periodos anteriores.</div>')+'</section>';
+
   h+='<section class="d-sec"><h2 id="base">Base normativa</h2><table class="tb"><thead><tr><th>Regla</th><th>Qué verifica</th><th>Fundamento</th></tr></thead><tbody>'+
     (c.s2_base_normativa||[]).map(function(b){return '<tr><td class="mono">'+esc(b.regla_id+' '+b.version)+'</td><td>'+esc(b.titulo)+'</td><td>'+esc(b.fundamento)+'</td></tr>'}).join('')+'</tbody></table></section>';
 
@@ -138,6 +148,7 @@ function pintar(r){
     '<tr><td>Huella SHA-256</td><td class="mono">'+esc(d.huella_contenido)+'</td></tr>'+
     '<tr><td>Ejecución del kernel</td><td class="mono">'+esc(p.ejecucion_id)+'<br>sello '+esc(p.sello_ejecucion)+'</td></tr>'+
     (a.cfdi?'<tr><td>Paquete de XML</td><td class="mono">'+esc(a.cfdi.sha256)+'</td></tr>':'')+
+    (c.conservacion?'<tr><td>Conservación</td><td>Papeles de trabajo: permanentes. Archivos fuente del cliente: hasta el '+esc(c.conservacion.archivos_fuente_hasta)+'.</td></tr>':'')+
     '<tr><td>Versiones</td><td class="mono">kernel '+esc(p.kernel_version)+' · reglas '+esc(p.version_catalogo_reglas)+' · parámetros '+esc(p.version_parametros)+'</td></tr></tbody></table>'+
     '<div class="d-acc"><button class="d-btn" onclick="window.print()">Imprimir o guardar PDF</button></div></section>';
   document.getElementById('raiz').innerHTML=h;

@@ -224,3 +224,14 @@ Cada hallazgo con contribución omitida (lo que el kernel calcula de más sobre 
 ## Cotizador (módulo 26; D9)
 
 Pestaña **Cotizador** en `/kernel`, sólo HRM: «Tomar del encargo» llena colaboradores, registros, corridas, carga patronal y percepciones desde la prenómina y el encargo. B1–B4 de tabla; B5+ con la fórmula `45,000 + 36·C + 2,200·máx(R−3,0) + 2,800·máx(K−2,0)` al millar; piso de $50 por colaborador o 0.85 % de la carga; diagnóstico = 5.2 o 4.0 × la iguala (N2); porcentajes contra el costo total de nómina (N3). Las cotizaciones guardadas no cambian. Rutas: `GET /api/kernel/cotizador/perfil`, `POST /api/kernel/cotizador`, `GET /api/kernel/cotizaciones`.
+
+## Expediente, conservación y datos personales (N6, N7.3)
+
+- Papeles de trabajo del sistema (ejecuciones, cálculos, diferencias, cruces, hallazgos y su bitácora, dictámenes):
+  permanentes; la base impide borrarlos.
+- Archivos fuente del cliente en R2: cada `put` lleva `customMetadata` con `encargo_id`, `categoria` y
+  `conservar_hasta` = max(31-mar del ejercicio + 6, plazo del contrato). El plazo del contrato se captura en la
+  pestaña Expediente (`POST /api/kernel/expediente/retencion`).
+- `GET /api/kernel/expediente?encargo_id=` inventaría papeles y archivos (categoría, tamaño, plazo, vencidos) y la
+  tabla de datos personales que trata el sistema. Del CFDI ya no se guarda CURP ni NSS.
+- El dictamen trae también la sección 7 (saldos a favor) y la 11 (seguimiento de periodos anteriores).

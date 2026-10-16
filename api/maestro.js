@@ -6,6 +6,7 @@
 import { leerMaestro, cruzarAfiliacion, PERFIL_MAESTRO_PRIME } from '../ingesta/maestro.js';
 import { sha256Hex, nuevoId } from '../kernel/src/sello.js';
 import { insertarMultiple } from '../kernel/src/d1.js';
+import { metadatosFuente } from '../servicio/expediente.js';
 
 const CUBETAS = ['proceso_mal', 'explicada', 'criterio_sin_resolver'];
 async function cuerpo(request) { try { return await request.json(); } catch { return null; } }
@@ -74,7 +75,7 @@ export async function rutasMaestro(request, env, u, C, J) {
     try { mae = await leerMaestro(bytes); } catch (e) { return J({ error: e.message }, 400, C); }
     const id = nuevoId('mae');
     const r2_key = 'encargos/' + encargo_id + '/maestro/' + Date.now() + '_' + f.name.replace(/[^\w.\- ]+/g, '_');
-    await env.DOCS.put(r2_key, bytes);
+    await env.DOCS.put(r2_key, bytes, { customMetadata: await metadatosFuente(db, encargo_id, 'maestro_empleados') });
     const reporte = { hojas: mae.hojas, sin_numero: mae.sin_numero, inconsistencias: mae.inconsistencias.length, muestra_inconsistencias: mae.inconsistencias.slice(0, 20),
       con_baja: mae.registros.filter(x => x.fecha_baja || x.fecha_baja_imss).length, con_baja_imss: mae.registros.filter(x => x.fecha_baja_imss).length };
     await lotes(db, [db.prepare('INSERT INTO maestro_carga (id, encargo_id, perfil, r2_key, archivo_nombre, archivo_sha256, registros, reporte_json, creado_por) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)')

@@ -8,6 +8,7 @@ import { cargarCatalogo, persistirEjecucion, leerEjecucion, verificarArranque, c
 import { crearIngesta, avanzar, estadoIngesta, reintentar, PERFILES, RUBROS_ENTERO } from '../ingesta/trabajos.js';
 import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import semilla from '../kernel/data/parametros-2026.js';
+import { metadatosFuente } from '../servicio/expediente.js';
 
 const MAX_ITEMS = 500;
 const ORIGENES = ['cliente', 'tercero', 'la_casa'];
@@ -196,7 +197,7 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
       if (f.size > 95 * 1024 * 1024) return J({ error: 'El archivo excede 95MB' }, 413, C);
       archivo_nombre = f.name;
       r2_key = 'encargos/' + encargo_id + '/fuentes/' + Date.now() + '_' + f.name.replace(/[^\w.\- ]+/g, '_');
-      await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' } });
+      await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' }, customMetadata: await metadatosFuente(db, encargo_id, 'prenomina') });
     } else {
       const d = await cuerpo(request);
       if (!d || !d.encargo_id || !d.r2_key) return J({ error: 'Se espera multipart (file, encargo_id) o JSON { encargo_id, r2_key }' }, 400, C);
