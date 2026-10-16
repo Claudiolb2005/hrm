@@ -2,6 +2,7 @@ import { rutasKernel } from "./api/kernel.js";
 import { rutasDictamen } from "./api/dictamen.js";
 import { rutasCfdi } from "./api/cfdi.js";
 import { rutasMaestro } from "./api/maestro.js";
+import { rutasCotizador } from "./api/cotizador.js";
 import { rutasRequerimiento } from "./api/requerimiento.js";
 import { paginaEncargo } from "./paginas/encargo.js";
 import { avanzarCfdi } from "./ingesta/cfdi.js";
@@ -45,6 +46,10 @@ var worker_default = {
         if (p.startsWith("/api/kernel/requerimiento") || p === "/api/encargos" || p.startsWith("/api/encargo")) {
           const rq = await rutasRequerimiento(request, env, u, C, J, ctx);
           if (rq) return rq;
+        }
+        if (p.startsWith("/api/kernel/cotiza")) {
+          const rz = await rutasCotizador(request, env, u, C, J);
+          if (rz) return rz;
         }
         if (p.startsWith("/api/kernel/maestro") || p.startsWith("/api/kernel/afiliacion")) {
           const rm = await rutasMaestro(request, env, u, C, J);

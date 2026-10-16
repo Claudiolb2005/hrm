@@ -19,7 +19,7 @@ const ADMIN = { id: 2, nombre: 'Revisor', rol: 'admin' };
 
 async function entorno() {
   const db = d1Local();
-  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql', 'migrations/0003_ingesta_lotes.sql', 'migrations/0004_sync_reglas_v1_1.sql', 'migrations/0005_vista_diferencia.sql', 'migrations/0006_hallazgos_dictamen.sql', 'migrations/0007_cfdi_nomina.sql', 'migrations/0008_requerimiento.sql', 'migrations/0009_maestro_afiliacion.sql', 'migrations/0010_parametros_valuacion.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
+  for (const f of ['schema.sql', 'migrations/0001_kernel_v1.sql', 'migrations/0002_semilla_kernel_v1.sql', 'migrations/0003_ingesta_lotes.sql', 'migrations/0004_sync_reglas_v1_1.sql', 'migrations/0005_vista_diferencia.sql', 'migrations/0006_hallazgos_dictamen.sql', 'migrations/0007_cfdi_nomina.sql', 'migrations/0008_requerimiento.sql', 'migrations/0009_maestro_afiliacion.sql', 'migrations/0010_parametros_valuacion.sql', 'migrations/0011_cotizacion.sql']) db.raw.exec(readFileSync(new URL(f, RAIZ), 'utf8'));
   db.raw.exec("INSERT INTO empresas (id, nombre, slug) VALUES (1, 'PRIMEWIRELESS', 'prime')");
   db.raw.exec("INSERT INTO usuarios (id, email, password_hash, nombre, rol) VALUES (2,'rev@hrm','x','Revisor','admin')");
   const llamar = async (metodo, ruta, body, u = ADMIN) => {

@@ -215,3 +215,12 @@ En **Archivos → Maestro de empleados**, sube el `.xlsx` del HC (hojas de activ
 |---|---|
 | `POST /api/kernel/maestro` (multipart: `file`, `encargo_id`) · `GET /api/kernel/maestro?encargo_id=` · `POST /api/kernel/maestro/cruzar` | Carga, lista y vuelve a cruzar |
 | `GET /api/kernel/afiliacion?carga_id=` · `POST /api/kernel/afiliacion/clasificar` | Casos vigentes y clasificación |
+
+
+## Valuación de hallazgos (módulo 18)
+
+Cada hallazgo con contribución omitida (lo que el kernel calcula de más sobre lo que el cliente retuvo o pagó) se valúa por rubro y mes de pago: actualización con INPC (CFF 17-A), recargos por mes o fracción (CFF 21; 2.07 % mensual en 2026 por la LIF art. 11) y multa (CFF 76 para ISR, LSS 304 para cuotas). La contingencia mínima es corregir espontáneamente (sin multa, CFF 73); la máxima, con la multa máxima. La materialidad usa la contingencia máxima (D7). El ISN no se valúa: sus accesorios son de ley estatal. Los parámetros (INPC, tasas, multas) viven en el catálogo con vigencia y nivel; `fecha_calculo` en la propuesta permite valuar a otra fecha.
+
+## Cotizador (módulo 26; D9)
+
+Pestaña **Cotizador** en `/kernel`, sólo HRM: «Tomar del encargo» llena colaboradores, registros, corridas, carga patronal y percepciones desde la prenómina y el encargo. B1–B4 de tabla; B5+ con la fórmula `45,000 + 36·C + 2,200·máx(R−3,0) + 2,800·máx(K−2,0)` al millar; piso de $50 por colaborador o 0.85 % de la carga; diagnóstico = 5.2 o 4.0 × la iguala (N2); porcentajes contra el costo total de nómina (N3). Las cotizaciones guardadas no cambian. Rutas: `GET /api/kernel/cotizador/perfil`, `POST /api/kernel/cotizador`, `GET /api/kernel/cotizaciones`.

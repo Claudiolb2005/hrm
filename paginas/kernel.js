@@ -65,6 +65,8 @@ ${CSS}
 .op .t{font-size:18px;font-weight:700;color:#0D2B31}
 .op .r{font-size:12px;color:#5a7a8a;margin-top:4px}
 .blq li{font-size:12px;color:#7a1c13;margin:3px 0 3px 18px}
+html body .k-row>label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:12px;font-weight:500;color:#3d5a6b}
+html body .k-row>label input{width:auto;margin:0}
 .oculto{display:none}
 .drop{border:2px dashed #c8dfe8;border-radius:12px;padding:16px;text-align:center;font-size:12px;color:#5a7a8a;background:#f8fbfc}
 .drop.on{border-color:#1a8a8a;background:#eef8f8}
@@ -107,6 +109,7 @@ ${CSS}
     <div class="k-tab" data-t="calendario">Calendario</div>
     <div class="k-tab" data-t="registros">Registros patronales</div>
     <div class="k-tab" data-t="criterios">Criterios</div>
+    <div class="k-tab" data-t="cotizador">Cotizador</div>
   </div>
 
   <section id="t-archivos">
@@ -289,6 +292,29 @@ ${CSS}
     </div>
   </section>
 
+  <section id="t-cotizador" class="oculto">
+    <div class="k-card">
+      <div class="k-row" style="justify-content:space-between"><h2 style="margin:0">Cotizador de honorarios</h2><button class="k-btn sec peq" onclick="tomarPerfil()">Tomar del encargo</button></div>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin:8px 0">Tarifa de Nómina Verificada v2 con las recomendaciones N2, N3 y T7 (por ratificar). Los porcentajes se dicen contra su base.</div>
+      <div class="frm">
+        <div><label>Colaboradores</label><input id="zC" class="k-in" type="number" min="0"></div>
+        <div><label>Registros patronales</label><input id="zR" class="k-in" type="number" min="0"></div>
+        <div><label>Corridas al mes</label><input id="zK" class="k-in" type="number" min="0"></div>
+        <div><label>Carga patronal mensual</label><input id="zCar" class="k-in" placeholder="27,755,641.00"></div>
+        <div><label>Percepciones mensuales</label><input id="zPer" class="k-in" placeholder="114,250,000.00"></div>
+        <div><label>RFC adicionales</label><input id="zRfc" class="k-in" type="number" min="0" value="0"></div>
+        <div><label>Ejercicios anteriores</label><input id="zEj" class="k-in" type="number" min="0" value="0"></div>
+        <div><label>Horas de requerimiento</label><input id="zHr" class="k-in" type="number" min="0" value="0"></div>
+        <div><label>Saldos a favor a recuperar</label><input id="zSal" class="k-in" placeholder="0.00"></div>
+      </div>
+      <div class="k-row" style="margin:10px 0;font-size:12px;color:#3d5a6b;gap:16px"><label><input type="checkbox" id="zPrev"> Modalidad preventiva</label><label><input type="checkbox" id="zRepse"> REPSE, ICSOE o SISUB</label><label><input type="checkbox" id="zCc"> Contrato colectivo o turnos</label><label><input type="checkbox" id="zSbc"> Reconstrucción de SBC variable</label></div>
+      <div class="k-row"><button class="k-btn" onclick="cotizarAhora(false)">Cotizar</button><input id="zPro" class="k-in" placeholder="Prospecto (si no es la empresa del encargo)" style="flex:1;min-width:200px"><button class="k-btn sec" onclick="cotizarAhora(true)">Guardar cotización</button></div>
+      <div id="msgCot"></div>
+      <div id="resCot"></div>
+    </div>
+    <div class="k-card"><h2>Cotizaciones guardadas</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>Fecha</th><th>Cliente</th><th class="num">Iguala mensual</th><th class="num">Diagnóstico</th><th>Tarifa</th></tr></thead><tbody id="tbCot"></tbody></table></div></div>
+  </section>
+
   <section id="t-criterios" class="oculto">
     <div class="k-card"><h2>Bitácora de criterios</h2><div class="scroll"><table class="k-tbl"><thead><tr><th>#</th><th>Tema</th><th>Decisión</th><th>Estado</th><th>Quién</th></tr></thead><tbody id="tbCrit"></tbody></table></div></div>
   </section>
@@ -322,7 +348,7 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios','cotizador'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
   if(t.dataset.t==='requerimiento')cargarReq();
   if(t.dataset.t==='cfdi')cargarPaquetes();
@@ -330,6 +356,7 @@ document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('clic
   if(t.dataset.t==='calendario')cargarCalendario();
   if(t.dataset.t==='registros')cargarRegistros();
   if(t.dataset.t==='criterios')cargarCriterios();
+  if(t.dataset.t==='cotizador')cargarCotizaciones();
 })});
 
 var drop=document.getElementById('drop');
@@ -572,6 +599,43 @@ function guardarReq(i){
   var x=REQ[i],b={encargo_id:ENC.id,fuente_clave:x.fuente_clave,estado:document.querySelector('[data-e="'+i+'"]').value,responsable:document.querySelector('[data-res="'+i+'"]').value.trim(),fecha_compromiso:document.querySelector('[data-fec="'+i+'"]').value||null};
   if(b.estado==='no_aplica'&&!x.nota){var n=prompt('¿Por qué no aplica?');if(!n)return;b.nota=n}
   api('POST','/api/kernel/requerimiento/item',b).then(function(){aviso('msgReq','Guardado','ok');cargarReq()}).catch(function(e){aviso('msgReq',e.message,'err')});
+}
+
+// ── Cotizador (módulo 26)
+function mxn(n){return '$'+Number(n||0).toLocaleString('es-MX',{maximumFractionDigits:0})}
+function tomarPerfil(){
+  if(!ENC)return;
+  api('GET','/api/kernel/cotizador/perfil?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){var p=r.perfil;
+    if(p.colaboradores!=null)document.getElementById('zC').value=p.colaboradores;if(p.registros!=null)document.getElementById('zR').value=p.registros;
+    document.getElementById('zK').value=p.corridas_mes;if(p.carga_patronal_mensual_c!=null)document.getElementById('zCar').value=centTxt(p.carga_patronal_mensual_c);
+    if(p.percepciones_mensuales_c!=null)document.getElementById('zPer').value=centTxt(p.percepciones_mensuales_c);
+    aviso('msgCot','Tomado de: '+(p.fuente.join(', ')||'calendario del encargo')+(p.colaboradores==null?'. Sin prenómina terminada: captura colaboradores y registros.':''),'ok');
+  }).catch(function(e){aviso('msgCot',e.message,'err')});
+}
+function insumosCot(){
+  var n=function(id){return Number(document.getElementById(id).value||0)},c=function(id){return document.getElementById(id).checked};
+  return {colaboradores:n('zC'),registros:n('zR'),corridas_mes:n('zK'),carga_patronal_mensual_c:aCent(document.getElementById('zCar').value)||0,percepciones_mensuales_c:aCent(document.getElementById('zPer').value)||0,
+    rfc_adicionales:n('zRfc'),ejercicios_anteriores:n('zEj'),horas_requerimiento:n('zHr'),saldos_recuperados_c:aCent(document.getElementById('zSal').value)||0,
+    preventiva:c('zPrev'),repse:c('zRepse'),contrato_colectivo:c('zCc'),sbc_variable:c('zSbc')};
+}
+function cotizarAhora(guardar){
+  var b={insumos:insumosCot()};
+  if(guardar){var pro=document.getElementById('zPro').value.trim();b.guardar=true;if(pro)b.prospecto=pro;else if(ENC){b.empresa_id=ENC.empresa_id;b.encargo_id=ENC.id}}
+  api('POST','/api/kernel/cotizador',b).then(function(r){pintarCot(r.cotizacion);if(guardar){aviso('msgCot','Cotización guardada.','ok');cargarCotizaciones()}else aviso('msgCot','')}).catch(function(e){aviso('msgCot',e.message,'err')});
+}
+function pintarCot(q){
+  var ra=q.ratios,h='<div class="op"><div class="t">'+esc(q.nivel)+' · iguala '+mxn(q.iguala_mensual)+' al mes</div><div class="r">'+esc(q.frecuencia)+' · diagnóstico (niveles A) '+mxn(q.diagnostico)+' ('+esc(q.k_diagnostico)+' × la iguala)</div>'+
+    '<div class="r">'+mxn(ra.iguala_por_colaborador)+' por colaborador'+(ra.iguala_pct_carga_patronal?' · '+esc(ra.iguala_pct_carga_patronal)+' % de la carga patronal':'')+(ra.iguala_pct_costo_total?' · '+esc(ra.iguala_pct_costo_total)+' % del costo total de nómina':'')+
+    (ra.diagnostico_pct_costo_total_anual?' · diagnóstico = '+esc(ra.diagnostico_pct_costo_total_anual)+' % del costo anual':'')+'</div></div>';
+  if(q.complementos_mensuales.length)h+='<h3>Complementos mensuales</h3>'+q.complementos_mensuales.map(function(c){return '<div style="font-size:12.5px">'+esc(c.concepto)+': '+mxn(c.importe)+'</div>'}).join('');
+  if(q.una_vez.length)h+='<h3>Montos de una vez</h3>'+q.una_vez.map(function(c){return '<div style="font-size:12.5px">'+esc(c.concepto)+': '+mxn(c.importe)+'</div>'}).join('');
+  h+='<h3>Cómo se calculó</h3><div style="font-size:12px;color:#5a7a8a">'+q.traza.map(esc).join('<br>')+'<br>Piso: '+mxn(q.piso.importe)+' (el mayor de $50 por colaborador y 0.85 % de la carga patronal mensual). Base de los porcentajes: '+esc(ra.base)+'. Tarifa '+esc(q.tarifa)+'.</div>';
+  document.getElementById('resCot').innerHTML=h;
+}
+function cargarCotizaciones(){
+  api('GET','/api/kernel/cotizaciones').then(function(r){
+    document.getElementById('tbCot').innerHTML=(r.cotizaciones||[]).map(function(c){return '<tr><td>'+fecha(c.creado_en)+'</td><td>'+esc(c.empresa||c.prospecto||'—')+'</td><td class="num">'+mxn(c.iguala_mensual)+'</td><td class="num">'+mxn(c.diagnostico)+'</td><td style="font-size:11px;color:#5a7a8a">'+esc(c.tarifa)+'</td></tr>'}).join('')||'<tr><td colspan="5" class="vacio">Sin cotizaciones guardadas.</td></tr>';
+  });
 }
 
 // ── Maestro de empleados y afiliación
