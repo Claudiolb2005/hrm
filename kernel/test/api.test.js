@@ -140,3 +140,11 @@ test('página /kernel: un solo <script>, JS del navegador sin errores de sintaxi
   assert.doesNotThrow(() => new Function(js));
   assert.ok(!/innerHTML\s*=\s*[^;]*\+\s*(i|x|c|g|r)\.(archivo_nombre|colaborador_id|motivo|fuente|tema)\s*\+/.test(js), 'campos del cliente sin esc()');
 });
+
+test('tema: se inyecta una vez en cualquier página, sus scripts compilan y no toca respuestas sin <head>', async () => {
+  const { aplicarTema } = await import('../../paginas/tema.js');
+  const h = aplicarTema('<!DOCTYPE html><html><head><title>x</title></head><body><div class="top"></div></body></html>');
+  assert.equal((h.match(/id="tema-hrm"/g) || []).length, 1);
+  for (const m of h.matchAll(/<script>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
+  assert.equal(aplicarTema('{"ok":true}'), '{"ok":true}');
+});

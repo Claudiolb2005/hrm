@@ -1,6 +1,7 @@
 import { rutasKernel } from "./api/kernel.js";
 import { avanzar as avanzarIngestas } from "./ingesta/trabajos.js";
 import { paginaKernel } from "./paginas/kernel.js";
+import { aplicarTema } from "./paginas/tema.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -76,7 +77,7 @@ function J(d, s = 200, c = {}) {
 }
 __name(J, "J");
 function H(html) {
-  return new Response(html, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+  return new Response(aplicarTema(html), { headers: { "Content-Type": "text/html;charset=utf-8" } });
 }
 __name(H, "H");
 async function sha256(s) {
@@ -1024,66 +1025,114 @@ var LOGOUT_FN = "async function logout(){var ok=true;if(typeof confirmAction==='
 var FMT_FN = "var fmt=function(n){return new Intl.NumberFormat('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)};";
 function pageLogin() {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HRM \u2014 Portal de Clientes</title>
+<title>HRM · Portal de supervisión de nómina</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(150deg,#e8f4f8 0%,#d5eff3 40%,#c4e8ee 100%);color:#1a2e3a}
-.nav{padding:18px 40px;background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid #b8ced8}.nav img{height:90px}
-.center{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
-.card{background:#fff;border:1px solid #b8ced8;border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(26,46,58,.08);position:relative;overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#1a8a8a,#40c8c8,#1a8a8a)}
-.card img{height:70px;display:block;margin:0 auto 28px}
-.card h2{font-size:22px;font-weight:800;text-align:center;margin-bottom:4px}
-.card .sub{color:#5f7d8a;font-size:14px;text-align:center;margin-bottom:28px}
-label{display:block;font-size:11px;font-weight:700;color:#5f7d8a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
-input{width:100%;padding:13px 16px;background:#f0f6f8;border:1.5px solid #b8ced8;border-radius:10px;color:#1a2e3a;font-size:15px;outline:none;transition:all .2s;margin-bottom:16px;font-family:inherit}
-input:focus{border-color:#1a8a8a;background:#fff;box-shadow:0 0 0 3px rgba(26,138,138,.08)}
-.btn{width:100%;padding:14px;background:linear-gradient(135deg,#1a8a8a,#20a0a0);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
-.btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(26,138,138,.3)}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.error{background:rgba(217,68,82,.06);border:1px solid rgba(217,68,82,.15);color:#d94452;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none}
-.foot{text-align:center;padding:20px;font-size:12px;color:#5f7d8a}
+body{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,.85fr);background:#F3F6F5;color:#10252B;font-family:'Instrument Sans',system-ui,sans-serif}
+.lado{position:relative;background:#0D2B31;color:#E4F0EE;padding:44px 56px;display:flex;flex-direction:column;overflow:hidden}
+.lado::after{content:'';position:absolute;inset:0;background:radial-gradient(900px 500px at 85% 110%,rgba(63,214,200,.10),transparent 60%);pointer-events:none}
+.marca img{height:64px;margin:-10px 0 0 -12px;filter:brightness(0) invert(1);opacity:.94}
+.tesis{margin-top:auto;max-width:560px;position:relative;z-index:1}
+.tesis h1{font-size:clamp(34px,4.2vw,56px);line-height:1.02;letter-spacing:-.035em;font-weight:600;color:#F2FAF9}
+.tesis p{margin-top:18px;font-size:16px;line-height:1.55;color:#A9C3C0;max-width:46ch}
+.cuadre{margin-top:40px;position:relative;z-index:1;border:1px solid #1D4B55;border-radius:14px;background:rgba(19,58,66,.55);max-width:620px;font-variant-numeric:tabular-nums}
+.cuadre .cab,.cuadre .fila{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr .9fr;gap:8px;padding:10px 16px;font-size:13px;align-items:center}
+.cuadre .cab{color:#7C9A97;font-size:12px;border-bottom:1px solid #1D4B55}
+.cuadre .fila{border-bottom:1px solid rgba(29,75,85,.6);color:#D6E7E5;opacity:0;transform:translateY(4px)}
+.cuadre .fila.ver{opacity:1;transform:none;transition:opacity .35s ease,transform .35s ease}
+.cuadre .fila span:not(:first-child),.cuadre .cab span:not(:first-child){text-align:right}
+.cuadre .dif{color:#E8B04A;font-weight:600;transition:color .3s}
+.cuadre .dif.ok{color:#3FD6C8}
+.cuadre .pie{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:12.5px;color:#93B1AE}
+.cuadre .pie b{color:#3FD6C8;font-weight:600}
+.sello{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#5F807C;letter-spacing:.02em}
+.nota{margin-top:22px;font-size:12px;color:#5F807C;position:relative;z-index:1}
+.form{display:flex;flex-direction:column;justify-content:center;padding:48px clamp(28px,5vw,72px);background:#FFFFFF}
+.form .caja{width:100%;max-width:360px;margin:0 auto}
+.form h2{font-size:26px;letter-spacing:-.025em;font-weight:600}
+.form .sub{color:#5E7479;font-size:14.5px;margin:6px 0 30px}
+label{display:block;font-size:13px;font-weight:600;color:#3B555B;margin-bottom:6px}
+input{width:100%;padding:12px 14px;background:#FBFDFC;border:1px solid #DCE5E3;border-radius:8px;color:#10252B;font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s;margin-bottom:18px;font-family:inherit}
+input:focus{border-color:#12857F;box-shadow:0 0 0 3px rgba(18,133,127,.14);background:#fff}
+.btn{width:100%;padding:13px;background:#0D2B31;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn:hover{background:#133A42}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.error{background:#FBEDEA;border:1px solid #F0CFC7;color:#9A2F1F;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+.ayuda{margin-top:22px;font-size:13px;color:#5E7479;line-height:1.6}
+.ayuda a{color:#12857F;font-weight:600;text-decoration:none}
+.foot{margin-top:40px;font-size:12px;color:#8FA3A6}
 .pw-wrap{position:relative}
-.pw-toggle{position:absolute;right:12px;top:13px;cursor:pointer;color:#8ba5b2;font-size:11px;font-weight:700;user-select:none;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em}
-.pw-toggle:hover{color:#1a8a8a;background:#f0f6f8}
-.lgo{position:fixed;inset:0;background:rgba(13,30,42,.55);backdrop-filter:blur(4px);z-index:9998;display:none;align-items:center;justify-content:center}
+.pw-toggle{position:absolute;right:10px;top:10px;cursor:pointer;color:#5E7479;font-size:12px;font-weight:600;user-select:none;padding:3px 8px;border-radius:6px}
+.pw-toggle:hover{color:#12857F;background:#EEF6F5}
+.lgo{position:fixed;inset:0;background:rgba(7,24,28,.5);backdrop-filter:blur(3px);z-index:9998;display:none;align-items:center;justify-content:center}
 .lgo.sh{display:flex}
-.lgo-c{background:#fff;border-radius:16px;padding:32px 44px;min-width:280px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.25)}
-.lgo-sp{width:48px;height:48px;border:4px solid #e8f1f4;border-top-color:#1a8a8a;border-radius:50%;margin:0 auto 18px;animation:lgoRot 1s linear infinite}
-.lgo-t{font-size:15px;font-weight:700;color:#1a2e3a}
+.lgo-c{background:#0D2B31;color:#E4F0EE;border:1px solid #1D4B55;border-radius:14px;padding:26px 36px;min-width:260px;text-align:center}
+.lgo-sp{width:36px;height:36px;border:3px solid #1D4B55;border-top-color:#3FD6C8;border-radius:50%;margin:0 auto 14px;animation:lgoRot .9s linear infinite}
+.lgo-t{font-size:14px;font-weight:600}
 @keyframes lgoRot{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-</style></head><body style="overflow-x:hidden;margin:0">
-<nav class="nav"><img src="${LOGO}" alt="HRM"></nav>
-<div class="center">
-  <div class="card">
-    <img src="${LOGO}" alt="HRM">
-    <h2>Portal de Clientes</h2>
-    <p class="sub">Ingresa tus credenciales para acceder</p>
-    <div class="error" id="error"></div>
-    <form id="lf">
-      <label>Correo electr\xF3nico</label>
-      <input type="email" id="email" placeholder="tu@empresa.com" autocomplete="email" required>
-      <label>Contrase\xF1a</label>
-      <div class="pw-wrap"><input type="password" id="password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required><span class="pw-toggle" id="pwTog" onclick="togPw()">Mostrar</span></div>
-      <button type="submit" class="btn" id="btn">Iniciar sesi\xF3n</button>
-    </form>
-    <p style="text-align:center;margin-top:20px;font-size:12px;color:#5f7d8a">\xBFNecesitas acceso? Contacta a tu administrador HRM</p>
-    <p style="text-align:center;margin-top:8px"><a href="#" onclick="showForgot()" style="font-size:13px;color:#1a8a8a;text-decoration:none;font-weight:600">\xBFOlvidaste tu contrase\xF1a?</a></p>
+#forgotModal .mod{background:#fff;border-radius:14px;padding:30px;width:100%;max-width:400px;box-shadow:0 30px 80px rgba(0,0,0,.25)}
+@media(max-width:900px){body{grid-template-columns:1fr}.lado{padding:28px 24px 30px}.tesis{margin-top:36px}.cuadre{display:none}.nota{display:none}.form{padding:36px 24px}}
+@media (prefers-reduced-motion:reduce){.cuadre .fila{opacity:1;transform:none}}
+</style></head><body>
+<section class="lado" aria-label="HRM Consultores">
+  <div class="marca"><img src="${LOGO}" alt="HRM Human Resources Management"></div>
+  <div class="tesis">
+    <h1>Tu nómina, verificada al centavo.</h1>
+    <p>Recalculamos cada retención y cada cuota desde la ley, y conciliamos tu nómina contra tus CFDI y tus pagos. Lo que no cuadra, aparece con nombre y monto.</p>
   </div>
-  <div id="forgotModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:none;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:20px;padding:36px;width:100%;max-width:400px;box-shadow:0 16px 48px rgba(0,0,0,.15)">
-      <h3 style="font-size:18px;font-weight:800;margin-bottom:8px">Recuperar contrase\xF1a</h3>
-      <p style="color:#5f7d8a;font-size:13px;margin-bottom:20px">Ingresa tu correo y te enviaremos un enlace para restablecer tu contrase\xF1a</p>
+  <div class="cuadre" aria-hidden="true">
+    <div class="cab"><span>Corrida</span><span>Nómina</span><span>CFDI</span><span>Pagos</span><span>Diferencia</span></div>
+    <div class="fila" data-d="0.62"><span>Semana 05</span><span>1,284,310.55</span><span>1,284,310.55</span><span>1,284,310.55</span><span class="dif">0.62</span></div>
+    <div class="fila" data-d="0.40"><span>Semana 06</span><span>1,301,977.20</span><span>1,301,977.20</span><span>1,301,977.20</span><span class="dif">0.40</span></div>
+    <div class="fila" data-d="1.06"><span>Catorcena 03</span><span>412,866.04</span><span>412,866.04</span><span>412,866.04</span><span class="dif">1.06</span></div>
+    <div class="fila" data-d="0.18"><span>Finiquitos</span><span>96,420.80</span><span>96,420.80</span><span>96,420.80</span><span class="dif">0.18</span></div>
+    <div class="pie"><span id="cuadreEstado">Conciliando tres fuentes…</span><span class="sello">ejemplo ilustrativo</span></div>
+  </div>
+  <p class="nota">Cifras de ejemplo. Tus datos sólo se ven después de entrar.</p>
+</section>
+<main class="form">
+  <div class="caja">
+    <h2>Entra a tu portal</h2>
+    <p class="sub">Informes de supervisión de nómina de HRM Consultores.</p>
+    <div class="error" id="error" role="alert"></div>
+    <form id="lf">
+      <label for="email">Correo</label>
+      <input type="email" id="email" placeholder="tu@empresa.com" autocomplete="email" required>
+      <label for="password">Contraseña</label>
+      <div class="pw-wrap"><input type="password" id="password" placeholder="Tu contraseña" autocomplete="current-password" required><span class="pw-toggle" id="pwTog" onclick="togPw()" role="button" tabindex="0">Mostrar</span></div>
+      <button type="submit" class="btn" id="btn">Iniciar sesión</button>
+    </form>
+    <p class="ayuda"><a href="#" onclick="showForgot();return false">Olvidé mi contraseña</a><br>¿Aún no tienes acceso? Pídelo a tu consultor de HRM.</p>
+    <p class="foot">© 2026 HRM Human Resources Management</p>
+  </div>
+  <div id="forgotModal" style="position:fixed;inset:0;background:rgba(7,24,28,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px">
+    <div class="mod">
+      <h3 style="font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px">Restablecer contraseña</h3>
+      <p style="color:#5E7479;font-size:13.5px;margin-bottom:20px">Te enviamos un enlace a tu correo para crear una nueva.</p>
       <div id="fMsg" style="display:none;padding:10px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
-      <label>Correo electr\xF3nico</label>
+      <label for="fEmail">Correo</label>
       <input type="email" id="fEmail" placeholder="tu@empresa.com">
       <button class="btn" onclick="sendRecover()" id="fBtn" style="width:100%;margin-top:4px">Enviar enlace</button>
-      <p style="text-align:center;margin-top:14px"><a href="#" onclick="closeForgot()" style="font-size:13px;color:#3d5a6b">Cancelar</a></p>
+      <p style="text-align:center;margin-top:14px"><a href="#" onclick="closeForgot();return false" style="font-size:13px;color:#5E7479">Cancelar</a></p>
     </div>
   </div>
-</div>
-<div id="__lgo" class="lgo"><div class="lgo-c"><div class="lgo-sp"></div><div class="lgo-t" id="__lgoT">Iniciando sesi\xF3n...</div></div></div>
-<div class="foot">\xA9 2026 HRM Human Resources Management</div>
+</main>
+<div id="__lgo" class="lgo"><div class="lgo-c"><div class="lgo-sp"></div><div class="lgo-t" id="__lgoT">Iniciando sesión...</div></div></div>
+<script>
+// Portada: las filas llegan, la diferencia se explica y la conciliación cierra en cero.
+(function(){
+  var filas=[].slice.call(document.querySelectorAll('.cuadre .fila')),est=document.getElementById('cuadreEstado');
+  var quieto=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function cerrar(f){var d=f.querySelector('.dif');d.textContent='0.00';d.classList.add('ok')}
+  if(quieto){filas.forEach(function(f){f.classList.add('ver');cerrar(f)});est.innerHTML='<b>Conciliado</b> · 0 diferencias sin explicar';return}
+  filas.forEach(function(f,i){
+    setTimeout(function(){f.classList.add('ver')},250+i*260);
+    var d=f.querySelector('.dif'),v=parseFloat(f.dataset.d),t0=1500+i*380,pasos=14;
+    for(var k=1;k<=pasos;k++)(function(k){setTimeout(function(){d.textContent=(v*(1-k/pasos)).toFixed(2);if(k===pasos)cerrar(f)},t0+k*45)})(k);
+  });
+  setTimeout(function(){est.innerHTML='<b>Conciliado</b> · 0 diferencias sin explicar'},1500+filas.length*380+700);
+})();
+</script>
 <script>
 // Clear old session on login page load
 localStorage.removeItem('hrm_token');
@@ -1093,7 +1142,7 @@ document.getElementById('lf').addEventListener('submit', async function(e) {
   e.preventDefault();
   var btn = document.getElementById('btn'), err = document.getElementById('error');
   err.style.display = 'none';
-  btn.disabled = true; btn.textContent = 'Verificando...';
+  btn.disabled = true; btn.textContent = 'Entrando…';
   var lgo = document.getElementById('__lgo'); if(lgo){document.getElementById('__lgoT').textContent='Verificando credenciales...';lgo.classList.add('sh');}
   try {
     var r = await fetch('/api/login', {
@@ -3445,6 +3494,50 @@ tr.tot td{font-weight:800;color:#1a2e3a;border-top:2px solid #b8ced8;background:
 
 
 @media(max-width:600px){.emp-grid,.imp-grid{grid-template-columns:1fr!important}}
+
+.cuadre3{background:#0D2B31;color:#E4F0EE;border:1px solid #1D4B55;border-radius:14px;padding:22px 24px 24px;margin-bottom:14px}
+.c3-cab{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}
+.c3-cab h2{font-size:17px;font-weight:600;letter-spacing:-.015em;color:#F2FAF9}
+.c3-cab p{font-size:13px;color:#93B1AE;margin-top:2px}
+.c3-est{font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid #1D4B55;color:#A9C3C0;white-space:nowrap}
+.c3-est.ok{color:#3FD6C8;border-color:rgba(63,214,200,.45);background:rgba(63,214,200,.08)}
+.c3-est.casi{color:#9EE6C9;border-color:rgba(158,230,201,.35)}
+.c3-est.dif{color:#F1C26B;border-color:rgba(241,194,107,.45);background:rgba(241,194,107,.08)}
+.c3-fila{display:grid;grid-template-columns:1fr minmax(70px,.55fr) 1fr minmax(70px,.55fr) 1fr;align-items:center}
+.c3-n span{display:block;font-size:12.5px;color:#93B1AE}
+.c3-n b{display:block;font-size:clamp(17px,2vw,22px);font-weight:600;letter-spacing:-.02em;color:#F2FAF9;margin:3px 0 2px;font-variant-numeric:tabular-nums}
+.c3-n i{font-style:normal;font-size:12px;color:#6F8F8C}
+.c3-l{position:relative;height:28px;margin:0 10px}
+.c3-l::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#2B5C66}
+.c3-l span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#0D2B31;padding:2px 8px;font-size:12px;font-weight:600;border-radius:999px;border:1px solid #2B5C66;color:#A9C3C0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.c3-l.ok::before{background:linear-gradient(90deg,#2B5C66,#3FD6C8,#2B5C66)}
+.c3-l.ok span{color:#3FD6C8;border-color:rgba(63,214,200,.5)}
+.c3-l.casi span{color:#9EE6C9;border-color:rgba(158,230,201,.4)}
+.c3-l.dif span{color:#F1C26B;border-color:rgba(241,194,107,.5)}
+.c3-l.falta::before{background:repeating-linear-gradient(90deg,#2B5C66 0 4px,transparent 4px 8px)}
+.cuadre3.anim .c3-l::before{transform-origin:left;animation:c3Linea .7s ease-out both}
+.cuadre3.anim #c3L2::before{animation-delay:.25s}
+@keyframes c3Linea{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.res-fig{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #DCE5E3;border-radius:14px;background:#fff;margin-bottom:14px}
+.res-fig div{padding:16px 20px}
+.res-fig div+div{border-left:1px solid #E9EFEE}
+.res-fig span{display:block;font-size:12.5px;color:#5E7479}
+.res-fig b{display:block;font-size:20px;font-weight:600;letter-spacing:-.02em;margin-top:2px;color:#10252B;font-variant-numeric:tabular-nums}
+.res-fig b.neg{color:#9A2F1F}
+.res-det{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;margin-bottom:24px;align-items:start}
+.res-p{padding:18px 20px!important}
+.res-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid #E9EFEE}
+.res-h span{font-size:13.5px;font-weight:600;color:#10252B}
+.res-h b{font-size:20px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.res-g{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px;font-size:12.5px}
+.res-r{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.res-r span{color:#5E7479}
+.res-r b{font-weight:500;color:#10252B;font-variant-numeric:tabular-nums}
+.res-r.tot{border-top:1px solid #E9EFEE;margin-top:3px;padding-top:5px}
+.res-r.tot b,.res-r.tot span{font-weight:600;color:#10252B}
+.res-sub{font-size:12px;font-weight:600;color:#12857F;margin:2px 0 3px}
+@media(max-width:760px){.c3-fila{grid-template-columns:1fr;gap:6px}.c3-l{height:26px;margin:2px 0}.c3-l::before{left:50%;right:auto;top:0;bottom:0;width:1px;height:auto;transform:none!important;animation:none!important}.c3-l span{left:50%}
+.c3-cab{flex-direction:column}.res-fig{grid-template-columns:1fr}.res-fig div+div{border-left:0;border-top:1px solid #E9EFEE}.res-det{grid-template-columns:1fr}.res-g{grid-template-columns:1fr}}
 </style></head><body style="overflow-x:hidden;margin:0">
 <div class="top">
   <div class="top-l"><img src="${LOGO}" alt="HRM"></div>
@@ -3481,16 +3574,26 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
   if(!p){document.getElementById('ts').textContent='Periodo no encontrado';return}
   document.getElementById('ts').textContent=(p.empresa_nombre||'')+' \u2014 '+p.mes+' '+p.anio;
   
-  // KPIs from periodo
+  // Resumen: el cuadre de tres fuentes primero (lo que verificamos), luego las cifras del mes.
   document.getElementById('kpis').innerHTML=
-    '<div class="g4" style="gap:12px;margin-bottom:12px">'+
-    '<div class="kpi" style="border-top:3px solid '+tl+'"><div style="font-size:10px;font-weight:700;color:#5a7a8a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Percepciones</div><div style="font-size:18px;font-weight:800;color:'+tl+';font-family:monospace">$'+fmt(p.total_percepciones)+'</div></div>'+
-    '<div class="kpi" style="border-top:3px solid '+rd+'"><div style="font-size:10px;font-weight:700;color:#5a7a8a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Deducciones</div><div style="font-size:18px;font-weight:800;color:'+rd+';font-family:monospace">$'+fmt(p.total_deducciones)+'</div></div>'+
-    '<div class="kpi" style="border-top:3px solid '+bl+'"><div style="font-size:10px;font-weight:700;color:#5a7a8a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Neto</div><div style="font-size:18px;font-weight:800;color:'+bl+';font-family:monospace">$'+fmt(p.total_neto)+'</div></div>'+
+    '<section class="cuadre3" id="cuadre3" aria-label="Cuadre de tres fuentes">'+
+      '<div class="c3-cab"><div><h2>Cuadre de tres fuentes</h2><p>El neto de la nómina contra lo timbrado en CFDI y lo dispersado en bancos.</p></div><span class="c3-est" id="c3Est">Calculando…</span></div>'+
+      '<div class="c3-fila">'+
+        '<div class="c3-n"><span>Nómina · neto</span><b>$'+fmt(p.total_neto)+'</b><i>Base de comparación</i></div>'+
+        '<div class="c3-l" id="c3L1"><span id="c3D1">—</span></div>'+
+        '<div class="c3-n"><span>CFDI timbrados</span><b id="c3V1">—</b><i id="c3S1"></i></div>'+
+        '<div class="c3-l" id="c3L2"><span id="c3D2">—</span></div>'+
+        '<div class="c3-n"><span>Dispersión bancaria</span><b id="c3V2">—</b><i id="c3S2"></i></div>'+
+      '</div>'+
+    '</section>'+
+    '<div class="res-fig">'+
+      '<div><span>Percepciones</span><b>$'+fmt(p.total_percepciones)+'</b></div>'+
+      '<div><span>Deducciones</span><b class="neg">$'+fmt(p.total_deducciones)+'</b></div>'+
+      '<div><span>Neto pagado</span><b>$'+fmt(p.total_neto)+'</b></div>'+
     '</div>'+
-    '<div class="kpi-row2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">'+
-    '<div class="kpi" style="border-top:3px solid '+pr+'"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:#5a7a8a;text-transform:uppercase;letter-spacing:.08em">Empleados</div><div style="font-size:22px;font-weight:800;color:#1a2e3a">'+p.total_empleados.toLocaleString()+'</div></div><div style="border-top:1px solid #e8f1f4;padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;font-size:11px" id="empGrid"></div></div>'+
-    '<div class="kpi" style="border-top:3px solid '+am+'"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:#5a7a8a;text-transform:uppercase;letter-spacing:.08em">Impuestos</div><div style="font-size:18px;font-weight:800;color:'+am+';font-family:monospace" id="impTotalV">$0</div></div><div style="border-top:1px solid #e8f1f4;padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:11px" id="impGrid"></div></div>'+
+    '<div class="res-det">'+
+      '<div class="kpi res-p"><div class="res-h"><span>Colaboradores</span><b>'+p.total_empleados.toLocaleString()+'</b></div><div class="res-g" id="empGrid"></div></div>'+
+      '<div class="kpi res-p"><div class="res-h"><span>Impuestos y cuotas del mes</span><b id="impTotalV">$0</b></div><div class="res-g" id="impGrid"></div></div>'+
     '</div>';
 
   // Load all report sections from API
@@ -3501,13 +3604,32 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
   
   
   
+  // Cuadre de tres fuentes (sec1): diferencias contra el neto de la nómina
+  (function(){
+    var s1=window.RD['sec1']||{};
+    function pinta(n,total,dif){
+      var v=document.getElementById('c3V'+n),d=document.getElementById('c3D'+n),l=document.getElementById('c3L'+n),sb=document.getElementById('c3S'+n);
+      if(total==null){v.textContent='Sin dato';sb.textContent='Fuente no cargada';l.className='c3-l falta';d.textContent='sin fuente';return null}
+      v.textContent='$'+fmt(total);var a=Math.abs(dif||0);
+      d.textContent=a<0.005?'0.00':(dif>0?'+':'−')+fmt(a);
+      l.className='c3-l '+(a<0.005?'ok':a<=5?'casi':'dif');
+      sb.textContent=a<0.005?'Cuadra al centavo':'Diferencia de $'+fmt(a);
+      return a;
+    }
+    var a1=pinta(1,s1.cfdi_total,s1.cfdi_dif),a2=pinta(2,s1.disp_total,s1.disp_dif);
+    var e=document.getElementById('c3Est');
+    if(a1==null&&a2==null){e.textContent='Sin fuentes para conciliar';e.className='c3-est neutro'}
+    else{var m=Math.max(a1||0,a2||0);e.textContent=m<0.005?'Cuadra al centavo':m<=5?'Diferencias menores a $5':'Hay diferencias por explicar';e.className='c3-est '+(m<0.005?'ok':m<=5?'casi':'dif')}
+    if(window.matchMedia&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.getElementById('cuadre3').classList.add('anim');
+  })();
+
   // Populate employee breakdown grid
   var s1d=window.RD['sec1']||{};
   var empG=document.getElementById('empGrid');
   if(empG){
     var rows=[{l:'Semanales',v:s1d.sem_prom||0},{l:'Catorcenales',v:s1d.cat_prom||0},{l:'Finiquitos',v:s1d.emp_finiquitos||0},{l:'Bonos sem.',v:s1d.emp_bonos_sem||0},{l:'Bonos cat.',v:s1d.emp_bonos_cat||0}];
     if(s1d.emp_gratificacion)rows.push({l:'Gratificaci\xF3n',v:s1d.emp_gratificacion});
-    empG.innerHTML=rows.map(function(r){return '<div style="display:flex;justify-content:space-between"><span style="color:#8ba5b2">'+r.l+'</span><span style="font-weight:700;color:#1a2e3a">'+r.v.toLocaleString()+'</span></div>'}).join('');
+    empG.innerHTML=rows.map(function(r){return '<div class="res-r"><span>'+r.l+'</span><b>'+r.v.toLocaleString()+'</b></div>'}).join('');
   }
 
   // Populate impuestos breakdown grid
@@ -3518,17 +3640,17 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
   var impG=document.getElementById('impGrid');
   if(impG){
     var h='<div>';
-    h+='<div style="font-size:9px;font-weight:700;color:'+am+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Trabajador</div>';
+    h+='<div class="res-sub">Retenido al trabajador</div>';
     [{l:'ISR',v:s7d.total_isr},{l:'IMSS+RCV',v:s7d.total_imss},{l:'Infonavit',v:s7d.total_info},{l:'FONACOT',v:s7d.total_fon}].forEach(function(r){
-      h+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#8ba5b2">'+r.l+'</span><span style="font-weight:600;color:#1a2e3a;font-family:monospace;font-size:10px">$'+fmt(r.v||0)+'</span></div>';
+      h+='<div class="res-r"><span>'+r.l+'</span><b>$'+fmt(r.v||0)+'</b></div>';
     });
-    h+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-top:1px solid #e8f1f4;margin-top:2px"><span style="font-weight:700;color:'+am+';font-size:10px">Subtotal</span><span style="font-weight:700;color:'+am+';font-family:monospace;font-size:10px">$'+fmt(s7d.total_trabajador||0)+'</span></div>';
+    h+='<div class="res-r tot"><span>Subtotal</span><b>$'+fmt(s7d.total_trabajador||0)+'</b></div>';
     h+='</div><div>';
-    h+='<div style="font-size:9px;font-weight:700;color:'+tl+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Patr\xF3n</div>';
+    h+='<div class="res-sub">A cargo del patr\xF3n</div>';
     [{l:'IMSS',v:s8d.total_imss},{l:'RCV',v:s8d.total_rcv},{l:'Infonavit',v:s8d.total_info},{l:'Imp. estatal',v:s8d.isn_total}].forEach(function(r){
-      h+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#8ba5b2">'+r.l+'</span><span style="font-weight:600;color:#1a2e3a;font-family:monospace;font-size:10px">$'+fmt(r.v||0)+'</span></div>';
+      h+='<div class="res-r"><span>'+r.l+'</span><b>$'+fmt(r.v||0)+'</b></div>';
     });
-    h+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #e8f1f4;margin-top:2px"><span style="font-weight:700;color:'+tl+';font-size:10px">Subtotal</span><span style="font-weight:700;color:'+tl+';font-family:monospace;font-size:10px">$'+fmt(s8d.total_patron||0)+'</span></div>';
+    h+='<div class="res-r tot"><span>Subtotal</span><b>$'+fmt(s8d.total_patron||0)+'</b></div>';
     h+='</div>';
     h+='<div id="impPdfLink" style="grid-column:1/-1;text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid #e8f1f4"><span style="color:#8ba5b2;font-size:10px">Cargando PDF...</span></div>';
     impG.innerHTML=h;
