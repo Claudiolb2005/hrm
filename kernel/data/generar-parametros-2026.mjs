@@ -106,7 +106,7 @@ for (const c of ['liquidacion', 'indemnizacion', 'prima_antiguedad']) EXE(c, { t
 EXE('fondo_ahorro_empresa', { tipo: 'requisitos', requisitos: 'LISR art. 93 fr. XI y art. 27 LSS' }, 'LISR art. 93 fr. XI', 'B', 'Exento sólo si el perfil del cliente acredita requisitos. PRIME: no los cumple (P2, hallazgo 5).');
 EXE('subsidio_incapacidad', { tipo: 'pendiente', decision: 'fr. VIII: previsión social general; pendiente de decisión' }, 'LISR art. 93 fr. VIII', 'C', 'Decisión pendiente con Rafael.');
 
-// ── ISN: tasas por entidad (32 entidades en el catálogo; aquí sólo las que cita la revisión).
+// ── ISN: tasas por entidad (las 32 del catálogo ISN_32).
 const ISN = (ent, valor, desde, hasta, nivel, notas) => add({ id: 'ISN_TASA:' + ent + '@' + desde.slice(0, 4), clave: 'ISN_TASA', entidad: ent, tipo: 'escalar', valor,
   vigencia_desde: desde, vigencia_hasta: hasta, base_temporal: 'mes_causacion', fundamento: 'Ley de hacienda / código fiscal de la entidad', fuente: CAT, nivel, notas });
 const subieron = { BCS: ['2.5', '3'], CHIS: ['2', '3'], CHIH: ['3', '4'], COL: ['2', '3'], MOR: ['2.5', '3'], YUC: ['3', '3.75'] };
@@ -115,6 +115,11 @@ for (const [e, [t25, t26]] of Object.entries(subieron)) {
   ISN(e, t26, '2026-01-01', '2026-12-31', 'B', e === 'YUC' ? '3% efectivo para micro y pequeñas con estímulo.' : undefined);
 }
 ISN('CDMX', '4', '2026-01-01', '2026-12-31', 'B');
+// Resto de las 32 (catálogo ISN_32, corte 12-oct-2026; tasa 2026 sin cambio contra 2025).
+for (const [e, t] of [['AGS', '2.5'], ['BC', '4.25'], ['CAMP', '3'], ['COAH', '3'], ['DGO', '3'], ['MEX', '3'], ['GTO', '3'], ['GRO', '3'], ['HGO', '3'],
+  ['MICH', '3'], ['NAY', '3'], ['NL', '3'], ['OAX', '3'], ['PUE', '3'], ['QRO', '3'], ['QROO', '4'], ['SLP', '3'], ['TAMS', '3'], ['ZAC', '3.5']]) {
+  ISN(e, t, '2026-01-01', '2026-12-31', 'B', e === 'BC' ? 'Tasa única 4.25% (LH BC art. 151-16); ya sin sobretasas separadas.' : undefined);
+}
 ISN('SON', '3', '2026-01-01', '2026-12-31', 'B');
 ISN('VER', '3', '2026-01-01', '2026-12-31', 'B');
 ISN('JAL', '3', '2026-01-01', '2026-12-31', 'B');
@@ -130,10 +135,52 @@ ADI('JAL', { descripcion: '5% especial: ¿asimilados o consejeros?' }, 'Sólo ap
 ADI('TLAX', { descripcion: 'Sin condonación general en la LI Tlaxcala 2026; sólo exenciones e incentivos condicionados (arts. 16–18 y 24)' }, 'Aplica sólo si el cliente acredita el supuesto.');
 
 // ── ISN: trato por concepto × entidad (cuadro de R. González). Sin fundamento por celda (V8) → nivel C.
-const ISNC = (ent, concepto, trato) => add({ id: 'ISN_CONCEPTO:' + concepto + ':' + ent + '@2026', clave: 'ISN_CONCEPTO:' + concepto, entidad: ent, tipo: 'objeto',
-  valor: { trato }, vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion',
-  fundamento: 'Pendiente por celda (V8)', fuente: 'Cuadro de conceptos de ISN por estado (R. González)', nivel: 'C' });
-for (const c of ['liquidacion', 'indemnizacion', 'prima_antiguedad', 'fondo_ahorro_empresa']) ISNC('CDMX', c, 'exento');
+// Cuadro completo (32 entidades, hoja «EXENCIONES ISN» de R. González, recibido 19-oct-2026). Un dígito por entidad en el
+// orden del cuadro: 1 = exento (✔), 0 = grava (❌). «exento_hasta» = exento con condición o tope: el kernel lo trata como
+// gravado y limita hasta tener el detalle. La celda vacía no existe: todas las del cuadro están capturadas.
+const ORDEN = ['AGS', 'BC', 'BCS', 'CAMP', 'CHIS', 'CHIH', 'COAH', 'COL', 'CDMX', 'DGO', 'MEX', 'GTO', 'GRO', 'HGO', 'JAL', 'MICH',
+  'MOR', 'NAY', 'NL', 'OAX', 'PUE', 'QROO', 'QRO', 'SLP', 'SIN', 'SON', 'TAB', 'TAMS', 'TLAX', 'VER', 'YUC', 'ZAC'];
+const CUADRO = [
+  // [conceptos del kernel, renglón del cuadro, 32 dígitos, trato cuando es 1, condición]
+  [['ptu'], 'Participación de los trabajadores en utilidades', '11000111110011110111101110111110', 'exento'],
+  [['indemnizacion_riesgo_trabajo'], 'Indemnizaciones por riesgos o enfermedades profesionales', '10111111111111111111111110111110', 'exento'],
+  [['pensiones'], 'Pensiones y jubilaciones', '10111111111111111111111110111110', 'exento'],
+  [['liquidacion', 'indemnizacion', 'prima_antiguedad'], 'Indemnizaciones y primas de retiro', '11001111111111101111111110111010', 'exento'],
+  [['gastos_funerarios'], 'Pagos por gastos funerarios', '10111111111111110111110111111110', 'exento'],
+  [['viaticos'], 'Gastos de representación y viáticos comprobados', '10010111110100111011001101010100', 'exento_hasta', 'Sólo si están comprobados'],
+  [['aportaciones_seguridad_social'], 'Aportaciones a SAR, INFONAVIT, IMSS, ISSSTE, ISSFAM', '10110111110111111101111111011100', 'exento'],
+  [['fondo_ahorro_empresa'], 'El ahorro', '10110111110101011111110101010100', 'exento_hasta', 'Condicionado a que el fondo cumpla requisitos; PRIME no los cumple (C18)'],
+  [['premio_asistencia', 'premio_puntualidad'], 'Premios por asistencia y puntualidad', '10000110010100011000100100000100', 'exento_hasta', 'Hasta 10% del salario base'],
+  [['tiempo_extra'], 'Pagos por tiempo extra', '10000010010100011001000001000100', 'exento_hasta', 'Condicionado a los límites legales'],
+  [['alimentacion_habitacion'], 'Alimentación y habitación', '10010111110101011001110001010100', 'exento_hasta', 'Cuando se otorguen con cargo al trabajador'],
+  [['comedor_transporte_uniformes'], 'Servicio de comedor, bono de transporte, uniformes', '10010101000100000000000001000100', 'exento'],
+  [['vales_despensa'], 'Despensas en dinero o especie', '10100110110101011011111100000100', 'exento_hasta', 'Tope por entidad (40% UMA o SM; Morelos 30% SM)'],
+  [['instrumentos_trabajo'], 'Instrumentos y materiales para el trabajo', '10110111110010010001111001000100', 'exento'],
+  [['remuneracion_discapacidad'], 'Remuneraciones a trabajadores con discapacidad', '10000000101000000010000001000000', 'exento_hasta', 'Depende de la condición del trabajador'],
+  [['prevision_social'], 'Prestaciones de previsión social', '01000000100000000000000000000000', 'exento'],
+  [['vacaciones'], 'Las vacaciones', '00000000000000010000000000000000', 'exento'],
+  [['intereses_creditos'], 'Intereses por créditos al personal', '00000000000010000000000000000000', 'exento'],
+  [['prima_vacacional'], 'Prima vacacional', '00000000000000000000000010000000', 'exento'],
+];
+// Aguinaldo: Nayarit exento; Sinaloa exento hasta 30 UMA si es general (renglón «Aguinaldo y gratificaciones»). Gratificación: sólo Sinaloa.
+const AGUINALDO = { NAY: ['exento'], SIN: ['exento_hasta', 'Hasta 30 UMA cuando se otorgue de manera general'] };
+const ISNC = (ent, concepto, trato, renglon, condicion, nivel = 'C', fundamento = 'Pendiente por celda (V8)', fuente = 'Cuadro de conceptos de ISN por estado (R. González, 19-oct-2026)') =>
+  add({ id: 'ISN_CONCEPTO:' + concepto + ':' + ent + '@2026', clave: 'ISN_CONCEPTO:' + concepto, entidad: ent, tipo: 'objeto',
+    valor: condicion ? { trato, condicion } : { trato }, vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion',
+    fundamento, fuente, nivel, notas: renglon ? 'Renglón del cuadro: ' + renglon : undefined });
+for (const [conceptos, renglon, digitos, trato, cond] of CUADRO) {
+  if (digitos.length !== 32) throw new Error('Cuadro ISN: ' + renglon + ' no trae 32 entidades');
+  ORDEN.forEach((ent, i) => { for (const c of conceptos) digitos[i] === '1' ? ISNC(ent, c, trato, renglon, cond) : ISNC(ent, c, 'grava', renglon); });
+}
+for (const ent of ORDEN) {
+  const a = AGUINALDO[ent];
+  ISNC(ent, 'aguinaldo', a ? a[0] : 'grava', 'Aguinaldo / Aguinaldo y gratificaciones', a ? a[1] : undefined);
+  ISNC(ent, 'gratificacion', ent === 'SIN' ? 'exento_hasta' : 'grava', 'Aguinaldo y gratificaciones', ent === 'SIN' ? 'Hasta 30 UMA cuando se otorgue de manera general' : undefined);
+  // Remuneración ordinaria: objeto del impuesto en todas las entidades (no es exención del cuadro).
+  for (const c of ['sueldo', 'bono', 'comisiones', 'incentivos', 'retroactivo', 'ajuste_sueldo', 'prima_dominical', 'dia_festivo', 'dia_descanso']) {
+    ISNC(ent, c, 'grava', null, undefined, 'B', 'Objeto del impuesto: toda remuneración al trabajo personal subordinado (ley de la entidad)', 'Reglas v1 (19-oct-2026)');
+  }
+}
 
 // ── Valuación de hallazgos (módulo 18): actualización, recargos y multas.
 // INPC mensual, base 2a quincena de julio 2018 = 100. Fuente: boletines del INEGI (la publicación en el DOF,

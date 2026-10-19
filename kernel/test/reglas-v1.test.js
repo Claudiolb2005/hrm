@@ -135,9 +135,8 @@ test('CALC-INF-001 · emp 1067513: 5% × 4,311.16 = 215.56 (= nómina)', () => {
 });
 
 test('CALC-ISN-001 · Y6079749104 CDMX agosto: con el cuadro 471,623.37; queda limitado (cuadro sin fundamento, V8)', () => {
-  const extendido = catalogoSemilla([{ id: 'TEST:ISN_CONCEPTO:sueldo:CDMX', clave: 'ISN_CONCEPTO:sueldo', entidad: 'CDMX', tipo: 'objeto', valor: { trato: 'grava' },
-    vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion', fundamento: 'prueba', fuente: 'prueba', nivel: 'B' }]);
-  const { r, ctx } = correr(extendido, 'CALC-ISN-001', { registro: 'Y6079749104', entidad: 'CDMX', mes: '2026-08',
+  // Desde 0.9.0 el sueldo grava en la semilla (nivel B) y la liquidación está exenta en CDMX según el cuadro (nivel C).
+  const { r, ctx } = correr(cat, 'CALC-ISN-001', { registro: 'Y6079749104', entidad: 'CDMX', mes: '2026-08',
     conceptos: [{ concepto: 'sueldo', monto_c: 1179058427 }, { concepto: 'liquidacion', monto_c: 78768305 }] });
   assert.equal(r.valor_c, 47162337);
   assert.equal(r.traza.base_c, 1179058427);
@@ -149,4 +148,68 @@ test('CALC-ISN-001 · Y6079749104 CDMX agosto: con el cuadro 471,623.37; queda l
 test('CALC-ISN-001 · Chihuahua: adicionales en nivel C producen limitación', () => {
   const { ctx } = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'CHIH', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 100000 }] });
   assert.ok(ctx.limitaciones.some(l => l.detalle === 'ISN_ADICIONAL:CHIH@2026'));
+});
+
+// ── 0.9.0: PTU (RLISR art. 174, C17), separación (LISR art. 95, C16) y cuadro ISN de 32 entidades.
+// Cifras calculadas a mano con aritmética decimal fuera del kernel (tarifa mensual del Anexo 8).
+test('CALC-ISR-174-001 · PTU 10,000 con SD 400: exento 15 UMA, gravado 8,240.35, ISR 1,049.17', () => {
+  const ex = correr(cat, 'CALC-EXE-001', { fecha_pago: '2026-08-12', percepciones: [{ concepto: 'ptu', monto_c: 1000000 }], consumido: { ptu: 0 } }).r;
+  assert.equal(ex.valor_c, 824035);
+  const { r, ctx } = correr(cat, 'CALC-ISR-174-001', { pago_gravable_c: ex.valor_c, salario_diario_c: 40000, fecha_pago: '2026-08-12', concepto: 'ptu' });
+  assert.equal(r.valor_c, 104917);
+  assert.equal(r.traza.sueldo_mensual, '12160');
+  assert.ok(ctx.criterios.has('C17'));
+  assert.equal(correr(cat, 'CALC-ISR-174-001', { pago_gravable_c: 0, salario_diario_c: 40000, fecha_pago: '2026-08-12' }).r.valor_c, 0);
+});
+
+test('CALC-ISR-174-001 · con sueldo mensual dado no usa el criterio del salario diario', () => {
+  const { r, ctx } = correr(cat, 'CALC-ISR-174-001', { pago_gravable_c: 824035, sueldo_mensual_c: 1216000, fecha_pago: '2026-08-12' });
+  assert.equal(r.valor_c, 104917);
+  assert.ok(!ctx.criterios.has('C17'));
+});
+
+test('CALC-ISR-SEP-001 · gravado 50,000 con SD 500 (sueldo 15,000): tasa 9.35%, ISR 4,676.06', () => {
+  const { r, ctx } = correr(cat, 'CALC-ISR-SEP-001', { separacion_gravable_c: 5000000, salario_diario_c: 50000, fecha_pago: '2026-08-20' });
+  assert.equal(r.valor_c, 467606);
+  assert.equal(r.traza.sueldo_mensual, '15000');
+  assert.ok(ctx.criterios.has('C16'));
+  assert.match(r.traza.metodo, /tasa del último sueldo/);
+});
+
+test('CALC-ISR-SEP-001 · gravado menor al sueldo mensual se acumula al ordinario: 6,000 → 1,194.43', () => {
+  const { r } = correr(cat, 'CALC-ISR-SEP-001', { separacion_gravable_c: 600000, salario_diario_c: 50000, fecha_pago: '2026-08-20' });
+  assert.equal(r.valor_c, 119443);
+  assert.match(r.traza.metodo, /se acumula/);
+});
+
+test('CALC-EXE-001 + CALC-ISR-SEP-001 · fracción mayor a 6 meses cuenta como año: 10 meses = 1 año exento', () => {
+  // Caso de agosto (sin datos personales): ingreso 2025-09-25, baja 2026-08-03; PRIME contó 0 años.
+  const ex = correr(cat, 'CALC-EXE-001', { fecha_pago: '2026-08-03', percepciones: [{ concepto: 'indemnizacion', monto_c: 2351722 }],
+    consumido: { separacion: 0 }, separacion: { fecha_ingreso: '2025-09-25', fecha_baja: '2026-08-03' } }).r;
+  assert.equal(ex.traza.exento_total_c, 1055790); // 90 × 117.31 × 1
+  assert.equal(ex.traza.base_para_tope_subsidio_c, 0);
+});
+
+test('CALC-ISN-001 · cuadro de 32 entidades: PTU exenta en Aguascalientes y gravada en Baja California Sur', () => {
+  const ags = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'AGS', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 1000000 }, { concepto: 'ptu', monto_c: 500000 }] }).r;
+  assert.equal(ags.traza.base_c, 1000000);
+  assert.equal(ags.valor_c, 25000); // 2.5%
+  const bcs = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'BCS', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 1000000 }, { concepto: 'ptu', monto_c: 500000 }] }).r;
+  assert.equal(bcs.traza.base_c, 1500000);
+  assert.equal(bcs.valor_c, 45000); // 3%
+});
+
+test('CALC-ISN-001 · fondo de ahorro de PRIME en CDMX: exento condicionado → grava y limita (C18)', () => {
+  const { r, ctx } = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'CDMX', mes: '2026-08', conceptos: [{ concepto: 'fondo_ahorro_empresa', monto_c: 100000 }] });
+  assert.equal(r.traza.base_c, 100000);
+  assert.ok(ctx.limitaciones.some(l => l.motivo === 'exento_hasta_requiere_detalle'));
+});
+
+test('ISN: las 32 entidades tienen tasa 2026 y el cuadro trae cada concepto en las 32', () => {
+  const ENT = ['AGS', 'BC', 'BCS', 'CAMP', 'CHIS', 'CHIH', 'CDMX', 'COAH', 'COL', 'DGO', 'GTO', 'GRO', 'HGO', 'JAL', 'MEX', 'MICH',
+    'MOR', 'NAY', 'NL', 'OAX', 'PUE', 'QRO', 'QROO', 'SLP', 'SIN', 'SON', 'TAB', 'TAMS', 'TLAX', 'VER', 'YUC', 'ZAC'];
+  for (const e of ENT) {
+    assert.ok(cat.buscar('ISN_TASA', '2026-08-01', e), 'tasa ' + e);
+    for (const c of ['sueldo', 'ptu', 'liquidacion', 'aguinaldo', 'gratificacion', 'fondo_ahorro_empresa', 'vacaciones']) assert.ok(cat.buscar('ISN_CONCEPTO:' + c, '2026-08-01', e), c + ' ' + e);
+  }
 });

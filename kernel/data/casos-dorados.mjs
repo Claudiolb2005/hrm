@@ -31,6 +31,8 @@ export const SALIDAS = {
   ceav_obrera: { etiqueta: 'Cesantía y vejez obrera', leer: (r) => r.extra.ceav_obr_c },
   infonavit: { etiqueta: 'Aportación patronal INFONAVIT 5%', leer: (r) => r.valor_c },
   isn: { etiqueta: 'Impuesto sobre nóminas del mes', leer: (r) => r.valor_c },
+  isr_pago_anual: { etiqueta: 'ISR del pago (PTU / aguinaldo, RLISR art. 174)', leer: (r) => r.valor_c },
+  isr_separacion: { etiqueta: 'ISR de la separación (LISR art. 95)', leer: (r) => r.valor_c },
 };
 
 const casos = [];
@@ -134,5 +136,14 @@ caso('D39', 'CALC-ISN-001', 'ISN de un registro en CDMX con separación', { regi
   'CDMX · agosto 2026 · sueldos $850,000 + comisiones $420,000 + indemnizaciones $60,000 + primas de antigüedad $12,000', ['isn']);
 caso('D40', 'CALC-ISN-001', 'ISN en Chihuahua con adicionales', { registro: 'R-PRUEBA', entidad: 'CHIH', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: p(500000) }] },
   'Chihuahua · agosto 2026 · sueldos $500,000 · ANOTE si incluye impuesto universitario y extraordinarias', ['isn']);
+
+// ── Pagos anuales y por separación (0.9.0; criterios C16 y C17) ──
+caso('D43', 'CALC-ISR-174-001', 'PTU de una baja con el método del art. 174 (C17)', { pago_gravable_c: p(8240.35), salario_diario_c: p(400), fecha_pago: '2026-08-12', concepto: 'ptu' },
+  'PTU pagada $10,000 (exentos 15 UMA = $1,759.65 → gravado $8,240.35) · salario diario $400 · pago 12-ago-2026 · ANOTE el sueldo mensual que usa (SD × 30.4 o SD × 30)', ['isr_pago_anual']);
+caso('D44', 'CALC-ISR-SEP-001', 'Indemnización con el art. 95 (C16)', { separacion_gravable_c: p(50000), salario_diario_c: p(500), fecha_pago: '2026-08-20' },
+  'Separación: gravado $50,000 (ya sin los 90 UMA por año) · salario diario $500 · pago 20-ago-2026 · ANOTE si usa SD × 30 como último sueldo mensual', ['isr_separacion']);
+caso('D45', 'CALC-EXE-001', 'Años de servicio: 1 año 7 meses cuenta como 2', { fecha_pago: '2026-08-20', percepciones: [{ concepto: 'indemnizacion', monto_c: p(60000) }],
+  consumido: { separacion: 0 }, separacion: { fecha_ingreso: '2025-01-23', fecha_baja: '2026-08-20' } },
+  'Indemnización $60,000 · ingreso 23-ene-2025, baja 20-ago-2026 · ¿cuántos años exentos (90 UMA × años)?', ['exento_total']);
 
 export const CASOS_DORADOS = casos;

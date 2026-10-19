@@ -44,6 +44,8 @@ await persistirEjecucion(env.DB, r, { catalogo, ejercicio: 2026 });
 | CALC-ISR-CAT-001 | ISR catorcenal (C1) | emp 191: 2,207.47 (nómina 2,207.49 → ver C1) |
 | CALC-ISR-AJM-001 | Ajuste mensual | emp 191: 2,058.41 |
 | CALC-ISR-EXT-001 | Pagos extra (C5) | bono 19,695.34 → 4,466.24 |
+| CALC-ISR-174-001 | PTU y pagos anuales, RLISR 174 (C17) | PTU de bajas: 11 pagos a −3/+10 ¢ de la nómina |
+| CALC-ISR-SEP-001 | Separación, LISR 95 (C16) | liquidaciones: 25 de 34 a 1 ¢; 5 con años mal contados por PRIME |
 | CALC-IMSS-001 | Cuotas IMSS por rama | emp 1067513: obrera 61.28, patronal 403.41 |
 | CALC-RCV-001 | Retiro, CEAV (C4) | emp 1067513: 410.12 / 48.50 |
 | CALC-INF-001 | INFONAVIT 5% | emp 1067513: 215.56 |

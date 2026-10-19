@@ -76,7 +76,7 @@ test('arranque: todas las reglas v1 declaran fuentes; una regla sin fuentes no d
   const mala = { id: 'CALC-X-001', version: '1.0.0', fuentes: [], calcular() {} };
   assert.match(verificarMatriz([...REGLAS_V1, mala])[0], /sin fuentes/);
   assert.throws(() => exigirMatriz([...REGLAS_V1, mala]), /no arranca/);
-  assert.equal(REGLAS_V1.length, 10);
+  assert.equal(REGLAS_V1.length, 12);
 });
 
 test('una sola fuente para matriz y lista PBC', () => {

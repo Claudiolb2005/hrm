@@ -48,10 +48,10 @@ const ITEMS = [{ regla_id: 'CALC-IMSS-001', colaborador_id: '1067513', entrada: 
 const FUENTES = { sua_ema: { estado: 'completa', sha256: 'b'.repeat(64) }, prima_rt_registro: { estado: 'completa' }, faltas_incapacidades: { estado: 'completa' },
   prenomina: { estado: 'completa' }, catalogo_conceptos_cliente: { estado: 'completa' } };
 
-test('migración + siembra: 10 reglas activas, ninguna sin fuente obligatoria; catálogo se relee igual', async () => {
+test('migración + siembra: 12 reglas activas, ninguna sin fuente obligatoria; catálogo se relee igual', async () => {
   const db = await baseLista();
   assert.deepEqual(await verificarArranque(db), []);
-  assert.equal(db.raw.prepare('SELECT count(*) n FROM regla WHERE activa = 1').get().n, 10);
+  assert.equal(db.raw.prepare('SELECT count(*) n FROM regla WHERE activa = 1').get().n, 12);
   const cat = await cargarCatalogo(db);
   const semilla = filasSemilla();
   assert.equal(cat.filas.length, semilla.length);

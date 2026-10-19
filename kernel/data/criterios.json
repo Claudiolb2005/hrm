@@ -1,5 +1,5 @@
 {
- "descripcion": "Bitácora de criterios (T1). Fuente: Revisión del maestro v0.3, punto 3 (14-oct-2026), más lo que salió de programar las reglas (15-oct).",
+ "descripcion": "Bitácora de criterios (T1). Fuente: Revisión del maestro v0.3, punto 3 (14-oct-2026), más lo que salió de programar las reglas (15-oct); actualizada el 19-oct-2026 con las respuestas de Rafael y la evidencia de agosto completo (nómina, CFDI, bancos y SUA).",
  "criterios": [
   {
    "id": "C1",
@@ -8,18 +8,18 @@
    "fundamento": "Equivale a la tarifa por día × 14 del catálogo; el Anexo 8 no publica tarifa de 14 días",
    "quien": "Rafael González",
    "fecha": "2026-10-14",
-   "estado": "vigente",
-   "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME."
+   "estado": "por_confirmar",
+   "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME. 19-oct (agosto completo): Rafael lo confirma en sus hojas (diaria × 14), pero PRIME aplica una proyección: 96 de 122 catorcenas exactas con base ÷ 14 × 15, tarifa quincenal, × 14 ÷ 15; todas a 1 ¢ o menos. La regla del kernel sigue en diaria × 14 hasta que Rafael decida cuál es el método correcto."
   },
   {
    "id": "C2",
    "tema": "Subsidio en semanal y catorcenal",
    "decision": "Monto y tope proporcionales a los días del periodo; ajuste mensual en la última nómina del mes con monto y tope mensuales",
    "fundamento": "Decreto DOF 31-dic-2025",
-   "quien": "Rafael González",
-   "fecha": "2026-10-14",
-   "estado": "por_confirmar",
-   "observaciones": "Divisor 30.4, no 30 (corrección 1): por confirmar con Rafael."
+   "quien": "Rafael González + evidencia de agosto",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "Divisor 30.4 confirmado: Rafael lo responde así y el ISR semanal de PRIME cuadra con subsidio 555.97 ÷ 30.4 × 7 = 128.02 en 3,098/3,113, 3,051/3,078 y 3,024/3,046 (SEM 31–33). Ojo: las hojas de cálculo de Rafael usan ÷ 30 (subsidio semanal 124.98, tope 2,681.62); están mal."
   },
   {
    "id": "C3",
@@ -36,18 +36,19 @@
    "decision": "SBC ÷ UMA truncado a dos decimales, como el SUA",
    "fundamento": "4,104 de 4,104 líneas del SUA; 1,034 renglones en 2.51–3.00 y ninguno al 3.150%",
    "quien": "Evidencia de agosto",
-   "fecha": "2026-10-14",
-   "estado": "por_confirmar"
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "19-oct: el SUA de agosto (30 registros) trunca el cociente en 5 casos frontera, p. ej. SBC 470.12 = 4.0075 UMA → 6.613%. Las hojas de Rafael usan ROUND a 2 decimales y tasas con 2 decimales: están mal."
   },
   {
    "id": "C5",
    "tema": "Pagos extra",
-   "decision": "Corrida aparte con la tarifa del periodo sobre el pago solo",
+   "decision": "Corrida aparte con la tarifa del periodo sobre el pago solo; en la última nómina regular del mes el pago extra se integra a la base del ajuste mensual",
    "fundamento": "99 de 99 en agosto",
-   "quien": "Evidencia de agosto",
-   "fecha": "2026-10-14",
-   "estado": "por_confirmar",
-   "observaciones": "Falta cómo entran al ajuste mensual: sólo 16 de 53 cuadran."
+   "quien": "Rafael González + evidencia de agosto",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "Rafael: los pagos extraordinarios se integran en la última nómina regular para el ajuste mensual. CAT 17 con BONO CAT: 92 de 101 cuadran; SEM 34: 2,598 de 3,050. Hallazgo aparte: en 413 ajustes el resultado negativo se dejó en 0 sin reintegrar la retención en exceso."
   },
   {
    "id": "C6",
@@ -64,17 +65,19 @@
    "decision": "Se tratan como gravados y el cálculo queda limitado hasta decidir",
    "fundamento": "LISR art. 93 fr. VIII",
    "quien": "Pendiente (Rafael)",
-   "fecha": "2026-10-15",
-   "estado": "abierto"
+   "fecha": "2026-10-19",
+   "estado": "por_confirmar",
+   "observaciones": "19-oct: tres versiones distintas. Rafael respondió «exento»; su Base de Conceptos dice «gravable 100%»; el CFDI de PRIME lo timbra gravado. La LISR art. 93 fr. IV exenta los subsidios por incapacidad. El kernel sigue tratándolo como gravado y limitado hasta que haya una sola respuesta."
   },
   {
    "id": "C8",
    "tema": "Ausentismos por rama",
-   "decision": "No se descuentan; el cálculo queda limitado cuando hay ausentismos",
+   "decision": "En el SUA no se descuentan faltas: días cotizados = días del mes − incapacidades. Retiro e INFONAVIT se pagan también sobre los días de incapacidad; CEAV y cuotas IMSS no",
    "fundamento": "LSS art. 31; PRIME no los registra en el SUA",
-   "quien": "Pendiente (Rafael)",
-   "fecha": "2026-10-15",
-   "estado": "abierto"
+   "quien": "Rafael González + evidencia de agosto",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "El SUA de agosto lo confirma: ningún ausentismo capturado y 3,013 trabajadores sin movimiento con 31 días menos incapacidades. Hallazgo: 1,099 días de falta de 328 trabajadores no se reportaron (LSS art. 31 permite hasta 7 por mes), así que se pagan cuotas de más. El kernel ya calcula así; los ausentismos siguen dando limitación, no se descuentan."
   },
   {
    "id": "C13",
@@ -105,6 +108,46 @@
    "fecha": "2026-10-19",
    "estado": "abierto",
    "observaciones": "Con nómina menor a 900,000 al mes el 3% plano cobra de más (600,000 → 18,000 vs 14,600). Confirmar con la ley vigente y modelar como tabla."
+  },
+  {
+   "id": "C16",
+   "tema": "ISR de pagos por separación",
+   "decision": "LISR art. 95: tasa = ISR del último sueldo mensual ordinario ÷ ese sueldo, aplicada a lo gravado (después de 90 UMA por año de servicio, con la fracción mayor a 6 meses como año). Último sueldo mensual = salario diario × 30",
+   "fundamento": "LISR arts. 93 fr. XIII y 95",
+   "quien": "Evidencia de agosto",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "Rafael respondió «art. 174», pero PRIME aplica el art. 95 y es lo que dice la ley para separación. Agosto: 29 de 34 liquidaciones cuadran con SD × 30 (con SD × 30.4 sólo 11). Las 5 que no cuadran tienen otro conteo de años: en 4 PRIME no contó la fracción mayor a 6 meses (retuvo de más) y en 1 contó un año de más. El kernel cuadra a 1 ¢ en 25 y a 3 ¢ o menos en otras 4; PRIME redondea pasos intermedios. Si lo gravado es menor al último sueldo mensual, el kernel lo acumula al ingreso del mes (ISR incremental)."
+  },
+  {
+   "id": "C17",
+   "tema": "ISR de PTU, aguinaldo y primas anuales",
+   "decision": "RLISR art. 174 con sueldo mensual ordinario = salario diario × 30.4; un solo redondeo al final",
+   "fundamento": "RLISR art. 174; LISR art. 93 fr. XIV (exento 15 UMA en PTU)",
+   "quien": "Rafael González + evidencia de agosto",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "11 pagos de PTU de bajas en agosto: el kernel difiere de PRIME entre −3 y +10 ¢ porque PRIME redondea a centavos el ISR con y sin el pago y la tasa a 6 decimales (con ese redondeo cuadran 8 de 11; las otras 3 difieren 12–13 ¢). Hallazgo aparte: el CFDI timbra la PTU 100% exenta."
+  },
+  {
+   "id": "C18",
+   "tema": "Fondo de ahorro de PRIME",
+   "decision": "Grava: no cumple los requisitos de previsión social (funciona como caja: bono en percepción y ahorro en deducción)",
+   "fundamento": "LISR art. 93 fr. XI; nota de Rafael en P2 Conceptos",
+   "quien": "Rafael González (nota P2)",
+   "fecha": "2026-10-19",
+   "estado": "vigente",
+   "observaciones": "Rafael respondió que es exento como previsión social, pero su propia nota dice que no cumple. El CFDI lo timbra exento: hallazgo. En el kernel el perfil de PRIME lleva fondo_ahorro_cumple_requisitos = false."
+  },
+  {
+   "id": "C19",
+   "tema": "Gratificación pagada en convenio de terminación",
+   "decision": "Por decidir. Hoy se trata como pago extra (C5: tarifa del periodo sobre el monto completo), que es lo que hace PRIME (10 de 10 exactos)",
+   "fundamento": "LISR arts. 93 fr. XIII y 95 (pagos por separación) vs RLISR art. 174",
+   "quien": "Pendiente (Rafael / HRM)",
+   "fecha": "2026-10-19",
+   "estado": "abierto",
+   "observaciones": "Rafael dice: 100% gravable, ISR por art. 174 y que son pagos de liquidación. PRIME retiene $160,340.84 en 10 personas (art. 174 ≈ $96 mil). Si son pagos por separación, la ley los llevaría al art. 95 y entrarían en el tope de 90 UMA por año. Los netos son redondos y PRIME absorbe el ISR."
   }
  ]
 }

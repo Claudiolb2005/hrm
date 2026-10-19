@@ -5,7 +5,7 @@
 // que antes se escribían por separado (Anexo A y Anexo B): qué prueba corre y
 // qué se le pide al cliente (lista PBC). Una regla sin fuentes no arranca.
 import { sha256Hex, jsonCanonico } from '../sello.js';
-import { CALC_SUB_001, CALC_ISR_SEM_001, CALC_ISR_CAT_001, CALC_ISR_AJM_001, CALC_ISR_EXT_001 } from './isr.js';
+import { CALC_SUB_001, CALC_ISR_SEM_001, CALC_ISR_CAT_001, CALC_ISR_AJM_001, CALC_ISR_EXT_001, CALC_ISR_174_001, CALC_ISR_SEP_001 } from './isr.js';
 import { CALC_EXE_001 } from './exenciones.js';
 import { CALC_IMSS_001, CALC_RCV_001, CALC_INF_001 } from './seguridad-social.js';
 import { CALC_ISN_001 } from './isn.js';
@@ -31,6 +31,7 @@ export const FUENTES = {
 
 export const REGLAS_V1 = [
   CALC_EXE_001, CALC_SUB_001, CALC_ISR_SEM_001, CALC_ISR_CAT_001, CALC_ISR_AJM_001, CALC_ISR_EXT_001,
+  CALC_ISR_174_001, CALC_ISR_SEP_001,
   CALC_IMSS_001, CALC_RCV_001, CALC_INF_001, CALC_ISN_001,
 ];
 
