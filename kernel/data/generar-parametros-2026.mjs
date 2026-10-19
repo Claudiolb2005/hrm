@@ -33,19 +33,19 @@ for (const [per, tabla] of Object.entries(TARIFAS)) {
   add({ id: 'ISR_TARIFA_' + per + '@2026', clave: 'ISR_TARIFA_' + per, tipo: 'tarifa', valor: tabla,
     vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'fecha_pago',
     fundamento: per === 'ANUAL' ? 'LISR art. 152 y 97' : 'LISR art. 96', fuente: ANEXO8, nivel: 'A',
-    notas: 'Transcrita del Anexo 8 publicado. Cotejar contra el renglón del catálogo de R. González.' });
+    notas: 'Transcrita del Anexo 8 publicado; los 11 renglones cotejados contra el PDF del SAT el 19-oct-2026 y verificados por invariantes (diaria = mensual ÷ 30.4; periodos = diaria × días).' });
 }
 // Catorcenal: el Anexo 8 no la publica; criterio C1 (tarifa por día × 14). No se carga tabla.
 
 // ── Generales
 add({ id: 'UMA_DIARIA@2025', clave: 'UMA_DIARIA', tipo: 'escalar', valor: '113.14', vigencia_desde: '2025-02-01', vigencia_hasta: '2026-01-31',
-  base_temporal: 'dia_cotizado', fundamento: 'Ley para Determinar el Valor de la UMA, arts. 4 y 5', fuente: CAT, nivel: 'B',
+  base_temporal: 'dia_cotizado', fundamento: 'Ley para Determinar el Valor de la UMA, arts. 4 y 5', fuente: 'INEGI, comunicado UMA 2025 (9-ene-2025), inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf', nivel: 'A',
   notas: 'Rige enero 2026. En ISR y exenciones se consulta a la fecha de pago; en IMSS/RCV/INFONAVIT por día cotizado.' });
 add({ id: 'UMA_DIARIA@2026', clave: 'UMA_DIARIA', tipo: 'escalar', valor: '117.31', vigencia_desde: '2026-02-01', vigencia_hasta: '2027-01-31',
-  base_temporal: 'dia_cotizado', fundamento: 'Ley para Determinar el Valor de la UMA, arts. 4 y 5', fuente: CAT, nivel: 'B',
+  base_temporal: 'dia_cotizado', fundamento: 'Ley para Determinar el Valor de la UMA, arts. 4 y 5', fuente: 'INEGI, comunicado UMA 2026 (8-ene-2026), inegi.org.mx/contenidos/saladeprensa/boletines/2026/uma/uma2026.pdf', nivel: 'A',
   notas: 'Corte de vigencia 1-feb. En ISR y exenciones se consulta a la fecha de pago.' });
 add({ id: 'UMA_MES_DIVISOR@2026', clave: 'UMA_MES_DIVISOR', tipo: 'escalar', valor: '30.4', vigencia_desde: '2025-01-01', vigencia_hasta: null,
-  base_temporal: 'fecha_pago', fundamento: 'Ley UMA art. 4 (UMA mensual = diaria × 30.4)', fuente: CAT, nivel: 'B' });
+  base_temporal: 'fecha_pago', fundamento: 'Ley UMA art. 4 (UMA mensual = diaria × 30.4)', fuente: 'INEGI, comunicados UMA 2025 y 2026 (mensual 3,439.46 y 3,566.22 = diaria × 30.4)', nivel: 'A' });
 add({ id: 'SM_GENERAL@2026', clave: 'SALARIO_MINIMO_GENERAL', tipo: 'escalar', valor: '315.04', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
   base_temporal: 'dia_cotizado', fundamento: 'Resolución CONASAMI 2026', fuente: CAT, nivel: 'B' });
 add({ id: 'SM_FRONTERA@2026', clave: 'SALARIO_MINIMO_FRONTERA', tipo: 'escalar', valor: '440.87', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
@@ -57,9 +57,9 @@ add({ id: 'SUBSIDIO_PCT@2026-01', clave: 'SUBSIDIO_PORCENTAJE_UMA', tipo: 'escal
 add({ id: 'SUBSIDIO_PCT@2026-02', clave: 'SUBSIDIO_PORCENTAJE_UMA', tipo: 'escalar', valor: '15.02', vigencia_desde: '2026-02-01', vigencia_hasta: '2026-12-31',
   base_temporal: 'fecha_pago', fundamento: 'Decreto subsidio para el empleo, DOF 31-dic-2025', fuente: CAT, nivel: 'B' });
 add({ id: 'SUBSIDIO_MONTO@2026-01', clave: 'SUBSIDIO_MONTO_MENSUAL', tipo: 'escalar', valor: '536.21', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-01-31',
-  base_temporal: 'fecha_pago', fundamento: '15.59% × UMA 2025 × 30.4', fuente: CAT, nivel: 'D', deriva_de: ['SUBSIDIO_PCT@2026-01', 'UMA_DIARIA@2025', 'UMA_MES_DIVISOR@2026'] });
+  base_temporal: 'fecha_pago', fundamento: '15.59% × UMA 2025 × 30.4', fuente: CAT, nivel: 'D', notas: '3,439.456 × 15.59% = 536.2112 → 536.21 (algunas fuentes publican 536.22 por redondeo previo).' + ' Cotejado contra fuente oficial el 19-oct-2026.', deriva_de: ['SUBSIDIO_PCT@2026-01', 'UMA_DIARIA@2025', 'UMA_MES_DIVISOR@2026'] });
 add({ id: 'SUBSIDIO_MONTO@2026-02', clave: 'SUBSIDIO_MONTO_MENSUAL', tipo: 'escalar', valor: '535.65', vigencia_desde: '2026-02-01', vigencia_hasta: '2026-12-31',
-  base_temporal: 'fecha_pago', fundamento: '15.02% × UMA 2026 × 30.4', fuente: CAT, nivel: 'D', deriva_de: ['SUBSIDIO_PCT@2026-02', 'UMA_DIARIA@2026', 'UMA_MES_DIVISOR@2026'] });
+  base_temporal: 'fecha_pago', fundamento: '15.02% × UMA 2026 × 30.4', fuente: CAT, nivel: 'D', notas: '3,566.224 × 15.02% = 535.6468 → 535.65. Cotejado contra fuente oficial el 19-oct-2026.', deriva_de: ['SUBSIDIO_PCT@2026-02', 'UMA_DIARIA@2026', 'UMA_MES_DIVISOR@2026'] });
 add({ id: 'SUBSIDIO_TOPE@2026', clave: 'SUBSIDIO_TOPE_MENSUAL', tipo: 'escalar', valor: '11492.66', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
   base_temporal: 'fecha_pago', fundamento: 'Decreto subsidio para el empleo, DOF 31-dic-2025', fuente: CAT, nivel: 'B',
   notas: 'No cuentan para el tope: prima de antigüedad, retiro, indemnizaciones y demás pagos por separación.' });
@@ -88,7 +88,7 @@ add({ id: 'RCV_CUOTAS@2026', clave: 'RCV_CUOTAS', tipo: 'objeto', valor: { retir
   vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'dia_cotizado', fundamento: 'LSS art. 168', fuente: CAT, nivel: 'B' });
 add({ id: 'CEAV_PATRONAL@2026', clave: 'CEAV_PATRONAL_TABLA', tipo: 'tabla_rangos', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
   base_temporal: 'dia_cotizado', fundamento: 'LSS art. 168 fr. II; Segundo Transitorio DOF 16-dic-2020', fuente: CAT, nivel: 'B',
-  notas: 'Rango por SBC ÷ UMA truncado a dos decimales (criterio C4). Tasas exactas (corrección 6).',
+  notas: 'Rango por SBC ÷ UMA truncado a dos decimales (criterio C4). Tasas exactas (corrección 6). OJO (19-oct): el transitorio dice «1.00 SM» en el primer renglón y «1.01 SM a 1.50 UMA» en el segundo; aquí está como 1.00 UMA. Sólo cambia el resultado si el SBC es exactamente un salario mínimo (criterio C13 por ratificar).',
   valor: [['1.00','3.150'],['1.50','3.676'],['2.00','4.851'],['2.50','5.556'],['3.00','6.026'],['3.50','6.361'],['4.00','6.613'],[null,'7.513']] });
 add({ id: 'INFONAVIT_APORT@2026', clave: 'INFONAVIT_APORTACION', tipo: 'escalar', valor: '5', vigencia_desde: '2026-01-01', vigencia_hasta: null,
   base_temporal: 'dia_cotizado', fundamento: 'Ley del INFONAVIT art. 29 fr. II', fuente: CAT, nivel: 'B' });
@@ -120,14 +120,14 @@ ISN('VER', '3', '2026-01-01', '2026-12-31', 'B');
 ISN('JAL', '3', '2026-01-01', '2026-12-31', 'B');
 ISN('TLAX', '3', '2026-01-01', '2026-12-31', 'B');
 ISN('TAB', '3.5', '2026-01-01', '2026-12-31', 'C', 'Por confirmar en qué supuesto aplica 3% y en cuál 3.5%.');
-ISN('SIN', '3', '2026-01-01', '2026-12-31', 'C', 'Tarifa progresiva 2.4%–3% por tramos; el 3% plano es lo que aplica la nómina.');
+ISN('SIN', '3', '2026-01-01', '2026-12-31', 'C', 'Tarifa progresiva mensual (LH Sinaloa arts. 17–18, fuente secundaria): hasta 500,000 2.4%; 500,000–700,000 12,000 + 2.6%; 700,000–900,000 17,200 + 2.8%; más de 900,000 22,800 + 3%. El 3% plano es lo que aplica la nómina; el kernel aún no modela la tabla.');
 const ADI = (ent, valor, notas) => add({ id: 'ISN_ADICIONAL:' + ent + '@2026', clave: 'ISN_ADICIONAL', entidad: ent, tipo: 'objeto', valor,
   vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion', fundamento: 'Ley de la entidad (por confirmar)', fuente: CAT, nivel: 'C', notas });
-ADI('CHIH', { descripcion: 'Impuesto Universitario 6% del impuesto; contribuciones extraordinarias 10% y 5%' }, 'Exposición +$15,218 a +$43,751/mes en PRIME.');
+ADI('CHIH', { descripcion: 'Impuesto Universitario 6% del impuesto causado; contribuciones extraordinarias 10% y 5% sobre base × 3% (no sobre el 4%); Expo-Chihuahua y Fideicomiso Paso del Norte sólo en sus municipios (guía SH-001-26)' }, 'Exposición +$15,218 a +$43,751/mes en PRIME.');
 ADI('SON', { descripcion: '1% adicional para patrones con 100 o más trabajadores' }, 'Exposición +$31,527/mes en PRIME.');
 ADI('VER', { descripcion: '15% adicional sobre el impuesto' }, 'Exposición +$13,742/mes en PRIME.');
 ADI('JAL', { descripcion: '5% especial: ¿asimilados o consejeros?' }, 'Sólo aplica si hay esos pagos.');
-ADI('TLAX', { descripcion: 'Condonación 2026: ¿a quién aplica?' }, 'Por confirmar.');
+ADI('TLAX', { descripcion: 'Sin condonación general en la LI Tlaxcala 2026; sólo exenciones e incentivos condicionados (arts. 16–18 y 24)' }, 'Aplica sólo si el cliente acredita el supuesto.');
 
 // ── ISN: trato por concepto × entidad (cuadro de R. González). Sin fundamento por celda (V8) → nivel C.
 const ISNC = (ent, concepto, trato) => add({ id: 'ISN_CONCEPTO:' + concepto + ':' + ent + '@2026', clave: 'ISN_CONCEPTO:' + concepto, entidad: ent, tipo: 'objeto',
@@ -143,14 +143,14 @@ const INPC = [['2025-12', '143.042', '8-ene-2026'], ['2026-01', '143.588', '9-fe
   ['2026-08', '145.462', '9-sep-2026'], ['2026-09', '146.075', '8-oct-2026']];
 const finMes = (ym) => { const [y, m] = ym.split('-').map(Number); return ym + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0'); };
 for (const [ym, v, pub] of INPC) add({ id: 'INPC@' + ym, clave: 'INPC', tipo: 'escalar', valor: v, vigencia_desde: ym + '-01', vigencia_hasta: finMes(ym),
-  base_temporal: 'mes_causacion', fundamento: 'CFF arts. 17-A y 20', fuente: 'INEGI, boletín del INPC publicado el ' + pub + ' (base 2a qna. jul-2018 = 100)', nivel: 'B',
-  notas: 'Cotejar contra la publicación en el DOF.' });
+  base_temporal: 'mes_causacion', fundamento: 'CFF arts. 17-A y 20', fuente: 'INEGI, boletín del INPC publicado el ' + pub + ' (base 2a qna. jul-2018 = 100)', nivel: 'A',
+  notas: 'Cotejado contra el boletín del INEGI el 19-oct-2026 (dof.gob.mx no consultable desde el sistema).' });
 add({ id: 'RECARGOS_PRORROGA@2026', clave: 'RECARGOS_PRORROGA_MENSUAL', tipo: 'escalar', valor: '1.38', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
-  base_temporal: 'mes_causacion', fundamento: 'LIF 2026 art. 11 fr. I', fuente: 'Ley de Ingresos de la Federación 2026, DOF 7-nov-2025 (diputados.gob.mx/LeyesBiblio/pdf_mov/Ley_de_Ingresos_2026.pdf)', nivel: 'A' });
+  base_temporal: 'mes_causacion', fundamento: 'LIF 2026 art. 11 fr. I', fuente: 'Ley de Ingresos de la Federación 2026, DOF 7-nov-2025, art. 11 fr. I (diputados.gob.mx/LeyesBiblio/pdf/LIF_2026.pdf)', nivel: 'A' });
 add({ id: 'RECARGOS_MORA@2026', clave: 'RECARGOS_MORA_MENSUAL', tipo: 'escalar', valor: '2.07', vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31',
-  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21: tasa de prórroga de la LIF incrementada en 50%', fuente: REGLAS, nivel: 'D', deriva_de: ['RECARGOS_PRORROGA@2026'] });
+  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21: tasa de prórroga de la LIF incrementada en 50%', fuente: REGLAS, nivel: 'D', deriva_de: ['RECARGOS_PRORROGA@2026'], notas: '1.38 × 1.5 = 2.07. Cotejado contra fuente oficial el 19-oct-2026.' });
 add({ id: 'RECARGOS_MORA@2025', clave: 'RECARGOS_MORA_MENSUAL', tipo: 'escalar', valor: '1.47', vigencia_desde: '2025-01-01', vigencia_hasta: '2025-12-31',
-  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21; LIF 2025 (prórroga 0.98% + 50%)', fuente: REGLAS, nivel: 'B', notas: 'Cotejar la tasa de prórroga contra la LIF 2025.' });
+  base_temporal: 'mes_causacion', fundamento: 'CFF art. 21; LIF 2025 (prórroga 0.98% + 50%)', fuente: REGLAS, nivel: 'B', notas: '0.98 × 1.5 = 1.47 (prórroga LIF 2025 confirmada en fuente secundaria; falta el texto oficial).' });
 add({ id: 'MULTA_CFF76@2026', clave: 'MULTA_OMISION_CFF', tipo: 'objeto', valor: { min_pct: '55', max_pct: '75' }, vigencia_desde: '2020-01-01', vigencia_hasta: null,
   base_temporal: 'fecha_pago', fundamento: 'CFF art. 76, primer párrafo (omisión descubierta por la autoridad); art. 73 (sin multa si se corrige espontáneamente)', fuente: REGLAS, nivel: 'B',
   notas: 'Sobre la contribución omitida actualizada (CFF art. 70). Reducciones del art. 76 no aplicadas.' });

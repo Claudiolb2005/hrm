@@ -58,7 +58,15 @@ npm run huella    # después de cambiar cualquier archivo de src/
 npm run parametros  # regenera data/parametros-2026.json
 ```
 
-Nivel 1 (T1): unitarias contra la ley con los casos de *Reglas v1*. Las cifras esperadas
+Nivel 1 (T1): unitarias contra la ley con los casos de *Reglas v1*, más tres redes que no
+dependen de cifras escritas por el programador:
+
+- **Invariantes** (`test/invariantes.test.js`): propiedades que la ley y las tablas obligan para cualquier entrada.
+- **Oráculo independiente** (`oraculo/`): la misma ley escrita aparte en Python; `node oraculo/diferencial.mjs 30000`.
+- **Casos dorados** (`data/casos-dorados.mjs`): cifras calculadas a mano por Rafael. Plantilla:
+  `python3 scripts/plantilla-casos-dorados.py`; importación: `python3 scripts/importar-casos-dorados.py archivo.xlsx "Nombre"`.
+
+ Las cifras esperadas
 las escribe quien sabe nómina; el programador no las toca. Los niveles 2 (no-regresión
 del portal contra febrero 2025) y 3 (reconciliación contra agosto) corren con datos
 reales, que no se versionan.

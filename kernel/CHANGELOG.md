@@ -3,6 +3,29 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.8.0 — 2026-10-19
+
+Pruebas de exactitud del cálculo. No cambia ninguna regla ni ningún importe; cambian nivel, fuente y notas de parámetros.
+
+- **Oráculo independiente** (`oraculo/`): ISR, subsidio, ajuste mensual, pagos extra, exenciones, IMSS, RCV e
+  INFONAVIT reescritos en Python desde la ley, sin ver el código del kernel. `oraculo/diferencial.mjs` compara los dos
+  al centavo; 130,000 casos aleatorios y de frontera en 6 semillas sin una diferencia. La primera corrida encontró 9
+  diferencias de un centavo en catorcenal: eran del oráculo (Decimal trunca ÷ 14), el kernel redondeaba bien.
+  `npm test` corre 3,000 casos.
+- **Invariantes** (`test/invariantes.test.js`, 33 pruebas): las seis tarifas del Anexo 8 cuadran al centavo entre sí
+  (diaria = mensual ÷ 30.4; 7, 10 y 15 días = diaria × días; anual = mensual × 12; cuotas fijas = impuesto acumulado);
+  ISR creciente y continuo en fronteras; subsidio al centavo en el tope; tope de 25 UMA; umbral de 3 UMA; fronteras de
+  CEAV con truncado (C4); cambio de UMA dentro del periodo; incapacidades por rama; topes de exención.
+- **Cotejo de parámetros contra fuente oficial** (19-oct-2026): UMA, INPC y tarifas del Anexo 8 a nivel A; subsidio,
+  recargos, cuotas IMSS, RCV, CEAV, salarios mínimos y tasas de ISN coinciden. Correcciones de descripción: adicionales
+  de Chihuahua (extraordinarias sobre base × 3%) y Tlaxcala (no hay condonación general). Migración 0013.
+- **Criterios nuevos** C13 (primer renglón de CEAV en SM), C14 (LSS art. 36, cuota obrera del salario mínimo) y C15
+  (ISN Sinaloa progresivo).
+- **No-regresión de informes publicados** (`scripts/no-regresion-reporte.mjs`): ISN por estado a través del kernel,
+  aritmética interna y cuadre entre secciones, registros duplicados.
+- **Casos dorados** (`data/casos-dorados.mjs`, 42 casos / 58 importes): plantilla .xlsx para que Rafael capture la
+  cifra esperada a mano, importador y prueba que compara al centavo.
+
 ## 0.7.0 — 2026-10-15
 
 Secciones 7 y 11 del dictamen y conservación (N6). No cambia ninguna regla de cálculo.

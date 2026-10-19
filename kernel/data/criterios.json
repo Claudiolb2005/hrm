@@ -1,16 +1,110 @@
 {
  "descripcion": "Bitácora de criterios (T1). Fuente: Revisión del maestro v0.3, punto 3 (14-oct-2026), más lo que salió de programar las reglas (15-oct).",
  "criterios": [
-  { "id": "C1", "tema": "ISR catorcenal", "decision": "Base ÷ 14, tarifa diaria, subsidio diario, × 14", "fundamento": "Equivale a la tarifa por día × 14 del catálogo; el Anexo 8 no publica tarifa de 14 días", "quien": "Rafael González", "fecha": "2026-10-14", "estado": "vigente",
-    "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME." },
-  { "id": "C2", "tema": "Subsidio en semanal y catorcenal", "decision": "Monto y tope proporcionales a los días del periodo; ajuste mensual en la última nómina del mes con monto y tope mensuales", "fundamento": "Decreto DOF 31-dic-2025", "quien": "Rafael González", "fecha": "2026-10-14", "estado": "por_confirmar",
-    "observaciones": "Divisor 30.4, no 30 (corrección 1): por confirmar con Rafael." },
-  { "id": "C3", "tema": "Despensa en CDMX", "decision": "Sin efecto para PRIME: ya no paga vales; agosto viene en ceros. La contradicción del cuadro sigue abierta para otros clientes", "fundamento": "Nota de Rafael y prenómina de agosto", "quien": "Rafael González", "fecha": "2026-10-14", "estado": "vigente" },
-  { "id": "C4", "tema": "Rango de CEAV", "decision": "SBC ÷ UMA truncado a dos decimales, como el SUA", "fundamento": "4,104 de 4,104 líneas del SUA; 1,034 renglones en 2.51–3.00 y ninguno al 3.150%", "quien": "Evidencia de agosto", "fecha": "2026-10-14", "estado": "por_confirmar" },
-  { "id": "C5", "tema": "Pagos extra", "decision": "Corrida aparte con la tarifa del periodo sobre el pago solo", "fundamento": "99 de 99 en agosto", "quien": "Evidencia de agosto", "fecha": "2026-10-14", "estado": "por_confirmar",
-    "observaciones": "Falta cómo entran al ajuste mensual: sólo 16 de 53 cuadran." },
-  { "id": "C6", "tema": "Base gravable cero o negativa", "decision": "ISR cero y traza con caso_borde; el arrastre al periodo siguiente no se decide aún", "fundamento": "Módulo 8, casos borde", "quien": "Pendiente (Claudio / Rafael)", "fecha": "2026-10-15", "estado": "abierto" },
-  { "id": "C7", "tema": "Subsidios por incapacidad (ISR)", "decision": "Se tratan como gravados y el cálculo queda limitado hasta decidir", "fundamento": "LISR art. 93 fr. VIII", "quien": "Pendiente (Rafael)", "fecha": "2026-10-15", "estado": "abierto" },
-  { "id": "C8", "tema": "Ausentismos por rama", "decision": "No se descuentan; el cálculo queda limitado cuando hay ausentismos", "fundamento": "LSS art. 31; PRIME no los registra en el SUA", "quien": "Pendiente (Rafael)", "fecha": "2026-10-15", "estado": "abierto" }
+  {
+   "id": "C1",
+   "tema": "ISR catorcenal",
+   "decision": "Base ÷ 14, tarifa diaria, subsidio diario, × 14",
+   "fundamento": "Equivale a la tarifa por día × 14 del catálogo; el Anexo 8 no publica tarifa de 14 días",
+   "quien": "Rafael González",
+   "fecha": "2026-10-14",
+   "estado": "vigente",
+   "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME."
+  },
+  {
+   "id": "C2",
+   "tema": "Subsidio en semanal y catorcenal",
+   "decision": "Monto y tope proporcionales a los días del periodo; ajuste mensual en la última nómina del mes con monto y tope mensuales",
+   "fundamento": "Decreto DOF 31-dic-2025",
+   "quien": "Rafael González",
+   "fecha": "2026-10-14",
+   "estado": "por_confirmar",
+   "observaciones": "Divisor 30.4, no 30 (corrección 1): por confirmar con Rafael."
+  },
+  {
+   "id": "C3",
+   "tema": "Despensa en CDMX",
+   "decision": "Sin efecto para PRIME: ya no paga vales; agosto viene en ceros. La contradicción del cuadro sigue abierta para otros clientes",
+   "fundamento": "Nota de Rafael y prenómina de agosto",
+   "quien": "Rafael González",
+   "fecha": "2026-10-14",
+   "estado": "vigente"
+  },
+  {
+   "id": "C4",
+   "tema": "Rango de CEAV",
+   "decision": "SBC ÷ UMA truncado a dos decimales, como el SUA",
+   "fundamento": "4,104 de 4,104 líneas del SUA; 1,034 renglones en 2.51–3.00 y ninguno al 3.150%",
+   "quien": "Evidencia de agosto",
+   "fecha": "2026-10-14",
+   "estado": "por_confirmar"
+  },
+  {
+   "id": "C5",
+   "tema": "Pagos extra",
+   "decision": "Corrida aparte con la tarifa del periodo sobre el pago solo",
+   "fundamento": "99 de 99 en agosto",
+   "quien": "Evidencia de agosto",
+   "fecha": "2026-10-14",
+   "estado": "por_confirmar",
+   "observaciones": "Falta cómo entran al ajuste mensual: sólo 16 de 53 cuadran."
+  },
+  {
+   "id": "C6",
+   "tema": "Base gravable cero o negativa",
+   "decision": "ISR cero y traza con caso_borde; el arrastre al periodo siguiente no se decide aún",
+   "fundamento": "Módulo 8, casos borde",
+   "quien": "Pendiente (Claudio / Rafael)",
+   "fecha": "2026-10-15",
+   "estado": "abierto"
+  },
+  {
+   "id": "C7",
+   "tema": "Subsidios por incapacidad (ISR)",
+   "decision": "Se tratan como gravados y el cálculo queda limitado hasta decidir",
+   "fundamento": "LISR art. 93 fr. VIII",
+   "quien": "Pendiente (Rafael)",
+   "fecha": "2026-10-15",
+   "estado": "abierto"
+  },
+  {
+   "id": "C8",
+   "tema": "Ausentismos por rama",
+   "decision": "No se descuentan; el cálculo queda limitado cuando hay ausentismos",
+   "fundamento": "LSS art. 31; PRIME no los registra en el SUA",
+   "quien": "Pendiente (Rafael)",
+   "fecha": "2026-10-15",
+   "estado": "abierto"
+  },
+  {
+   "id": "C13",
+   "tema": "CEAV patronal: primer renglón en salario mínimo",
+   "decision": "Por decidir. Hoy el primer renglón se lee como 1.00 UMA; el transitorio de la reforma (DOF 16-dic-2020) dice «1.00 SM» y «1.01 SM a 1.50 UMA»",
+   "fundamento": "LSS art. 168 fr. II y Segundo Transitorio; cotejo del 19-oct-2026",
+   "quien": "Pendiente (Rafael)",
+   "fecha": "2026-10-19",
+   "estado": "abierto",
+   "observaciones": "Sólo cambia el resultado cuando el SBC es exactamente un salario mínimo (315.04 = 2.68 UMA): con la lectura en UMA va a 6.026%, con la lectura en SM a 3.150%. Caso dorado D41."
+  },
+  {
+   "id": "C14",
+   "tema": "Cuota obrera de quien gana el salario mínimo",
+   "decision": "Por decidir. El kernel calcula cuota obrera aunque el SBC sea el salario mínimo",
+   "fundamento": "LSS art. 36: el patrón paga íntegramente la cuota del trabajador que percibe el salario mínimo",
+   "quien": "Pendiente (Rafael)",
+   "fecha": "2026-10-19",
+   "estado": "abierto",
+   "observaciones": "Definir si se mide por salario diario o por SBC y cómo se presenta (obrera 0 y patronal + obrera). Caso dorado D41."
+  },
+  {
+   "id": "C15",
+   "tema": "ISN Sinaloa",
+   "decision": "Hoy 3% plano en nivel C (limitado). La LH Sinaloa (arts. 17–18, fuente secundaria) trae tarifa progresiva 2.4%–3% por tramos mensuales",
+   "fundamento": "Cotejo del 19-oct-2026",
+   "quien": "Pendiente (Rafael / HRM)",
+   "fecha": "2026-10-19",
+   "estado": "abierto",
+   "observaciones": "Con nómina menor a 900,000 al mes el 3% plano cobra de más (600,000 → 18,000 vs 14,600). Confirmar con la ley vigente y modelar como tabla."
+  }
  ]
 }
