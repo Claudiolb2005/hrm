@@ -3,6 +3,28 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.9.0 — 2026-10-19
+
+Respuestas de Rafael González y agosto 2026 completo (nómina, CFDI, bancos y SUA). Aplica desde el 1-ene-2026.
+
+- **Regla nueva CALC-ISR-174-001** (PTU, aguinaldo y primas anuales; RLISR art. 174, criterio C17): equivalente mensual
+  = gravado ÷ 365 × 30.4; tasa = (ISR(sueldo + equivalente) − ISR(sueldo)) ÷ equivalente; sueldo = SD × 30.4; un solo
+  redondeo. Contra los 11 pagos de PTU de agosto difiere de −3 a +10 ¢ porque PRIME redondea pasos intermedios.
+- **Regla nueva CALC-ISR-SEP-001** (separación; LISR art. 95, criterio C16): tasa del último sueldo mensual ordinario
+  (SD × 30) sobre lo gravado después de 90 UMA por año. Si lo gravado es menor al sueldo, ISR incremental de la tarifa
+  mensual. Rubro propio `isr_separacion`. Agosto: 25 de 34 a 1 ¢, 4 a 3 ¢ o menos y 5 con otro conteo de años en PRIME.
+- **Ingesta**: los finiquitos y la PTU ya no quedan «sin regla»; generan su exención y su ISR. La PTU en su propia
+  corrida se compara contra el ISR del renglón; mezclada con otras percepciones va como `isr_ptu` y limitada. Perfil
+  PRIME: ISR FINIQUITO entra a la familia de ISR e ISR Liquidacion se compara contra la separación (instrucción de Rafael).
+- **ISN de las 32 entidades**: tasas 2026 de las 19 que faltaban (catálogo ISN_32) y el cuadro concepto × entidad de
+  Rafael completo (1,056 celdas, nivel C hasta tener fundamento por celda, V8); remuneración ordinaria grava en todas
+  (nivel B). Fondo de ahorro: exento condicionado (C18), así que para PRIME grava y limita.
+- **Criterios**: C2 (divisor 30.4), C4 (CEAV truncado), C5 (pagos extra al ajuste mensual) y C8 (días SUA = mes −
+  incapacidades) pasan a vigentes; C1 y C7 a por confirmar con la contradicción documentada; nuevos C16, C17, C18 y C19
+  (gratificación de convenio, abierto).
+- **Casos dorados** D43–D45 (PTU, separación y años de servicio). `scripts/delta-sql.mjs` genera migraciones por
+  diferencia contra un commit. Migración 0014.
+
 ## 0.8.0 — 2026-10-19
 
 Pruebas de exactitud del cálculo. No cambia ninguna regla ni ningún importe; cambian nivel, fuente y notas de parámetros.

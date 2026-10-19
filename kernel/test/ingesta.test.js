@@ -89,7 +89,7 @@ test('perfil PRIME: corridas, «Vacaciones» duplicada, conceptos no catalogados
   assert.deepEqual(m.faltantes, []);
   assert.equal(m.conceptos.find(c => c.encabezado === 'Vacaciones').j, VAC_MONTO);
   assert.deepEqual(m.no_catalogados.map(c => c.encabezado), ['Premio Especial']);
-  assert.equal(m.movimientos.isr.length, 2);
+  assert.equal(m.movimientos.isr.length, 3); // I.S.R. (sp), ISR AJUSTE e ISR FINIQUITO (R. González, 19-oct)
 });
 
 test('domingos: columna explícita o prima = domingos × 25% SD exacto; si no, no se deduce', () => {
@@ -199,4 +199,44 @@ test('dos ingestas del mismo archivo en el mismo encargo se reconcilian cada una
   const [a, b] = await Promise.all(ids.map(id => estadoIngesta(db, id)));
   assert.equal(a.reporte.reconciliacion.coincidencias, 4);
   assert.deepEqual(b.reporte.reconciliacion, a.reporte.reconciliacion);
+});
+
+test('0.9.0 · finiquito y PTU generan ítems de LISR 95 y RLISR 174 con su rubro; ya no quedan «sin regla»', async () => {
+  const { itemsDeRenglon } = await import('../../ingesta/items.js');
+  const { catalogoSemilla } = await import('./util.js');
+  const { Contexto, reglaPorId } = await import('../src/index.js');
+  const catalogo = catalogoSemilla();
+  const calendario = new Map([['FINIQUITOS', { periodicidad: 'semanal', fecha_pago: '2026-08-20', ordinaria: false }],
+    ['PTUSEM', { periodicidad: 'semanal', fecha_pago: '2026-08-12', ordinaria: false }]]);
+  const ctx = { calendario, ultimaDelMes: new Set(), perfil: prime, catalogo, aplicaAjuste: true, encargo_id: 'e' };
+  const base = { fila: 1, corrida_raw: 'x', control_ok: true, no_catalogados: [], errores: [], movimientos: {}, sd_c: 50000, fecha_ingreso: '2025-01-23' };
+  const correrItem = (it) => { const c = new Contexto(catalogo); for (const l of it.limitaciones || []) c.limitar(l.motivo, l.detalle); return { r: reglaPorId(it.regla_id).calcular(it.entrada, c), c }; };
+
+  // Finiquito: indemnización 60,000 con 1 año 7 meses → 2 años exentos (21,115.80); gravado 38,884.20 ≥ sueldo 15,000.
+  const fin = await itemsDeRenglon({ ...base, colaborador_id: '9001', corrida_id: 'FINIQUITOS',
+    percepciones: [{ tipo: 'percepcion', concepto: 'vacaciones', monto_c: 200000 }, { tipo: 'separacion', concepto: 'indemnizacion', monto_c: 6000000, encabezado: 'Indemnización' }] }, ctx, 'sha', 'ing');
+  const sep = fin.items.find(i => i.regla_id === 'CALC-ISR-SEP-001');
+  assert.ok(sep, 'genera el ítem de separación');
+  assert.equal(sep.entrada.separacion_gravable_c, 6000000 - 2111580);
+  assert.ok(!sep.limitaciones.some(l => l.motivo === 'regla_faltante'));
+  const rs = correrItem(sep).r;
+  assert.equal(rs.renglones?.[0]?.rubro ?? reglaPorId('CALC-ISR-SEP-001').rubro, 'isr_separacion');
+  assert.ok(fin.items.some(i => i.regla_id === 'CALC-ISR-EXT-001'), 'la parte ordinaria sigue en la corrida extra');
+  assert.ok(!fin.items.find(i => i.regla_id === 'CALC-ISR-EXT-001').limitaciones.some(l => l.motivo === 'regla_faltante'));
+
+  // PTU en su propia corrida: un solo ítem de ISR (174) con rubro isr; sin acumulado anual queda limitado.
+  const ptu = await itemsDeRenglon({ ...base, colaborador_id: '9002', corrida_id: 'PTUSEM', percepciones: [{ tipo: 'ptu', concepto: 'ptu', monto_c: 1000000 }] }, ctx, 'sha', 'ing');
+  assert.deepEqual(ptu.items.map(i => i.regla_id), ['CALC-EXE-001', 'CALC-ISR-174-001']);
+  const p = correrItem(ptu.items[1]);
+  assert.equal(p.r.renglones[0].rubro, 'isr');
+  assert.equal(p.r.valor_c, 147667); // PTU 10,000, SD 500 (sueldo 15,200), calculado a mano fuera del kernel
+  assert.ok(p.c.limitaciones.some(l => /acumulado anual/.test(l.detalle)), 'la PTU de mayo pudo consumir el tope');
+
+  // PTU mezclada con sueldo: rubro isr_ptu y limitación explícita.
+  const mix = await itemsDeRenglon({ ...base, colaborador_id: '9003', corrida_id: 'PTUSEM',
+    percepciones: [{ tipo: 'percepcion', concepto: 'sueldo', monto_c: 300000 }, { tipo: 'ptu', concepto: 'ptu', monto_c: 500000 }] }, ctx, 'sha', 'ing');
+  const it = mix.items.find(i => i.regla_id === 'CALC-ISR-174-001');
+  assert.equal(it.entrada.rubro_salida, 'isr_ptu');
+  assert.ok(it.limitaciones.some(l => l.motivo === 'ptu_mezclada'));
+  assert.ok(mix.items.some(i => i.regla_id === 'CALC-ISR-EXT-001'));
 });

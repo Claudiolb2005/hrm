@@ -4,6 +4,8 @@
 //   CALC-ISR-CAT-001  ISR catorcenal (criterio C1: tarifa por día × 14)
 //   CALC-ISR-AJM-001  Ajuste mensual
 //   CALC-ISR-EXT-001  Pagos extra en corrida aparte (criterio C5)
+//   CALC-ISR-174-001  PTU, aguinaldo y primas anuales (RLISR art. 174; criterio C17)
+//   CALC-ISR-SEP-001  Pagos por separación (LISR art. 95; criterio C16)
 //
 // Redondeo: el ISR se calcula exacto y se redondea UNA vez, al final, medio hacia
 // arriba. El subsidio del periodo es un importe (va al CFDI) y se redondea a centavo.
@@ -159,5 +161,102 @@ export const CALC_ISR_EXT_001 = {
     ctx.criterio('C5');
     const r = isrPeriodo(ctx, { base_gravable_c: e.pago_gravable_c, periodicidad: e.periodicidad, fecha_pago: e.fecha_pago, con_subsidio: false });
     return { valor_c: r.isr_retenido_c, traza: { ...r.traza, nota: 'Aplica dos veces los renglones bajos; lo corrige el ajuste mensual (C5 debe decir cómo entra).' } };
+  },
+};
+
+// ───────────────────── Pagos anuales y por separación ─────────────────────
+
+/** Sueldo mensual ordinario: el que llega, o salario diario × factor (criterio que corresponda). */
+function sueldoMensual(ctx, e, factor, criterio) {
+  if (e.sueldo_mensual_c !== undefined && e.sueldo_mensual_c !== null) {
+    exigirCentavos('sueldo_mensual_c', e.sueldo_mensual_c);
+    return { sueldo: Exacto.centavos(e.sueldo_mensual_c), origen: 'dato de entrada' };
+  }
+  exigirCentavos('salario_diario_c', e.salario_diario_c);
+  ctx.criterio(criterio);
+  return { sueldo: Exacto.centavos(e.salario_diario_c).por(factor), origen: 'salario diario × ' + factor + ' (' + criterio + ')' };
+}
+
+function rubroSalida(e) {
+  const r = e.rubro_salida || 'isr';
+  if (!['isr', 'isr_ptu'].includes(r)) throw new Error('rubro_salida debe ser isr o isr_ptu');
+  return r;
+}
+
+export const CALC_ISR_174_001 = {
+  id: 'CALC-ISR-174-001', version: '1.0.0', rubro: 'isr',
+  titulo: 'ISR de PTU, aguinaldo y primas anuales (RLISR art. 174)',
+  fundamento: 'RLISR art. 174 (opción del retenedor); LISR art. 96, tarifa mensual; criterio C17',
+  fuentes: [PRENOMINA, CATALOGO_CONCEPTOS, XML],
+  /**
+   * entrada: { pago_gravable_c, fecha_pago, salario_diario_c | sueldo_mensual_c, concepto?, rubro_salida?: 'isr' | 'isr_ptu' }
+   *  rubro_salida: 'isr' cuando la PTU va en su propia corrida (el ISR del cliente es sólo de PTU);
+   *  'isr_ptu' cuando viene mezclada con otras percepciones en el mismo renglón.
+   *  I.   equivalente mensual = gravado ÷ 365 × 30.4
+   *  II.  ISR(sueldo + equivalente) con la tarifa mensual
+   *  III. menos ISR(sueldo)
+   *  IV.  tasa = diferencia ÷ equivalente
+   *  V.   ISR = gravado × tasa. Exacto en todos los pasos; un solo redondeo al final.
+   */
+  calcular(e, ctx) {
+    exigirCentavos('pago_gravable_c', e.pago_gravable_c); exigirFecha('fecha_pago', e.fecha_pago);
+    const { sueldo, origen } = sueldoMensual(ctx, e, '30.4', 'C17');
+    const grav = Exacto.centavos(e.pago_gravable_c);
+    if (grav.le(0)) return { valor_c: 0, renglones: [{ rubro: rubroSalida(e), valor_c: 0 }], traza: { concepto: e.concepto || null, pago_gravable_c: e.pago_gravable_c, caso_borde: 'gravado_cero' } };
+    const tabla = ctx.param('ISR_TARIFA_MENSUAL', e.fecha_pago);
+    const equivalente = grav.div(365).por('30.4');
+    const t1 = aplicarTarifa(tabla, sueldo.suma(equivalente));
+    const t0 = aplicarTarifa(tabla, sueldo);
+    const dif = Exacto.max(t1.isr.resta(t0.isr), 0);
+    const tasa = dif.div(equivalente);
+    const isr = grav.por(tasa);
+    const valor_c = isr.aCentavos();
+    return {
+      valor_c, renglones: [{ rubro: rubroSalida(e), valor_c }],
+      traza: { concepto: e.concepto || null, pago_gravable_c: e.pago_gravable_c, sueldo_mensual: sueldo.texto(6), sueldo_origen: origen,
+        equivalente_mensual: equivalente.texto(6), isr_con_pago: t1.isr.texto(6), isr_sin_pago: t0.isr.texto(6), diferencia: dif.texto(6),
+        tasa: tasa.texto(10), isr_exacto: isr.texto(6), isr_c: valor_c, tarifa_con_pago: t1.traza, tarifa_sin_pago: t0.traza,
+        redondeo: 'único, al final, medio hacia arriba' },
+    };
+  },
+};
+
+export const CALC_ISR_SEP_001 = {
+  id: 'CALC-ISR-SEP-001', version: '1.0.0', rubro: 'isr_separacion', // se compara contra el ISR de liquidación del cliente
+  titulo: 'ISR de pagos por separación (LISR art. 95)',
+  fundamento: 'LISR art. 95; exención LISR art. 93 fr. XIII (CALC-EXE-001); criterio C16',
+  fuentes: [PRENOMINA, CATALOGO_CONCEPTOS, { clave: 'fecha_ingreso', obligatoria: true }, XML],
+  /**
+   * entrada: { separacion_gravable_c (ya neto de la exención de 90 UMA por año), fecha_pago,
+   *            salario_diario_c | sueldo_mensual_c (último sueldo mensual ordinario) }
+   * Si lo gravado es al menos el último sueldo mensual: tasa = ISR(sueldo) ÷ sueldo, ISR = gravado × tasa.
+   * Si es menor: se acumula al ingreso ordinario; aquí se calcula como el ISR incremental de la tarifa
+   * mensual (ISR(sueldo + gravado) − ISR(sueldo)) y la traza lo señala.
+   */
+  calcular(e, ctx) {
+    exigirCentavos('separacion_gravable_c', e.separacion_gravable_c); exigirFecha('fecha_pago', e.fecha_pago);
+    const { sueldo, origen } = sueldoMensual(ctx, e, '30', 'C16');
+    const grav = Exacto.centavos(e.separacion_gravable_c);
+    if (grav.le(0)) return { valor_c: 0, traza: { separacion_gravable_c: e.separacion_gravable_c, caso_borde: 'gravado_cero', nota: 'Todo exento por años de servicio' } };
+    if (sueldo.le(0)) { ctx.limitar('dato_faltante', 'último sueldo mensual ordinario'); return { valor_c: null, traza: { motivo: 'sin sueldo mensual' } }; }
+    const tabla = ctx.param('ISR_TARIFA_MENSUAL', e.fecha_pago);
+    const t0 = aplicarTarifa(tabla, sueldo);
+    let isr, metodo, tasa = null, t1 = null;
+    if (grav.lt(sueldo)) {
+      t1 = aplicarTarifa(tabla, sueldo.suma(grav));
+      isr = Exacto.max(t1.isr.resta(t0.isr), 0);
+      metodo = 'gravado menor al último sueldo mensual: se acumula al ingreso ordinario (ISR incremental, tarifa mensual)';
+    } else {
+      tasa = t0.isr.div(sueldo);
+      isr = grav.por(tasa);
+      metodo = 'tasa del último sueldo mensual ordinario × gravado';
+    }
+    const valor_c = isr.aCentavos();
+    return {
+      valor_c,
+      traza: { separacion_gravable_c: e.separacion_gravable_c, sueldo_mensual: sueldo.texto(6), sueldo_origen: origen, metodo,
+        isr_sueldo: t0.isr.texto(6), tasa: tasa ? tasa.texto(10) : null, isr_exacto: isr.texto(6), isr_c: valor_c,
+        tarifa_sueldo: t0.traza, tarifa_acumulada: t1 ? t1.traza : null, redondeo: 'único, al final, medio hacia arriba' },
+    };
   },
 };

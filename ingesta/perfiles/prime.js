@@ -12,13 +12,13 @@
 //   otro_pago    otro pago del CFDI (no es ingreso gravable): subsidio entregado, ISR ajustado.
 //   no_ingreso   devolución de un descuento: no es ingreso.
 //   opaco        naturaleza por confirmar (P2): limita el ISR del renglón si trae importe.
-//   separacion   indemnización/liquidación/prima de antigüedad: sin regla de ISR en v1
-//                (LISR 95); el renglón queda limitado.
-//   ptu          sin regla de ISR en v1; el renglón queda limitado.
+//   separacion   indemnización/liquidación/prima de antigüedad: exención de 90 UMA por año
+//                (CALC-EXE-001) e ISR por LISR 95 (CALC-ISR-SEP-001, criterio C16).
+//   ptu          exención de 15 UMA (CALC-EXE-001) e ISR por RLISR 174 (CALC-ISR-174-001, C17).
 
 export default {
   id: 'prime',
-  version: '2026-10-15',
+  version: '2026-10-19',
   empresa: 'PRIMEWIRELESS HOLDINGS (PHO190128QD8)',
 
   // Hoja: la que más renglones × columnas tenga (el acumulado trae hojas auxiliares).
@@ -81,8 +81,11 @@ export default {
   // Lado «cliente» de la resta: lo que calculó la nómina actual, por rubro.
   // Varias columnas se suman (familias): no sumarlas fue el bug histórico.
   movimientos: {
-    isr:           ['I.S.R. (sp)', 'ISR Nómina', 'ISR AJUSTE'],
-    isr_separacion:['ISR FINIQUITO', 'ISR Liquidacion'],
+    // R. González (19-oct): el ISR de finiquitos y PTU es I.S.R. (sp) + ISR FINIQUITO + ISR Liquidacion.
+    // ISR FINIQUITO es el de la parte ordinaria del finiquito (aguinaldo, vacaciones…): va con el ISR del renglón.
+    // ISR Liquidacion es el de la separación (LISR 95): se compara contra CALC-ISR-SEP-001.
+    isr:           ['I.S.R. (sp)', 'ISR Nómina', 'ISR AJUSTE', 'ISR FINIQUITO'],
+    isr_separacion:['ISR Liquidacion'],
     imss_obrera:   ['I.M.S.S.'],
     ceav_obrera:   ['rcv (MONTO)'],
     imss_patronal: ['Imss'],
