@@ -248,7 +248,8 @@ test('Incapacidades: restan días en IMSS y CEAV, no en retiro ni INFONAVIT', ()
 
 test('CEAV: fronteras de rango exactas y truncado a dos decimales (C4)', () => {
   // SBC = veces × UMA; el rango se decide con veces truncado, no redondeado.
-  const casos = [['1.00', '3.150'], ['1.009', '3.150'], ['1.01', '3.676'], ['1.50', '3.676'], ['1.509', '3.676'], ['1.51', '4.851'],
+  // C13: el renglón 3.150% («1.00 SM») sólo aplica con SBC = SM exacto; 1.00 UMA cae ya en el segundo renglón.
+  const casos = [['1.00', '3.676'], ['1.009', '3.676'], ['1.01', '3.676'], ['1.50', '3.676'], ['1.509', '3.676'], ['1.51', '4.851'],
     ['2.00', '4.851'], ['2.01', '5.556'], ['3.00', '6.026'], ['3.01', '6.361'], ['4.00', '6.613'], ['4.01', '7.513'], ['24.99', '7.513']];
   const dia = { desde: '2026-08-03', hasta: '2026-08-03' };
   for (const [veces, tasa] of casos) {
@@ -258,6 +259,26 @@ test('CEAV: fronteras de rango exactas y truncado a dos decimales (C4)', () => {
     const clave = Object.keys(r.traza.rango_ceav)[0];
     assert.ok(clave.endsWith('→' + tasa + '%'), veces + ' UMA → ' + clave + ' (esperado ' + tasa + '%)');
   }
+});
+
+test('CEAV y cuota obrera con SBC = salario mínimo exacto (C13 y C14)', () => {
+  const dia = { desde: '2026-08-03', hasta: '2026-08-09' };
+  const sm = correr(cat, 'CALC-RCV-001', { sbc_c: 31504, periodo: dia, incapacidades: 0 });
+  assert.deepEqual(sm.r.traza.rango_ceav, { '1.00 SM→3.150%': 7 });
+  assert.ok(sm.ctx.criterios.has('C13') && sm.ctx.criterios.has('C14'));
+  assert.equal(sm.r.extra.retencion_ceav_obr_c, 0);
+  assert.equal(sm.r.extra.ceav_obr_a_cargo_patron_c, sm.r.extra.ceav_obr_c);
+  const un = correr(cat, 'CALC-RCV-001', { sbc_c: 31505, periodo: dia, incapacidades: 0 });
+  assert.ok(Object.keys(un.r.traza.rango_ceav)[0].endsWith('→6.026%'));
+  assert.ok(!un.ctx.criterios.has('C13') && !un.ctx.criterios.has('C14'));
+  // IMSS: la cuota obrera se calcula, pero no se retiene; el renglón patronal la incluye.
+  const im = correr(cat, 'CALC-IMSS-001', { sbc_c: 31504, periodo: dia, incapacidades: 0, prima_rt: { pct: '0.54355' } }).r;
+  assert.equal(im.extra.obrera_c, 2756); assert.equal(im.valor_c, 0);
+  assert.deepEqual(im.renglones, [{ rubro: 'imss_obrera', valor_c: 0 }, { rubro: 'imss_patronal', valor_c: 27875 + 2756 }]);
+  // Con salario diario = SM y SBC integrado (330.57) también aplica C14; C13 no (el SBC no es el mínimo).
+  const sd = correr(cat, 'CALC-RCV-001', { sbc_c: 33057, salario_diario_c: 31504, periodo: dia, incapacidades: 0 });
+  assert.ok(sd.ctx.criterios.has('C14') && !sd.ctx.criterios.has('C13'));
+  assert.equal(sd.r.traza.salario_minimo.medido, 'salario_diario');
 });
 
 test('Cambio de UMA dentro del periodo: cada día usa la UMA vigente ese día', () => {

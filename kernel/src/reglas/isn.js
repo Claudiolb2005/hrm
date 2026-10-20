@@ -9,8 +9,8 @@ import { Exacto, E } from '../exacto.js';
 import { exigirCentavos } from './comun.js';
 
 export const CALC_ISN_001 = {
-  id: 'CALC-ISN-001', version: '1.0.0', rubro: 'isn',
-  titulo: 'Impuesto sobre nóminas por entidad', fundamento: 'Ley de hacienda o código fiscal de cada entidad; cuadro de conceptos (V8 pendiente)',
+  id: 'CALC-ISN-001', version: '1.1.0', rubro: 'isn',
+  titulo: 'Impuesto sobre nóminas por entidad', fundamento: 'Ley de hacienda o código fiscal de cada entidad; cuadro de conceptos (V8 pendiente); criterios C22 y C23',
   fuentes: [
     { clave: 'prenomina', obligatoria: true },
     { clave: 'entidad_por_registro', obligatoria: true },
@@ -44,16 +44,42 @@ export const CALC_ISN_001 = {
       if (trato === 'exento') exento = exento.suma(m); else base = base.suma(m);
       detalle.push({ concepto: c.concepto, monto_c: c.monto_c, trato, fuente_trato: f ? f.id : null, nivel: f ? f.nivel : null });
     }
-    // Adicionales: si existe renglón (hoy todos en nivel C), el resultado queda limitado.
-    const adicional = ctx.catalogo.buscar('ISN_ADICIONAL', fecha, e.entidad);
-    if (adicional) ctx.param('ISN_ADICIONAL', fecha, e.entidad);
     const tasa = tasaF ? tasaF.valor : null;
-    const impuesto_c = tasa ? base.por(Exacto.pct(tasa)).aCentavos() : null;
+    const impuestoExacto = tasa ? base.por(Exacto.pct(tasa)) : null;
+    const impuesto_c = impuestoExacto ? impuestoExacto.aCentavos() : null;
+
+    // Adicionales. Con componentes cargados (p. ej. Chihuahua, C23) se calculan y se suman,
+    // cada uno redondeado por separado; sin componentes sólo se describen y el resultado queda limitado.
+    const adicional = ctx.catalogo.buscar('ISN_ADICIONAL', fecha, e.entidad);
+    let adic = null, adicionales_c = 0;
+    if (adicional) {
+      ctx.param('ISN_ADICIONAL', fecha, e.entidad);
+      const v = adicional.valor;
+      if (Array.isArray(v.componentes) && impuestoExacto) {
+        if (e.entidad === 'CHIH') ctx.criterio('C23');
+        const comps = v.componentes.map(k => {
+          const sobre = k.sobre === 'impuesto' ? impuestoExacto : base;
+          const c = sobre.por(Exacto.pct(k.pct)).aCentavos();
+          adicionales_c += c;
+          return { clave: k.clave, sobre: k.sobre, pct: k.pct, valor_c: c };
+        });
+        let municipal = null;
+        if (v.municipales) {
+          if (!e.municipio) { municipal = 'municipio no indicado'; ctx.limitar('dato_faltante', 'municipio del registro (adicionales municipales de ' + e.entidad + ')'); }
+          else if (v.municipales.municipios.includes(e.municipio)) { municipal = 'aplica, no calculado'; ctx.limitar('parametro_faltante', v.municipales.descripcion); }
+          else municipal = 'no aplica en ' + e.municipio;
+        }
+        adic = { id: adicional.id, descripcion: v.descripcion, nivel: adicional.nivel, calculado: true, componentes: comps, adicionales_c, municipal };
+      } else {
+        adic = { id: adicional.id, descripcion: v.descripcion, nivel: adicional.nivel, calculado: false };
+      }
+    }
+    const total_c = impuesto_c === null ? null : impuesto_c + adicionales_c;
     return {
-      valor_c: impuesto_c,
+      valor_c: total_c,
       traza: { registro: e.registro, entidad: e.entidad, mes: e.mes, conceptos: detalle, base_c: base.aCentavos(), exento_c: exento.aCentavos(),
-        tasa_pct: tasa, nivel_tasa: tasaF ? tasaF.nivel : null, impuesto_c,
-        adicional: adicional ? { id: adicional.id, descripcion: adicional.valor.descripcion, nivel: adicional.nivel, calculado: false } : null },
+        tasa_pct: tasa, nivel_tasa: tasaF ? tasaF.nivel : null, impuesto_c, adicionales_c, total_c, adicional: adic },
+      extra: { impuesto_c, adicionales_c, total_c },
     };
   },
 };

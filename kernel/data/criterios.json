@@ -4,12 +4,12 @@
   {
    "id": "C1",
    "tema": "ISR catorcenal",
-   "decision": "Base ÷ 14, tarifa diaria, subsidio diario, × 14",
+   "decision": "Tarifa diaria × 14: base ÷ 14, tarifa diaria, subsidio diario, × 14; un solo redondeo al final",
    "fundamento": "Equivale a la tarifa por día × 14 del catálogo; el Anexo 8 no publica tarifa de 14 días",
-   "quien": "Rafael González",
-   "fecha": "2026-10-14",
-   "estado": "por_confirmar",
-   "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME. 19-oct (agosto completo): Rafael lo confirma en sus hojas (diaria × 14), pero PRIME aplica una proyección: 96 de 122 catorcenas exactas con base ÷ 14 × 15, tarifa quincenal, × 14 ÷ 15; todas a 1 ¢ o menos. La regla del kernel sigue en diaria × 14 hasta que Rafael decida cuál es el método correcto."
+   "quien": "Rafael González (D10/D11) + Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "15-oct: la regla exacta da 2,207.47 (emp 191 cat. 16) y 62,868.17 (bono emp 89); la nómina dio 2,207.49 y 62,868.21. La proyección mensual (× 30.4 ÷ 14, tarifa mensual, regreso) reproduce 2,207.49 exacto y da 62,868.2158 en el bono: la diferencia es de método, no de redondeo. Además el caso escrito «4,490.58 × 14 = 62,868.21» no cuadra aritméticamente (da 62,868.12). Confirmar con Rafael qué método aplica la nómina de PRIME. 19-oct (agosto completo): Rafael lo confirma en sus hojas (diaria × 14), pero PRIME aplica una proyección: 96 de 122 catorcenas exactas con base ÷ 14 × 15, tarifa quincenal, × 14 ÷ 15; todas a 1 ¢ o menos. La regla del kernel sigue en diaria × 14 hasta que Rafael decida cuál es el método correcto. 20-oct: cerrado. Rafael aplica diaria × 14 en D10 y D11. PRIME usa proyección quincenal (96 de 122 exactos): se reporta como diferencia de criterio, no como error de cálculo."
   },
   {
    "id": "C2",
@@ -82,22 +82,22 @@
   {
    "id": "C13",
    "tema": "CEAV patronal: primer renglón en salario mínimo",
-   "decision": "Por decidir. Hoy el primer renglón se lee como 1.00 UMA; el transitorio de la reforma (DOF 16-dic-2020) dice «1.00 SM» y «1.01 SM a 1.50 UMA»",
+   "decision": "El renglón 3.150% («1.00 SM») aplica sólo si el SBC es igual al salario mínimo exacto; cualquier otro SBC se ubica por rango de UMA (truncado, C4) desde el segundo renglón",
    "fundamento": "LSS art. 168 fr. II y Segundo Transitorio; cotejo del 19-oct-2026",
-   "quien": "Pendiente (Rafael)",
-   "fecha": "2026-10-19",
-   "estado": "abierto",
-   "observaciones": "Sólo cambia el resultado cuando el SBC es exactamente un salario mínimo (315.04 = 2.68 UMA): con la lectura en UMA va a 6.026%, con la lectura en SM a 3.150%. Caso dorado D41."
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "Sólo cambia el resultado cuando el SBC es exactamente un salario mínimo (315.04 = 2.68 UMA): con la lectura en UMA va a 6.026%, con la lectura en SM a 3.150%. Caso dorado D41. 20-oct: cerrado con D42 (315.04 × 31 × 3.150% = 307.64). Implementado en CALC-RCV-001 1.1.0."
   },
   {
    "id": "C14",
    "tema": "Cuota obrera de quien gana el salario mínimo",
-   "decision": "Por decidir. El kernel calcula cuota obrera aunque el SBC sea el salario mínimo",
+   "decision": "Si el trabajador percibe el salario mínimo, el patrón paga la cuota obrera de IMSS y CEAV: retención al trabajador 0 y la cuota pasa al renglón patronal. Se mide con el salario diario cuando viene; si no, con el SBC",
    "fundamento": "LSS art. 36: el patrón paga íntegramente la cuota del trabajador que percibe el salario mínimo",
-   "quien": "Pendiente (Rafael)",
-   "fecha": "2026-10-19",
-   "estado": "abierto",
-   "observaciones": "Definir si se mide por salario diario o por SBC y cómo se presenta (obrera 0 y patronal + obrera). Caso dorado D41."
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "Definir si se mide por salario diario o por SBC y cómo se presenta (obrera 0 y patronal + obrera). Caso dorado D41. 20-oct: cerrado con D41. Implementado en CALC-IMSS-001 y CALC-RCV-001 1.1.0. Un SM real integra arriba del mínimo (factor ≈ 1.0493), por eso se mide con el salario diario."
   },
   {
    "id": "C15",
@@ -148,6 +148,66 @@
    "fecha": "2026-10-19",
    "estado": "abierto",
    "observaciones": "Rafael dice: 100% gravable, ISR por art. 174 y que son pagos de liquidación. PRIME retiene $160,340.84 en 10 personas (art. 174 ≈ $96 mil). Si son pagos por separación, la ley los llevaría al art. 95 y entrarían en el tope de 90 UMA por año. Los netos son redondos y PRIME absorbe el ISR."
+  },
+  {
+   "id": "C20",
+   "tema": "Tope de ingresos del subsidio",
+   "decision": "Se compara contra el tope prorrateado exacto, sin redondear (11,492.66 ÷ 30.4 × 7 = 2,646.336 semanal)",
+   "fundamento": "Decreto de subsidio DOF 31-dic-2025; regla de un solo redondeo al final",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "D02 (2,646.33 → 123.34) y D03 (2,646.34 → 0)."
+  },
+  {
+   "id": "C21",
+   "tema": "Cambio de UMA dentro del periodo (IMSS)",
+   "decision": "Cuotas IMSS por día con la UMA vigente de cada día; cada mes en su cédula",
+   "fundamento": "LSS; IMSS se determina por mes calendario",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "D32: 3 días con UMA 113.14 y 4 con 117.31."
+  },
+  {
+   "id": "C22",
+   "tema": "ISN CDMX: pagos por separación",
+   "decision": "Indemnización y prima de antigüedad fuera de la base del ISN",
+   "fundamento": "Jurisprudencia 2a./J. 23/2002; cuadro ISN de R. González",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "D39: 4% × (850,000 + 420,000) = 50,800. El kernel ya lo aplicaba por el cuadro concepto × entidad."
+  },
+  {
+   "id": "C23",
+   "tema": "ISN Chihuahua: adicionales",
+   "decision": "4% + impuesto universitario 6% del impuesto + contribuciones extraordinarias 0.30% y 0.15% de la base, cada una redondeada por separado; Expo-Chihuahua y Paso del Norte sólo si el registro está en Chihuahua o Juárez (sin municipio → limitado)",
+   "fundamento": "Guía del ISN 2026 del Gobierno de Chihuahua (SH-001-26)",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "D40: 500,000 → 23,450. Implementado en CALC-ISN-001 1.1.0. Falta cargar las tasas municipales."
+  },
+  {
+   "id": "C24",
+   "tema": "Redondeo de cuotas IMSS",
+   "decision": "Cada rama se acumula exacta y se redondea a centavo por separado; la cuota obrera y la patronal son la suma de ramas ya redondeadas",
+   "fundamento": "Así calcula el SUA; recálculo de agosto 2026 a 0 ¢ en 30 registros",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "20-oct: siete casos dorados (D29a, D30a, D31a/b, D32b, D41a/b) se habían calculado sumando y redondeando al final, con 1 ¢ de diferencia; se recalcularon por rama."
+  },
+  {
+   "id": "C25",
+   "tema": "Ajuste mensual negativo",
+   "decision": "Un ajuste mensual negativo es retención en exceso: se reporta el negativo y se reintegra al trabajador en la misma nómina; no se deja en cero",
+   "fundamento": "LISR art. 96; consistente con el hallazgo de 413 ajustes sin reintegro en PRIME agosto 2026",
+   "quien": "Casos dorados revisados (HRM, 20-oct)",
+   "fecha": "2026-10-20",
+   "estado": "vigente",
+   "observaciones": "D15: −652.23. Rafael proponía dejarlo en cero."
   }
  ]
 }

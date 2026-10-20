@@ -52,7 +52,7 @@ filas = [
                           "($536.21) y 15.02% desde febrero ($535.65); tope de ingresos $11,492.66 mensuales; divisor 30.4 (criterio C2). Tarifas del Anexo 8 RMF 2026. "
                           "Bases gravables ya netas de exenciones salvo en los casos de exenciones. Prima de riesgo indicada en cada caso. Trabajadores ficticios."),
     ("Ejemplo (ya resuelto)", "Caso de la revisión del maestro: semanal, base gravable $7,760.68, pago 6-ago-2026 → ISR a retener 1222.87 · "
-                              "Cómo: renglón 6 semanal, 427.56 + (7,760.68 − 4,037.33) × 21.36% = 1,222.87; sin subsidio (base > $2,646.34)."),
+                              "Cómo: renglón 6 semanal, 427.56 + (7,760.68 − 4,037.33) × 21.36% = 1,222.87; sin subsidio (base > tope semanal exacto $2,646.336)."),
     ("Al terminar", "Guarde el archivo con el mismo nombre y envíelo. El sistema lo importa (scripts/importar-casos-dorados.py) y compara cada cifra al centavo."),
 ]
 for i, (k, v) in enumerate(filas, start=1):

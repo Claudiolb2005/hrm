@@ -128,7 +128,17 @@ ISN('TAB', '3.5', '2026-01-01', '2026-12-31', 'C', 'Por confirmar en qué supues
 ISN('SIN', '3', '2026-01-01', '2026-12-31', 'C', 'Tarifa progresiva mensual (LH Sinaloa arts. 17–18, fuente secundaria): hasta 500,000 2.4%; 500,000–700,000 12,000 + 2.6%; 700,000–900,000 17,200 + 2.8%; más de 900,000 22,800 + 3%. El 3% plano es lo que aplica la nómina; el kernel aún no modela la tabla.');
 const ADI = (ent, valor, notas) => add({ id: 'ISN_ADICIONAL:' + ent + '@2026', clave: 'ISN_ADICIONAL', entidad: ent, tipo: 'objeto', valor,
   vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion', fundamento: 'Ley de la entidad (por confirmar)', fuente: CAT, nivel: 'C', notas });
-ADI('CHIH', { descripcion: 'Impuesto Universitario 6% del impuesto causado; contribuciones extraordinarias 10% y 5% sobre base × 3% (no sobre el 4%); Expo-Chihuahua y Fideicomiso Paso del Norte sólo en sus municipios (guía SH-001-26)' }, 'Exposición +$15,218 a +$43,751/mes en PRIME.');
+add({ id: 'ISN_ADICIONAL:CHIH@2026', clave: 'ISN_ADICIONAL', entidad: 'CHIH', tipo: 'objeto',
+  valor: { descripcion: 'Impuesto Universitario 6% del impuesto causado; contribuciones extraordinarias 10% y 5% sobre base × 3% (= 0.30% y 0.15% de la base, no sobre el 4%); Expo-Chihuahua y Fideicomiso Paso del Norte sólo en sus municipios (guía SH-001-26)',
+    componentes: [
+      { clave: 'impuesto_universitario', sobre: 'impuesto', pct: '6' },
+      { clave: 'contribucion_extraordinaria_10', sobre: 'base', pct: '0.30' },
+      { clave: 'contribucion_extraordinaria_5', sobre: 'base', pct: '0.15' },
+    ],
+    municipales: { municipios: ['Chihuahua', 'Juárez'], descripcion: 'Expo-Chihuahua (Chihuahua) y Fideicomiso Paso del Norte (Juárez): tasas no cargadas' } },
+  vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion',
+  fundamento: 'Código Fiscal y Ley de Ingresos del Estado de Chihuahua 2026; criterio C23', fuente: 'Gobierno de Chihuahua, Guía del Impuesto sobre Nóminas 2026 (SH-001-26), ipagos.chihuahua.gob.mx',
+  nivel: 'B', notas: 'Cada componente se redondea a centavo por separado. Caso dorado D40: 500,000 → 20,000 + 1,200 + 1,500 + 750 = 23,450. Exposición +$15,218 a +$43,751/mes en PRIME.' });
 ADI('SON', { descripcion: '1% adicional para patrones con 100 o más trabajadores' }, 'Exposición +$31,527/mes en PRIME.');
 ADI('VER', { descripcion: '15% adicional sobre el impuesto' }, 'Exposición +$13,742/mes en PRIME.');
 ADI('JAL', { descripcion: '5% especial: ¿asimilados o consejeros?' }, 'Sólo aplica si hay esos pagos.');
