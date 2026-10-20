@@ -145,9 +145,26 @@ test('CALC-ISN-001 · Y6079749104 CDMX agosto: con el cuadro 471,623.37; queda l
   assert.equal(50313069 - r.valor_c, 3150732);
 });
 
-test('CALC-ISN-001 · Chihuahua: adicionales en nivel C producen limitación', () => {
-  const { ctx } = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'CHIH', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 100000 }] });
-  assert.ok(ctx.limitaciones.some(l => l.detalle === 'ISN_ADICIONAL:CHIH@2026'));
+test('CALC-ISN-001 · Chihuahua: 4% + universitario 6% del impuesto + extraordinarias 0.30% y 0.15% de la base (C23)', () => {
+  const e = { registro: 'X', entidad: 'CHIH', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 100000 }] };
+  const { r, ctx } = correr(cat, 'CALC-ISN-001', e);
+  assert.equal(r.extra.impuesto_c, 4000);
+  assert.deepEqual(r.traza.adicional.componentes.map(c => c.valor_c), [240, 300, 150]);
+  assert.equal(r.valor_c, 4690);
+  assert.ok(ctx.criterios.has('C23'));
+  assert.ok(ctx.limitaciones.some(l => l.motivo === 'dato_faltante' && /municipio/.test(l.detalle)));
+  const jz = correr(cat, 'CALC-ISN-001', { ...e, municipio: 'Juárez' });
+  assert.ok(jz.ctx.limitaciones.some(l => l.motivo === 'parametro_faltante'));
+  const de = correr(cat, 'CALC-ISN-001', { ...e, municipio: 'Delicias' });
+  assert.ok(!de.ctx.limitaciones.some(l => /municip|Expo/.test(l.detalle || '')));
+  assert.equal(de.r.valor_c, 4690);
+});
+
+test('CALC-ISN-001 · Veracruz: adicional sin componentes sigue limitado y no se suma', () => {
+  const { r, ctx } = correr(cat, 'CALC-ISN-001', { registro: 'X', entidad: 'VER', mes: '2026-08', conceptos: [{ concepto: 'sueldo', monto_c: 100000 }] });
+  assert.equal(r.traza.adicional.calculado, false);
+  assert.equal(r.valor_c, r.extra.impuesto_c);
+  assert.ok(ctx.limitaciones.some(l => l.detalle === 'ISN_ADICIONAL:VER@2026'));
 });
 
 // ── 0.9.0: PTU (RLISR art. 174, C17), separación (LISR art. 95, C16) y cuadro ISN de 32 entidades.

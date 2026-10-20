@@ -13,6 +13,7 @@ import os
 import sys
 from datetime import date, timedelta
 from decimal import Decimal as D, getcontext, ROUND_HALF_UP, ROUND_DOWN
+from fractions import Fraction as F
 
 getcontext().prec = 50
 
@@ -37,6 +38,20 @@ def r_c(pesos):
 
 def c2p(c):
     return D(int(c)) / CIEN
+
+
+def r_c_frac(x):
+    """Fraction exacta en pesos -> centavos enteros, medio hacia arriba (simétrico)."""
+    c = F(x) * 100
+    neg = c < 0
+    c = abs(c)
+    n = (c + F(1, 2)).__floor__()
+    return -int(n) if neg else int(n)
+
+
+def fq(v):
+    """str/Decimal/int -> Fraction exacta."""
+    return F(str(v))
 
 
 def fecha(s):
@@ -176,7 +191,70 @@ def regla_ajm(e):
             "subsidio_c": r_c(sub)}
 
 
+# ---------------------------------------------------------------- ISR art. 174 RLISR / art. 95 LISR
+def isr_mensual_frac(base, fecha_pago):
+    """LISR art. 96, tarifa mensual (Anexo 8), en racionales exactos."""
+    if base <= 0:
+        return F(0)
+    fila = None
+    for li, ls, cf, pct in P.vigente("ISR_TARIFA_MENSUAL", fecha_pago):
+        if fq(li) <= base:
+            fila = (fq(li), fq(cf), fq(pct))
+    if fila is None:
+        return F(0)
+    li, cf, pct = fila
+    return cf + (base - li) * pct / 100
+
+
+def sueldo_mensual(e, dias):
+    if e.get("sueldo_mensual_c") is not None:
+        return F(int(e["sueldo_mensual_c"]), 100)
+    return F(int(e["salario_diario_c"]), 100) * dias
+
+
+def regla_174(e):
+    """RLISR art. 174, criterio C17. Racionales exactos, un redondeo al final."""
+    fp = e["fecha_pago"]
+    g = F(int(e["pago_gravable_c"]), 100)
+    if g <= 0:
+        return {"valor_c": 0}
+    sueldo = sueldo_mensual(e, fq("30.4"))
+    eq = g / 365 * fq("30.4")                                  # I
+    if eq == 0:
+        return {"valor_c": 0}
+    dif = isr_mensual_frac(sueldo + eq, fp) - isr_mensual_frac(sueldo, fp)   # II − III
+    tasa = dif / eq                                            # IV
+    return {"valor_c": r_c_frac(g * tasa)}                     # V
+
+
+def regla_sep(e):
+    """LISR art. 95, criterio C16 (último sueldo = SD × 30)."""
+    fp = e["fecha_pago"]
+    g = F(int(e["separacion_gravable_c"]), 100)
+    sueldo = sueldo_mensual(e, F(30))
+    if sueldo <= 0:
+        return {"valor_c": None}
+    if g <= 0:
+        return {"valor_c": 0}
+    if g >= sueldo:
+        isr = g * isr_mensual_frac(sueldo, fp) / sueldo
+    else:
+        isr = isr_mensual_frac(sueldo + g, fp) - isr_mensual_frac(sueldo, fp)
+    return {"valor_c": r_c_frac(isr)}
+
+
 # ---------------------------------------------------------------- IMSS / RCV / INFONAVIT
+def salario_minimo(e, d):
+    clave = "SALARIO_MINIMO_FRONTERA" if e.get("zona_salarial") == "frontera" else "SALARIO_MINIMO_GENERAL"
+    return P.num(clave, d)
+
+
+def gana_minimo(e):
+    """Criterio C14 (LSS art. 36): salario diario si viene, si no el SBC; igualdad exacta."""
+    sm = salario_minimo(e, e["periodo"]["desde"])
+    medida = e.get("salario_diario_c")
+    medida = medida if medida is not None else e["sbc_c"]
+    return c2p(medida) == sm
 def dias_no_incap(periodo, incap):
     dias = dias_rango(periodo["desde"], periodo["hasta"])
     if incap is None:
@@ -220,7 +298,10 @@ def regla_imss(e):
     ramas = {k: r_c(v) for k, v in acc.items()}
     obr = sum(v for k, v in ramas.items() if k.endswith("_obr"))
     pat = sum(v for k, v in ramas.items() if k.endswith("_pat"))
-    return {"valor_c": obr, "patronal_c": pat, "ramas_c": ramas}
+    c14 = gana_minimo(e)
+    # valor_c = retención al trabajador; con C14 el patrón absorbe la cuota obrera.
+    return {"valor_c": 0 if c14 else obr, "obrera_c": obr, "patronal_c": pat, "ramas_c": ramas,
+            "c14": c14}
 
 
 def regla_rcv(e):
@@ -233,16 +314,22 @@ def regla_rcv(e):
     for d in dias_no_incap(e["periodo"], e.get("incapacidades")):
         q = P.vigente("RCV_CUOTAS", d)
         uma, s = sbc_dia(sbc, d)
-        veces = (s / uma).quantize(D("0.01"), rounding=ROUND_DOWN)  # criterio C4
+        tabla = P.vigente("CEAV_PATRONAL_TABLA", d)
         tasa = None
-        for hasta, t in P.vigente("CEAV_PATRONAL_TABLA", d):
-            if hasta is None or veces <= D(str(hasta)):
-                tasa = D(str(t))
-                break
+        if s == salario_minimo(e, d):  # criterio C13: renglón «1.00 SM» sólo con SBC = SM exacto
+            tasa = D(str(tabla[0][1]))
+        else:
+            veces = (s / uma).quantize(D("0.01"), rounding=ROUND_DOWN)  # criterio C4
+            for hasta, t in tabla[1:]:
+                if hasta is None or veces <= D(str(hasta)):
+                    tasa = D(str(t))
+                    break
         ceav_p += tasa / CIEN * s
         ceav_o += D(str(q["ceav_obr"])) / CIEN * s
     r, cp, co = r_c(retiro), r_c(ceav_p), r_c(ceav_o)
-    return {"valor_c": r + cp, "retiro_c": r, "ceav_pat_c": cp, "ceav_obr_c": co}
+    ret_co = 0 if gana_minimo(e) else co  # criterio C14
+    return {"valor_c": r + cp, "retiro_c": r, "ceav_pat_c": cp, "ceav_obr_c": co,
+            "retencion_ceav_obr_c": ret_co}
 
 
 def regla_inf(e):
@@ -334,6 +421,8 @@ REGLAS = {
     "CALC-ISR-CAT-001": lambda e: regla_isr(e, "catorcenal"),
     "CALC-ISR-EXT-001": regla_ext,
     "CALC-ISR-AJM-001": regla_ajm,
+    "CALC-ISR-174-001": regla_174,
+    "CALC-ISR-SEP-001": regla_sep,
     "CALC-IMSS-001": regla_imss,
     "CALC-RCV-001": regla_rcv,
     "CALC-INF-001": regla_inf,

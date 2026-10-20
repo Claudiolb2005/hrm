@@ -42,7 +42,7 @@ export function generarCasos(n = 3000, semilla = 20261019) {
   ];
   const casos = [];
   for (let i = 0; i < n; i++) {
-    const k = i % 9, id = 'c' + i, fecha_pago = elige(fechas);
+    const k = i % 11, id = 'c' + i, fecha_pago = elige(fechas);
     if (k === 0) {
       const periodicidad = elige(['semanal', 'decenal', 'quincenal', 'mensual', 'diaria']);
       casos.push({ id, regla: 'CALC-ISR-SEM-001', entrada: { base_gravable_c: base(periodicidad), fecha_pago, periodicidad } });
@@ -61,13 +61,33 @@ export function generarCasos(n = 3000, semilla = 20261019) {
     } else if (k === 5 || k === 6 || k === 7) {
       const regla = ['CALC-IMSS-001', 'CALC-RCV-001', 'CALC-INF-001'][k - 5];
       const periodo = elige(periodos);
-      const sbc_c = r() % 5 === 0 ? 300000 + (r() % 400000) : 27800 + (r() % 120000);
+      let sbc_c = r() % 5 === 0 ? 300000 + (r() % 400000) : 27800 + (r() % 120000);
+      // Criterios C13/C14: SBC = salario mínimo exacto, o salario diario mínimo con SBC integrado.
+      const extra = {};
+      const sm = r() % 8;
+      if (sm === 0) sbc_c = 31504;
+      else if (sm === 1) { extra.salario_diario_c = 31504; sbc_c = 33057; }
+      else if (sm === 2) { extra.zona_salarial = 'frontera'; if (r() % 2) sbc_c = 44087; else { extra.salario_diario_c = 44087; sbc_c = 31504; } }
+      else if (sm === 3) extra.salario_diario_c = 31504 + 1 + (r() % 50000);
       let incapacidades = 0;
       const t = r() % 4;
       if (t === 1) incapacidades = r() % 3;
       if (t === 2) incapacidades = [periodo.desde];
       // Incapacidad como número con cambio de UMA: el kernel limita, el número sigue comparable.
-      casos.push({ id, regla, entrada: { sbc_c, periodo, incapacidades, prima_rt: { pct: elige(['0.50', '0.54355', '2.59840', '7.58875', '15.00']) } } });
+      casos.push({ id, regla, entrada: { sbc_c, ...extra, periodo, incapacidades, prima_rt: { pct: elige(['0.50', '0.54355', '2.59840', '7.58875', '15.00']) } } });
+    } else if (k === 9 || k === 10) {
+      // RLISR art. 174 (C17) y LISR art. 95 (C16).
+      const sd = 31504 + (r() % 270000);
+      const sueldo = r() % 4 === 0 ? { sueldo_mensual_c: 950000 + (r() % 9000000) } : { salario_diario_c: sd };
+      const sm = sueldo.sueldo_mensual_c ?? sd * (k === 9 ? 30.4 : 30);
+      const t = r() % 10;
+      let g;
+      if (t === 0) g = 0;
+      else if (t < 3 && k === 10) g = Math.max(0, Math.round(sm) + (r() % 7) - 3);   // gravado ≈ sueldo
+      else if (t < 4) g = r() % 2000000;
+      else g = r() % 100000000;
+      if (k === 9) casos.push({ id, regla: 'CALC-ISR-174-001', entrada: { pago_gravable_c: g, fecha_pago, ...sueldo, concepto: elige(['ptu', 'aguinaldo', 'prima_vacacional']) } });
+      else casos.push({ id, regla: 'CALC-ISR-SEP-001', entrada: { separacion_gravable_c: g, fecha_pago, ...sueldo } });
     } else {
       const conceptos = ['sueldo', 'aguinaldo', 'prima_vacacional', 'ptu', 'tiempo_extra', 'prima_dominical', 'gratificacion', 'fondo_ahorro_empresa', 'dia_festivo'];
       const percepciones = conceptos.filter(() => r() % 3 === 0).map(c => ({ concepto: c, monto_c: r() % 3000000, domingos: 1 + (r() % 4) }));
@@ -89,9 +109,11 @@ const CAMPOS = {
   'CALC-SUB-001': (k) => ({ valor_c: k.valor_c }),
   'CALC-ISR-EXT-001': (k) => ({ valor_c: k.valor_c }),
   'CALC-ISR-AJM-001': (k) => ({ valor_c: k.valor_c }),
-  'CALC-IMSS-001': (k) => ({ valor_c: k.valor_c, patronal_c: k.extra.patronal_c }),
-  'CALC-RCV-001': (k) => ({ valor_c: k.valor_c, retiro_c: k.extra.retiro_c, ceav_pat_c: k.extra.ceav_pat_c, ceav_obr_c: k.extra.ceav_obr_c }),
+  'CALC-IMSS-001': (k) => ({ valor_c: k.valor_c, patronal_c: k.extra.patronal_c, obrera_c: k.extra.obrera_c }),
+  'CALC-RCV-001': (k) => ({ valor_c: k.valor_c, retiro_c: k.extra.retiro_c, ceav_pat_c: k.extra.ceav_pat_c, ceav_obr_c: k.extra.ceav_obr_c, retencion_ceav_obr_c: k.extra.retencion_ceav_obr_c }),
   'CALC-INF-001': (k) => ({ valor_c: k.valor_c }),
+  'CALC-ISR-174-001': (k) => ({ valor_c: k.valor_c }),
+  'CALC-ISR-SEP-001': (k) => ({ valor_c: k.valor_c }),
   'CALC-EXE-001': (k) => ({ valor_c: k.valor_c, exento_total_c: k.traza.exento_total_c, base_para_tope_subsidio_c: k.extra.base_para_tope_subsidio_c }),
 };
 

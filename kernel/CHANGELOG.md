@@ -3,6 +3,26 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.10.0 — 2026-10-20
+
+Casos dorados revisados contra el kernel: 58 de 58 importes al centavo. Aplica desde el 1-ene-2026.
+
+- **CALC-RCV-001 1.1.0 · C13**: el renglón 3.150% de CEAV («1.00 SM») aplica sólo con SBC igual al salario mínimo exacto;
+  cualquier otro SBC se ubica por rango de UMA desde el segundo renglón (1.00 UMA ya cae en 3.676%). D42: 307.64.
+- **CALC-IMSS-001 y CALC-RCV-001 1.1.0 · C14** (LSS art. 36): si el trabajador percibe el salario mínimo (salario
+  diario; si no viene, SBC) la cuota obrera de IMSS y de CEAV se calcula pero no se retiene: el renglón `imss_obrera` /
+  `ceav_obrera` va en 0 y el importe pasa al renglón patronal. `extra.obrera_c` conserva la cuota.
+- **CALC-ISN-001 1.1.0 · C23**: Chihuahua suma el impuesto universitario (6% del impuesto) y las contribuciones
+  extraordinarias (0.30% y 0.15% de la base), cada una redondeada por separado (guía SH-001-26, nivel B). Sin municipio
+  el cálculo queda limitado; en Chihuahua o Juárez, limitado por las tasas municipales no cargadas. D40: 23,450.
+  Los demás adicionales (SON, VER, JAL, TLAX) siguen sólo descritos y limitados. C22 (CDMX sin separación) ya se cumplía.
+- **Criterios**: C1 (catorcenal diaria × 14), C13 y C14 pasan a vigentes; nuevos C20 (tope del subsidio sin redondear),
+  C21 (UMA por día), C22, C23, C24 (redondeo IMSS por rama, como el SUA) y C25 (ajuste mensual negativo = retención en
+  exceso que se reintegra).
+- **Casos dorados**: `data/casos-dorados-esperados.json` con las 58 cifras finales (31 de Rafael confirmadas, el resto
+  corregidas con fundamento). Siete cifras de IMSS se recalcularon por rama (C24) y D35a quedó en 930.00 porque Retiro
+  se paga sobre los días de incapacidad (C8 vigente). Migración 0015.
+
 ## 0.9.0 — 2026-10-19
 
 Respuestas de Rafael González y agosto 2026 completo (nómina, CFDI, bancos y SUA). Aplica desde el 1-ene-2026.

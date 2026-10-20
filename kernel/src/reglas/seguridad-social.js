@@ -32,6 +32,25 @@ function diasCotizados(ctx, periodo, incapacidades) {
   return { todos, sinIncap };
 }
 
+/** Salario mínimo diario que rige el día: general, o frontera si entrada.zona_salarial = 'frontera'. */
+function salarioMinimoDelDia(ctx, e, dia) {
+  return E(ctx.param(e.zona_salarial === 'frontera' ? 'SALARIO_MINIMO_FRONTERA' : 'SALARIO_MINIMO_GENERAL', dia).valor);
+}
+
+/**
+ * C14 (LSS art. 36): ¿el trabajador percibe como cuota diaria el salario mínimo?
+ * Se mide con el salario diario (entrada.salario_diario_c) cuando viene; si no, con el SBC.
+ * Un SM real integra arriba del mínimo (factor ≈ 1.0493), por eso el SBC sólo es respaldo.
+ */
+function ganaSalarioMinimo(ctx, e) {
+  const sm = salarioMinimoDelDia(ctx, e, e.periodo.desde);
+  const medido = Number.isInteger(e.salario_diario_c) ? 'salario_diario' : 'sbc';
+  const valor = Exacto.centavos(medido === 'salario_diario' ? e.salario_diario_c : e.sbc_c);
+  const aplica = valor.eq(sm);
+  if (aplica) ctx.criterio('C14');
+  return { aplica, medido, salario_minimo: sm.texto(2) };
+}
+
 function sbcDelDia(ctx, sbc, dia) {
   const uma = E(ctx.param('UMA_DIARIA', dia).valor);
   const tope = uma.por(ctx.param('TOPE_SBC_VECES_UMA', dia).valor);
@@ -39,8 +58,8 @@ function sbcDelDia(ctx, sbc, dia) {
 }
 
 export const CALC_IMSS_001 = {
-  id: 'CALC-IMSS-001', version: '1.0.0', rubro: 'imss',
-  titulo: 'Cuotas IMSS por rama', fundamento: 'LSS arts. 25, 71 a 74, 106, 107, 147 y 211',
+  id: 'CALC-IMSS-001', version: '1.1.0', rubro: 'imss',
+  titulo: 'Cuotas IMSS por rama', fundamento: 'LSS arts. 25, 36, 71 a 74, 106, 107, 147 y 211; criterios C8, C14, C21 y C24',
   fuentes: [SUA, { clave: 'prima_rt_registro', obligatoria: true }, { clave: 'faltas_incapacidades', obligatoria: true }, { clave: 'movimientos_idse', obligatoria: false }],
   /**
    * entrada: { sbc_c, periodo: {desde, hasta}, incapacidades: string[]|number,
@@ -89,16 +108,20 @@ export const CALC_IMSS_001 = {
     for (const [k, v] of Object.entries(acc)) ramas[k] = v.aCentavos();
     const obrera_c = ramas.excedente_obr + ramas.dinero_obr + ramas.gmp_obr + ramas.iv_obr;
     const patronal_c = ramas.cuota_fija_pat + ramas.excedente_pat + ramas.dinero_pat + ramas.gmp_pat + ramas.rt_pat + ramas.iv_pat + ramas.guarderias_pat;
+    // C14 (LSS art. 36): si el trabajador percibe el salario mínimo, el patrón paga la cuota obrera.
+    const sm = ganaSalarioMinimo(ctx, e);
+    const absorbida_c = sm.aplica ? obrera_c : 0, retencion_c = obrera_c - absorbida_c;
     const traza = { sbc_c: e.sbc_c, tope_aplicado: topado, dias_cotizados: sinIncap.length, dias_por_uma: Object.fromEntries(porTramo),
-      prima_rt: pr || null, ramas_c: ramas, obrera_c, patronal_c, redondeo: 'por rama, a centavo' };
-    return { valor_c: obrera_c, traza, extra: { obrera_c, patronal_c },
-      renglones: [{ rubro: 'imss_obrera', valor_c: obrera_c }, { rubro: 'imss_patronal', valor_c: patronal_c }] };
+      prima_rt: pr || null, ramas_c: ramas, obrera_c, patronal_c, redondeo: 'por rama, a centavo (C24)',
+      salario_minimo: sm, retencion_obrera_c: retencion_c, obrera_a_cargo_patron_c: absorbida_c };
+    return { valor_c: retencion_c, traza, extra: { obrera_c, patronal_c, retencion_obrera_c: retencion_c, obrera_a_cargo_patron_c: absorbida_c },
+      renglones: [{ rubro: 'imss_obrera', valor_c: retencion_c }, { rubro: 'imss_patronal', valor_c: patronal_c + absorbida_c }] };
   },
 };
 
 export const CALC_RCV_001 = {
-  id: 'CALC-RCV-001', version: '1.0.0', rubro: 'rcv',
-  titulo: 'Retiro, cesantía y vejez', fundamento: 'LSS art. 168; Segundo Transitorio DOF 16-dic-2020; criterio C4',
+  id: 'CALC-RCV-001', version: '1.1.0', rubro: 'rcv',
+  titulo: 'Retiro, cesantía y vejez', fundamento: 'LSS arts. 36 y 168; Segundo Transitorio DOF 16-dic-2020; criterios C4, C8, C13 y C14',
   fuentes: [{ clave: 'sua_eba', obligatoria: true }],
   /** entrada: { sbc_c, periodo: {desde, hasta}, incapacidades } */
   calcular(e, ctx) {
@@ -112,23 +135,31 @@ export const CALC_RCV_001 = {
     for (const dia of todos) {
       const c = ctx.param('RCV_CUOTAS', dia).valor;
       const { uma, sbc: s } = sbcDelDia(ctx, sbc, dia);
-      retiro = retiro.suma(s.por(Exacto.pct(c.retiro_pat)));       // retiro no resta incapacidades
+      retiro = retiro.suma(s.por(Exacto.pct(c.retiro_pat)));       // retiro no resta incapacidades (C8)
       if (ceavDias.has(dia)) {
+        const tabla = ctx.param('CEAV_PATRONAL_TABLA', dia);
         const veces = s.div(uma).trunc2();                          // C4: truncado a dos decimales
-        const r = tasaPorRango(ctx.param('CEAV_PATRONAL_TABLA', dia), veces);
+        // C13: el primer renglón («1.00 SM») sólo aplica con SBC igual al salario mínimo exacto;
+        // cualquier otro SBC se ubica por rango de UMA a partir del segundo renglón.
+        const enSM = s.eq(salarioMinimoDelDia(ctx, e, dia));
+        if (enSM) ctx.criterio('C13');
+        const r = enSM ? { renglon: 1, tasa: tabla.valor[0][1] } : tasaPorRango({ valor: tabla.valor.slice(1) }, veces);
         ceavPat = ceavPat.suma(s.por(Exacto.pct(r.tasa)));
         ceavObr = ceavObr.suma(s.por(Exacto.pct(c.ceav_obr)));
-        const k = veces.texto(2) + '→' + r.tasa + '%';
+        const k = (enSM ? '1.00 SM' : veces.texto(2)) + '→' + r.tasa + '%';
         rangos.set(k, (rangos.get(k) || 0) + 1);
       }
     }
     const retiro_c = retiro.aCentavos(), ceav_pat_c = ceavPat.aCentavos(), ceav_obr_c = ceavObr.aCentavos();
     const patronal_c = retiro_c + ceav_pat_c;
+    const sm = ganaSalarioMinimo(ctx, e);                           // C14: el patrón absorbe la cuota obrera
+    const absorbida_c = sm.aplica ? ceav_obr_c : 0, retencion_c = ceav_obr_c - absorbida_c;
     return { valor_c: patronal_c,
       traza: { sbc_c: e.sbc_c, dias_retiro: todos.length, dias_ceav: sinIncap.length, rango_ceav: Object.fromEntries(rangos),
-        retiro_c, ceav_patronal_c: ceav_pat_c, ceav_obrera_c: ceav_obr_c, patronal_c },
-      extra: { retiro_c, ceav_pat_c, ceav_obr_c, patronal_c },
-      renglones: [{ rubro: 'rcv_patronal', valor_c: patronal_c }, { rubro: 'ceav_obrera', valor_c: ceav_obr_c }] };
+        retiro_c, ceav_patronal_c: ceav_pat_c, ceav_obrera_c: ceav_obr_c, patronal_c,
+        salario_minimo: sm, retencion_ceav_obrera_c: retencion_c, ceav_obrera_a_cargo_patron_c: absorbida_c },
+      extra: { retiro_c, ceav_pat_c, ceav_obr_c, patronal_c, retencion_ceav_obr_c: retencion_c, ceav_obr_a_cargo_patron_c: absorbida_c },
+      renglones: [{ rubro: 'rcv_patronal', valor_c: patronal_c + absorbida_c }, { rubro: 'ceav_obrera', valor_c: retencion_c }] };
   },
 };
 
