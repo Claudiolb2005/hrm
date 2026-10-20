@@ -9,7 +9,7 @@ import { Exacto, E } from '../exacto.js';
 import { exigirCentavos } from './comun.js';
 
 export const CALC_ISN_001 = {
-  id: 'CALC-ISN-001', version: '1.1.0', rubro: 'isn',
+  id: 'CALC-ISN-001', version: '1.2.0', rubro: 'isn',
   titulo: 'Impuesto sobre nóminas por entidad', fundamento: 'Ley de hacienda o código fiscal de cada entidad; cuadro de conceptos (V8 pendiente); criterios C22 y C23',
   fuentes: [
     { clave: 'prenomina', obligatoria: true },
@@ -63,11 +63,15 @@ export const CALC_ISN_001 = {
           adicionales_c += c;
           return { clave: k.clave, sobre: k.sobre, pct: k.pct, valor_c: c };
         });
+        // Contribuciones municipales (Expo-Chihuahua, Paso del Norte): UMA × promedio semestral de
+        // empleados ÷ 2, de pago semestral. No forman parte del ISN del mes: sólo se señalan.
         let municipal = null;
         if (v.municipales) {
-          if (!e.municipio) { municipal = 'municipio no indicado'; ctx.limitar('dato_faltante', 'municipio del registro (adicionales municipales de ' + e.entidad + ')'); }
-          else if (v.municipales.municipios.includes(e.municipio)) { municipal = 'aplica, no calculado'; ctx.limitar('parametro_faltante', v.municipales.descripcion); }
-          else municipal = 'no aplica en ' + e.municipio;
+          const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+          const lista = v.municipales.municipios.map(norm);
+          if (!e.municipio) municipal = { estado: 'municipio_no_indicado', nota: v.municipales.descripcion };
+          else if (lista.includes(norm(e.municipio))) municipal = { estado: 'aplica_semestral', municipio: e.municipio, nota: v.municipales.descripcion };
+          else municipal = { estado: 'no_aplica', municipio: e.municipio };
         }
         adic = { id: adicional.id, descripcion: v.descripcion, nivel: adicional.nivel, calculado: true, componentes: comps, adicionales_c, municipal };
       } else {

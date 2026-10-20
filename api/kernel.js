@@ -261,16 +261,17 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   }
   if (p === '/api/kernel/registros' && m === 'POST') {
     const d = await cuerpo(request);
-    if (!d || !d.empresa_id || !Array.isArray(d.registros) || !d.fuente) return J({ error: 'Se espera { empresa_id, fuente, registros: [{ registro, entidad?, prima_rt_pct?, prima_desde?, prima_hasta? }] }' }, 400, C);
+    if (!d || !d.empresa_id || !Array.isArray(d.registros) || !d.fuente) return J({ error: 'Se espera { empresa_id, fuente, registros: [{ registro, entidad?, municipio?, prima_rt_pct?, prima_desde?, prima_hasta? }] }' }, 400, C);
     for (const r of d.registros) {
       if (!/^[A-Z0-9]{11}$/.test(String(r.registro || '').toUpperCase())) return J({ error: 'Registro patronal inválido', registro: r }, 400, C);
       if (r.entidad && !ENTIDADES.includes(r.entidad)) return J({ error: 'Entidad inválida (usa la clave: ' + ENTIDADES.join(', ') + ')', registro: r }, 400, C);
       if (r.prima_rt_pct && !/^\d+(\.\d+)?$/.test(String(r.prima_rt_pct))) return J({ error: 'Prima inválida', registro: r }, 400, C);
+      if (r.municipio !== undefined && (typeof r.municipio !== 'string' || !r.municipio.trim() || r.municipio.length > 80)) return J({ error: 'Municipio inválido', registro: r }, 400, C);
     }
-    const st = d.registros.map(r => db.prepare('INSERT INTO registro_patronal (empresa_id, registro, entidad, prima_rt_pct, prima_desde, prima_hasta, fuente) VALUES (?1,?2,?3,?4,?5,?6,?7) ' +
-      "ON CONFLICT (empresa_id, registro) DO UPDATE SET entidad = coalesce(excluded.entidad, entidad), prima_rt_pct = coalesce(excluded.prima_rt_pct, prima_rt_pct), " +
+    const st = d.registros.map(r => db.prepare('INSERT INTO registro_patronal (empresa_id, registro, entidad, prima_rt_pct, prima_desde, prima_hasta, fuente, municipio) VALUES (?1,?2,?3,?4,?5,?6,?7,?8) ' +
+      "ON CONFLICT (empresa_id, registro) DO UPDATE SET entidad = coalesce(excluded.entidad, entidad), municipio = coalesce(excluded.municipio, municipio), prima_rt_pct = coalesce(excluded.prima_rt_pct, prima_rt_pct), " +
       "prima_desde = coalesce(excluded.prima_desde, prima_desde), prima_hasta = coalesce(excluded.prima_hasta, prima_hasta), fuente = excluded.fuente, actualizado_en = datetime('now')")
-      .bind(Number(d.empresa_id), String(r.registro).toUpperCase(), r.entidad || null, r.prima_rt_pct ? String(r.prima_rt_pct) : null, r.prima_desde || null, r.prima_hasta || null, d.fuente));
+      .bind(Number(d.empresa_id), String(r.registro).toUpperCase(), r.entidad || null, r.prima_rt_pct ? String(r.prima_rt_pct) : null, r.prima_desde || null, r.prima_hasta || null, d.fuente, r.municipio ? r.municipio.trim() : null));
     for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
     return J({ ok: true, registros: st.length }, 200, C);
   }

@@ -135,10 +135,10 @@ add({ id: 'ISN_ADICIONAL:CHIH@2026', clave: 'ISN_ADICIONAL', entidad: 'CHIH', ti
       { clave: 'contribucion_extraordinaria_10', sobre: 'base', pct: '0.30' },
       { clave: 'contribucion_extraordinaria_5', sobre: 'base', pct: '0.15' },
     ],
-    municipales: { municipios: ['Chihuahua', 'Juárez'], descripcion: 'Expo-Chihuahua (Chihuahua) y Fideicomiso Paso del Norte (Juárez): tasas no cargadas' } },
+    municipales: { municipios: ['Chihuahua', 'Juárez'], descripcion: 'Expo-Chihuahua (municipio de Chihuahua) y Fideicomiso Paso del Norte (municipio de Juárez): UMA × promedio semestral de empleados en el municipio ÷ 2, pago semestral; no forman parte del ISN mensual (guía SH-001-26)' } },
   vigencia_desde: '2026-01-01', vigencia_hasta: '2026-12-31', base_temporal: 'mes_causacion',
   fundamento: 'Código Fiscal y Ley de Ingresos del Estado de Chihuahua 2026; criterio C23', fuente: 'Gobierno de Chihuahua, Guía del Impuesto sobre Nóminas 2026 (SH-001-26), ipagos.chihuahua.gob.mx',
-  nivel: 'B', notas: 'Cada componente se redondea a centavo por separado. Caso dorado D40: 500,000 → 20,000 + 1,200 + 1,500 + 750 = 23,450. Exposición +$15,218 a +$43,751/mes en PRIME.' });
+  nivel: 'B', notas: 'Cada componente se redondea a centavo por separado. Las contribuciones municipales son semestrales y se determinan aparte. Caso dorado D40: 500,000 → 20,000 + 1,200 + 1,500 + 750 = 23,450. Exposición +$15,218 a +$43,751/mes en PRIME.' });
 ADI('SON', { descripcion: '1% adicional para patrones con 100 o más trabajadores' }, 'Exposición +$31,527/mes en PRIME.');
 ADI('VER', { descripcion: '15% adicional sobre el impuesto' }, 'Exposición +$13,742/mes en PRIME.');
 ADI('JAL', { descripcion: '5% especial: ¿asimilados o consejeros?' }, 'Sólo aplica si hay esos pagos.');
