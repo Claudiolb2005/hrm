@@ -152,12 +152,14 @@ test('CALC-ISN-001 · Chihuahua: 4% + universitario 6% del impuesto + extraordin
   assert.deepEqual(r.traza.adicional.componentes.map(c => c.valor_c), [240, 300, 150]);
   assert.equal(r.valor_c, 4690);
   assert.ok(ctx.criterios.has('C23'));
-  assert.ok(ctx.limitaciones.some(l => l.motivo === 'dato_faltante' && /municipio/.test(l.detalle)));
-  const jz = correr(cat, 'CALC-ISN-001', { ...e, municipio: 'Juárez' });
-  assert.ok(jz.ctx.limitaciones.some(l => l.motivo === 'parametro_faltante'));
-  const de = correr(cat, 'CALC-ISN-001', { ...e, municipio: 'Delicias' });
-  assert.ok(!de.ctx.limitaciones.some(l => /municip|Expo/.test(l.detalle || '')));
-  assert.equal(de.r.valor_c, 4690);
+  assert.equal(r.traza.adicional.municipal.estado, 'municipio_no_indicado');
+  // Las municipales son semestrales: nunca cambian ni limitan el ISN del mes.
+  for (const [mun, estado] of [['CHIHUAHUA', 'aplica_semestral'], ['Juárez', 'aplica_semestral'], ['Delicias', 'no_aplica']]) {
+    const x = correr(cat, 'CALC-ISN-001', { ...e, municipio: mun });
+    assert.equal(x.r.traza.adicional.municipal.estado, estado, mun);
+    assert.equal(x.r.valor_c, 4690);
+    assert.ok(!x.ctx.limitaciones.some(l => /municip|Expo|Paso/.test(l.detalle || '')), mun);
+  }
 });
 
 test('CALC-ISN-001 · Veracruz: adicional sin componentes sigue limitado y no se suma', () => {

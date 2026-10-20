@@ -460,7 +460,7 @@
       "Chihuahua",
       "Juárez"
      ],
-     "descripcion": "Expo-Chihuahua (Chihuahua) y Fideicomiso Paso del Norte (Juárez): tasas no cargadas"
+     "descripcion": "Expo-Chihuahua (municipio de Chihuahua) y Fideicomiso Paso del Norte (municipio de Juárez): UMA × promedio semestral de empleados en el municipio ÷ 2, pago semestral; no forman parte del ISN mensual (guía SH-001-26)"
     }
    },
    "vigencia_desde": "2026-01-01",
@@ -469,7 +469,7 @@
    "fundamento": "Código Fiscal y Ley de Ingresos del Estado de Chihuahua 2026; criterio C23",
    "fuente": "Gobierno de Chihuahua, Guía del Impuesto sobre Nóminas 2026 (SH-001-26), ipagos.chihuahua.gob.mx",
    "nivel": "B",
-   "notas": "Cada componente se redondea a centavo por separado. Caso dorado D40: 500,000 → 20,000 + 1,200 + 1,500 + 750 = 23,450. Exposición +$15,218 a +$43,751/mes en PRIME."
+   "notas": "Cada componente se redondea a centavo por separado. Las contribuciones municipales son semestrales y se determinan aparte. Caso dorado D40: 500,000 → 20,000 + 1,200 + 1,500 + 750 = 23,450. Exposición +$15,218 a +$43,751/mes en PRIME."
   },
   {
    "id": "ISN_ADICIONAL:JAL@2026",

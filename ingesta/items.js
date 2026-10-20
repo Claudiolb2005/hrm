@@ -204,7 +204,7 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
     if (a.no_catalogados) lim.push({ motivo: 'concepto_no_catalogado', detalle: a.no_catalogados + ' importes en conceptos no catalogados' });
     if (a.opacos) lim.push({ motivo: 'concepto_opaco', detalle: a.opacos + ' importes en conceptos por confirmar (P2)' });
     items.push({ regla_id: 'CALC-ISN-001', colaborador_id: a.registro, corrida_id: 'MES' + a.mes,
-      entrada: { registro: a.registro, entidad, mes: a.mes, conceptos: [...a.conceptos.entries()].sort().map(([concepto, monto_c]) => ({ concepto, monto_c })) },
+      entrada: { registro: a.registro, entidad, municipio: (ctx.municipios && ctx.municipios.get(a.registro)) || undefined, mes: a.mes, conceptos: [...a.conceptos.entries()].sort().map(([concepto, monto_c]) => ({ concepto, monto_c })) },
       limitaciones: lim, origen: { archivo_sha256, agregado: 'registro × mes' } });
     movimientos.push({ id: await idMovimiento(ingesta_id, 'MES' + a.mes, a.registro, 'isn'), encargo_id: ctx.encargo_id, ingesta_id,
       corrida_id: 'MES' + a.mes, colaborador_id: a.registro, rubro: 'isn', valor_c: a.isn_cliente_c, archivo_sha256, renglon_origen: 'suma por registro y mes' });
