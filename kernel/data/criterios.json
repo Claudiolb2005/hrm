@@ -191,13 +191,13 @@
   },
   {
    "id": "C24",
-   "tema": "Redondeo de cuotas IMSS",
-   "decision": "Cada rama se acumula exacta y se redondea a centavo por separado; la cuota obrera y la patronal son la suma de ramas ya redondeadas",
+   "tema": "Redondeo de cuotas IMSS, RCV e INFONAVIT",
+   "decision": "Cada rama de IMSS, RCV e INFONAVIT se redondea a centavo por trabajador y por tramo de SBC (alta, modificación o baja dentro del periodo), y los tramos se suman. Así calculan la emisión del IMSS y el SUA.",
    "fundamento": "Así calcula el SUA; recálculo de agosto 2026 a 0 ¢ en 30 registros",
    "quien": "Casos dorados revisados (HRM, 20-oct)",
    "fecha": "2026-10-20",
    "estado": "vigente",
-   "observaciones": "20-oct: siete casos dorados (D29a, D30a, D31a/b, D32b, D41a/b) se habían calculado sumando y redondeando al final, con 1 ¢ de diferencia; se recalcularon por rama."
+   "observaciones": "20-oct: siete casos dorados (D29a, D30a, D31a/b, D32b, D41a/b) se habían calculado sumando y redondeando al final, con 1 ¢ de diferencia; se recalcularon por rama. 21-oct: comprobado contra el SUA y la emisión de agosto 2026 de PrimeWireless (30 registros, 3,677 trabajadores): con redondeo por tramo el kernel reproduce la emisión al centavo en todas las ramas; con un solo redondeo por trabajador quedaban ±1 ¢ en 2,258 renglones con varios tramos."
   },
   {
    "id": "C25",
@@ -208,6 +208,16 @@
    "fecha": "2026-10-20",
    "estado": "vigente",
    "observaciones": "D15: −652.23. Rafael proponía dejarlo en cero."
+  },
+  {
+   "id": "C26",
+   "tema": "Cuotas debidas: tramos de la emisión e incapacidades del SUA",
+   "decision": "El kernel calcula IMSS, RCV e INFONAVIT con los tramos de SBC de la emisión del IMSS (EMA del mes, EBA del bimestre) y las incapacidades del SUA, porque la emisión no las descuenta. Si dentro del periodo cambia el SBC y el SUA no trae las fechas de la incapacidad, el cálculo queda limitado en vez de suponer qué días restar.",
+   "fundamento": "LSS arts. 31, 39 y 42; criterio C8",
+   "quien": "Sistema (por ratificar con HRM)",
+   "fecha": "2026-10-21",
+   "estado": "por_confirmar",
+   "observaciones": "Agosto 2026: la emisión cobra $141,668.33 más de IMSS y $239,039.82 más de RCV que el SUA por incapacidades; el kernel coincide con el SUA en esos 1,231 renglones."
   }
  ]
 }

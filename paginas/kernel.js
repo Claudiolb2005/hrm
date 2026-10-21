@@ -105,6 +105,7 @@ html body .k-row>label input{width:auto;margin:0}
     <div class="k-tab" data-t="requerimiento">Requerimiento <span class="n" id="nReq">0</span></div>
     <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
     <div class="k-tab" data-t="cfdi">Nómina ↔ CFDI <span class="n" id="nCru">0</span></div>
+    <div class="k-tab" data-t="sua">SUA ↔ IMSS <span class="n" id="nSua">0</span></div>
     <div class="k-tab" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
     <div class="k-tab" data-t="calendario">Calendario</div>
     <div class="k-tab" data-t="registros">Registros patronales</div>
@@ -161,6 +162,35 @@ html body .k-row>label input{width:auto;margin:0}
       </div>
       <h3>Casos</h3>
       <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Nómina</th><th class="num">CFDI</th><th>UUID</th><th></th></tr></thead><tbody id="tbCruC"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="t-sua" class="oculto">
+    <div class="k-card">
+      <h2>SUA contra la emisión del IMSS</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Por trabajador y rama: lo que <b>calcula el kernel</b> (tramos de SBC de la emisión del IMSS e incapacidades del SUA, criterio C26), lo que <b>emitió el IMSS</b> (EMA/EBA) y lo que <b>se pagó</b> en el archivo .SUA. Al centavo, sin tolerancia (C24). Lo que coincide en los tres lados no aparece.</div>
+      <div class="drop" id="dropS">Arrastra aquí el .zip del SUA del mes (también sirve el paquete completo) o <a href="#" onclick="document.getElementById('fSua').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>. Se abre en tu navegador y al servidor sólo suben, por registro patronal, el .SUA y los archivos de la emisión (CDEMMO99, CDEBMO99, CDEMPA99).<input type="file" id="fSua" accept=".zip" class="oculto" onchange="subirSua(this.files[0])"></div>
+      <div id="msgSua"></div>
+      <div class="k-row" style="margin:10px 0"><label style="font-size:12px;color:#5a7a8a">Periodo</label><select id="selSuaPer" class="k-sel" onchange="pintarSua()"></select></div>
+      <div id="kpiSua"></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro</th><th>Entidad</th><th class="num">Trab.</th><th class="num">Pagado SUA</th><th class="num">Kernel</th><th class="num">Emitido IMSS</th><th class="num">Pagado − kernel</th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th>Cuadre</th></tr></thead><tbody id="tbSua"></tbody></table></div>
+    </div>
+    <div class="k-card">
+      <h2>Diferencias por causa y rama</h2>
+      <div id="aceptS"></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Causa</th><th>Rama</th><th class="num">Casos</th><th class="num">Registros</th><th class="num">Pagado − kernel</th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th>Cubeta</th></tr></thead><tbody id="tbSuaG"></tbody></table></div>
+    </div>
+    <div class="k-card oculto" id="clasS">
+      <h2 id="clasST">Clasificar</h2>
+      <div class="frm">
+        <div><label>Cubeta</label><select id="sCub" class="k-sel" onchange="document.getElementById('sCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
+          <option value="explicada">Explicada (no es incumplimiento)</option><option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
+        <div id="sCritW" class="oculto"><label>Criterio de la bitácora</label><select id="sCrit" class="k-sel"></select></div>
+        <div style="grid-column:span 2"><label>Motivo</label><input id="sMot" class="k-in" placeholder="Ej. La emisión no descuenta incapacidades (C26)"></div>
+        <div><button class="k-btn" onclick="clasificarSua()">Clasificar grupo</button></div>
+      </div>
+      <h3>Casos (los de mayor importe primero)</h3>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro</th><th>Colaborador</th><th>NSS</th><th class="num">Kernel</th><th class="num">Emitido</th><th class="num">Pagado</th><th class="num">Días / incap.</th><th class="num">Tramos</th><th></th></tr></thead><tbody id="tbSuaC"></tbody></table></div>
     </div>
   </section>
 
@@ -361,10 +391,11 @@ function badgeEstado(e){
 
 document.querySelectorAll('.k-tab').forEach(function(t){t.addEventListener('click',function(){
   document.querySelectorAll('.k-tab').forEach(function(x){x.classList.toggle('act',x===t)});
-  ['archivos','requerimiento','diferencias','cfdi','dictamen','calendario','registros','criterios','cotizador','expediente'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
+  ['archivos','requerimiento','diferencias','cfdi','sua','dictamen','calendario','registros','criterios','cotizador','expediente'].forEach(function(s){document.getElementById('t-'+s).classList.toggle('oculto',s!==t.dataset.t)});
   if(t.dataset.t==='diferencias')cargarEjecuciones();
   if(t.dataset.t==='requerimiento')cargarReq();
   if(t.dataset.t==='cfdi')cargarPaquetes();
+  if(t.dataset.t==='sua')cargarSua();
   if(t.dataset.t==='dictamen')cargarDictamen();
   if(t.dataset.t==='calendario')cargarCalendario();
   if(t.dataset.t==='registros')cargarRegistros();
@@ -402,7 +433,7 @@ function cambiarEncargo(){
   var id=document.getElementById('selEnc').value;ENC=ENCS.filter(function(e){return e.id===id})[0]||null;
   try{if(ENC)localStorage.setItem('hrm_kernel_enc',ENC.id)}catch(x){}
   ING=null;document.getElementById('detIng').classList.add('oculto');
-  cargarIngestas();cargarCfdi();cargarMaestro();
+  cargarIngestas();cargarCfdi();cargarMaestro();cargarSua();
   var act=document.querySelector('.k-tab.act');if(act&&act.dataset.t!=='archivos')act.click();
 }
 function crearEncargo(){
@@ -411,6 +442,108 @@ function crearEncargo(){
     origen_nomina:document.getElementById('eOri').value,aplica_ajuste_mensual:document.getElementById('eAju').value==='1'};
   if(b.origen_nomina==='la_casa'){var op=prompt('Id de usuario que operó la nómina (no podrá revisar):');if(!op)return;b.operador_nomina_usuario_id=Number(op)}
   api('POST','/api/kernel/encargos',b).then(function(){toggle('frmEnc');cargarEncargos(b.id)}).catch(function(e){alert(e.message)});
+}
+
+// ── SUA ↔ emisión del IMSS
+var SUAL=[],GSUA=null;
+var CAUSAS={incapacidad:'Incapacidad: la emisión no la descuenta',sua_distinto_imss:'SUA distinto al IMSS (días o SBC)',calculo_limitado:'Cálculo limitado',kernel_distinto:'Kernel distinto de ambos',sin_emision:'Pagado sin emisión',sin_pago:'Emitido sin pago'};
+var RAMASN={cuota_fija:'Cuota fija',excedente:'Excedente 3 UMA',dinero:'Prest. en dinero',gmp:'Gastos médicos pens.',rt:'Riesgo de trabajo',iv:'Invalidez y vida',guarderias:'Guarderías',retiro:'Retiro',ceav_patronal:'CEAV patronal',ceav_obrera:'CEAV obrera',infonavit:'INFONAVIT'};
+var CUBS={proceso_mal:'Hallazgo',explicada:'Explicada',criterio_sin_resolver:'Criterio'};
+function cargarJSZip(){if(window.JSZip)return Promise.resolve();return new Promise(function(ok,mal){var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=ok;sc.onerror=mal;document.head.appendChild(sc)})}
+function latin(u8){var s='';for(var i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return s}
+async function juntarZip(z,ruta,prof,out){
+  var nombres=Object.keys(z.files);
+  for(var i=0;i<nombres.length;i++){
+    var e=z.files[nombres[i]];if(e.dir)continue;
+    var base=e.name.split('/').pop();
+    if(/\\.zip$/i.test(base)&&prof<3){
+      try{var z2=await JSZip.loadAsync(await e.async('uint8array'));await juntarZip(z2,ruta+e.name+'/',prof+1,out)}catch(x){}
+    }else if(/\\.sua$/i.test(base)){
+      var b=await e.async('uint8array');if(b[0]===48&&b[1]===50)out.push({k:'sua',reg10:latin(b.subarray(2,12)),reg:latin(b.subarray(2,13)),per:latin(b.subarray(26,30))+'-'+latin(b.subarray(30,32)),nombre:base,bytes:b,grupo:ruta});
+    }else{
+      var m=/^(CDEMMO99|CDEBMO99|CDEMPA99)\\.txt$/i.exec(base);
+      if(m){var b2=await e.async('uint8array');var t=latin(b2.subarray(0,500));var k={CDEMMO99:'ema',CDEBMO99:'eba',CDEMPA99:'ema_pa'}[m[1].toUpperCase()];
+        var per=null;if(k==='ema_pa'){var mp=/C\\d{9}(\\d{2})(\\d{4})\\d{2}\\.\\d{5}/.exec(t);if(mp)per=mp[2]+'-'+mp[1]}
+        out.push({k:k,reg10:t.slice(0,10),per:per,nombre:base,bytes:b2,grupo:ruta})}
+    }
+  }
+}
+async function subirSua(f){
+  if(!ENC){aviso('msgSua','Primero crea o elige un encargo','err');return}
+  if(!f)return;
+  try{await cargarJSZip()}catch(x){aviso('msgSua','No cargó el lector de ZIP; revisa la conexión y recarga','err');return}
+  aviso('msgSua','Abriendo '+f.name+' en tu navegador…');
+  try{
+    var out=[];await juntarZip(await JSZip.loadAsync(f),'',0,out);
+    var suas=out.filter(function(x){return x.k==='sua'});
+    if(!suas.length){aviso('msgSua','El ZIP no trae archivos .SUA','err');return}
+    var periodoDe={};out.forEach(function(x){if(x.k==='ema_pa')periodoDe[x.grupo]=x.per});
+    var regs=suas.map(function(s){
+      var mismos=out.filter(function(x){return x.k!=='sua'&&x.reg10===s.reg10});
+      var del=function(k){var c=mismos.filter(function(x){return x.k===k&&(!periodoDe[x.grupo]||periodoDe[x.grupo]===s.per)});return c[0]||null};
+      var ema=del('ema');var pa=ema?mismos.filter(function(x){return x.k==='ema_pa'&&x.grupo===ema.grupo})[0]:null;
+      return {reg:s.reg,per:s.per,sua:s,ema:ema,eba:del('eba'),ema_pa:pa||del('ema_pa')};
+    });
+    var ok=0,errores=[];
+    for(var i=0;i<regs.length;i++){
+      var r=regs[i];aviso('msgSua','Registro '+(i+1)+' de '+regs.length+': '+r.reg+' ('+r.per+')…');
+      if(!r.ema){errores.push(r.reg+': falta la emisión mensual (CDEMMO99)');continue}
+      var fd=new FormData();fd.append('encargo_id',ENC.id);
+      ['sua','ema','eba','ema_pa'].forEach(function(k){if(r[k])fd.append(k,new Blob([r[k].bytes]),r[k].nombre)});
+      try{await api('POST','/api/kernel/sua',fd);ok++}catch(x){errores.push(r.reg+': '+x.message)}
+    }
+    document.getElementById('fSua').value='';
+    document.getElementById('msgSua').innerHTML='<div class="aviso '+(errores.length?'err':'ok')+'">Leídos '+ok+' de '+regs.length+' registros.'+(errores.length?'<br>'+errores.map(esc).join('<br>'):'')+'</div>';
+    cargarSua();
+  }catch(x){aviso('msgSua',x.message,'err')}
+}
+function cargarSua(){
+  if(!ENC)return;
+  Promise.all([api('GET','/api/kernel/sua?encargo_id='+encodeURIComponent(ENC.id)),api('GET','/api/kernel/criterios')]).then(function(r){
+    SUAL=r[0].lecturas||[];
+    document.getElementById('sCrit').innerHTML=(r[1].criterios||[]).map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
+    var pers=[];SUAL.forEach(function(l){if(pers.indexOf(l.periodo)<0)pers.push(l.periodo)});
+    var s=document.getElementById('selSuaPer'),prev=s.value;
+    s.innerHTML=pers.length?pers.map(function(p){return '<option>'+esc(p)+'</option>'}).join(''):'<option value="">Sin SUA leído</option>';
+    if(pers.indexOf(prev)>=0)s.value=prev;
+    document.getElementById('nSua').textContent=SUAL.reduce(function(a,l){return a+(l.pendientes||0)},0);
+    pintarSua();
+  });
+}
+function pintarSua(){
+  var per=document.getElementById('selSuaPer').value;document.getElementById('clasS').classList.add('oculto');GSUA=null;
+  var l=SUAL.filter(function(x){return x.periodo===per});
+  if(!l.length){document.getElementById('tbSua').innerHTML='<tr><td colspan="10" class="vacio">Sube el .zip del SUA del mes.</td></tr>';document.getElementById('kpiSua').innerHTML='';document.getElementById('tbSuaG').innerHTML='';document.getElementById('aceptS').innerHTML='';return}
+  var T={p:0,k:0,e:0,n:0,pen:0,c:0};
+  document.getElementById('tbSua').innerHTML=l.map(function(x){var t=x.totales||{};T.p+=t.pagado_c||0;T.k+=t.kernel_c||0;T.e+=t.emitido_c||0;T.n+=x.trabajadores;T.pen+=x.pendientes||0;T.c+=x.cuadre_interno?1:0;
+    return '<tr><td class="mono"><b>'+esc(x.registro)+'</b></td><td>'+esc(x.entidad||'—')+'</td><td class="num">'+x.trabajadores+'</td><td class="num">'+pesos(t.pagado_c)+'</td><td class="num">'+pesos(t.kernel_c)+'</td><td class="num">'+pesos(t.emitido_c)+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.kernel_c||0))+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.emitido_c||0))+'</td><td class="num">'+(x.pendientes||0)+'</td><td>'+(x.cuadre_interno?'<span class="b b-ok">03 = 05</span>':'<span class="b b-lim">No cuadra</span>')+(x.prima_distinta?' <span class="b b-par">Prima RT distinta</span>':'')+'</td></tr>'}).join('');
+  document.getElementById('kpiSua').innerHTML='<div class="kpis">'+[['Registros',l.length],['Trabajadores',T.n.toLocaleString('es-MX')],['Pagado SUA',pesos(T.p)],['Kernel',pesos(T.k)],['Emitido IMSS',pesos(T.e)],['Pagado − kernel',pesos(T.p-T.k)],['Pagado − emitido',pesos(T.p-T.e)],['Cuadre interno',T.c+' de '+l.length]].map(function(k){return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v" style="font-size:16px">'+k[1]+'</div></div>'}).join('')+'</div>'+
+    '<div class="sub" style="font-size:11px;color:#8ba5b2">Importes sin amortización de créditos INFONAVIT ni actualizaciones. «Pagado − kernel» negativo: el SUA pagó menos de lo que la ley pide con los datos del IMSS.</div>';
+  api('GET','/api/kernel/sua/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&periodo='+encodeURIComponent(per)).then(function(r){
+    var a=r.aceptacion;window.SUAG=r.grupos;
+    document.getElementById('aceptS').innerHTML=r.total===0?'<div class="aviso ok">Kernel, emisión y pago coinciden en todo.</div>':(a.aceptado?'<div class="aviso ok">Todo el cruce está clasificado.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.</div>');
+    document.getElementById('tbSuaG').innerHTML=r.grupos.map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(CAUSAS[g.causa]||g.causa)+'</td><td>'+esc(RAMASN[g.rama]||g.rama)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.registros+'</td><td class="num">'+pesos(g.pagado_menos_kernel_c)+'</td><td class="num">'+pesos(g.pagado_menos_emitido_c)+'</td><td class="num">'+g.pendientes+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBS[g.cubeta])+'</span>':'')+'</td></tr>'}).join('');
+    document.querySelectorAll('#tbSuaG tr.click').forEach(function(tr){tr.addEventListener('click',function(){verGrupoSua(window.SUAG[Number(tr.dataset.i)],tr)})});
+  }).catch(function(e){document.getElementById('aceptS').innerHTML='<div class="aviso err">'+esc(e.message)+'</div>'});
+}
+function verGrupoSua(g,tr){
+  GSUA=g;document.querySelectorAll('#tbSuaG tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
+  document.getElementById('clasS').classList.remove('oculto');
+  document.getElementById('clasST').textContent='Clasificar: '+(CAUSAS[g.causa]||g.causa)+' · '+(RAMASN[g.rama]||g.rama)+' ('+g.n+' casos)';
+  var sug={incapacidad:'La emisión no descuenta incapacidades; el SUA sí (C26)',sua_distinto_imss:'El SUA trae días o SBC distintos a la emisión del IMSS',calculo_limitado:'Incapacidad sin fechas con cambio de SBC: falta el detalle de incapacidades'};
+  document.getElementById('sMot').value=sug[g.causa]||'';
+  document.getElementById('sCub').value=g.causa==='sua_distinto_imss'||g.causa==='sin_pago'?'proceso_mal':'explicada';
+  var per=document.getElementById('selSuaPer').value;
+  api('GET','/api/kernel/sua/cruces?encargo_id='+encodeURIComponent(ENC.id)+'&periodo='+encodeURIComponent(per)+'&causa='+encodeURIComponent(g.causa)+'&rama='+encodeURIComponent(g.rama)).then(function(r){
+    document.getElementById('tbSuaC').innerHTML=r.cruces.map(function(x){var d=x.detalle||{};return '<tr><td class="mono">'+esc(x.registro)+'</td><td class="mono">'+esc(x.colaborador_id)+'</td><td class="mono">…'+esc(x.nss_final)+'</td><td class="num">'+pesos(x.kernel_c)+'</td><td class="num">'+pesos(x.emitido_c)+'</td><td class="num">'+pesos(x.pagado_c)+'</td><td class="num">'+(d.dias_mes==null?'—':d.dias_mes)+' / '+(['retiro','ceav_patronal','ceav_obrera','infonavit'].indexOf(x.rama)>=0?d.incapacidades_bim:d.incapacidades_mes)+'</td><td class="num">'+(d.tramos||0)+'</td><td>'+(x.limitado?'<span class="b b-lim">Limitado</span>':'')+(x.cubeta?' <span class="b b-neu">'+esc(CUBS[x.cubeta])+'</span>':'')+'</td></tr>'}).join('');
+  });
+}
+function clasificarSua(){
+  if(!GSUA)return;
+  var b={encargo_id:ENC.id,periodo:document.getElementById('selSuaPer').value,causa:GSUA.causa,rama:GSUA.rama,cubeta:document.getElementById('sCub').value,motivo:document.getElementById('sMot').value.trim()};
+  if(b.cubeta==='criterio_sin_resolver')b.criterio_id=document.getElementById('sCrit').value;
+  if(!b.motivo){alert('Escribe el motivo');return}
+  api('POST','/api/kernel/sua/clasificar',b).then(function(r){cargarSua()}).catch(function(e){alert(e.message)});
 }
 
 // ── Archivos / ingestas

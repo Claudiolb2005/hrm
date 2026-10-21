@@ -193,6 +193,24 @@ En **Archivos**, sube el `.zip` con los XML originales del periodo y, si lo tien
 | `GET /api/kernel/cruces/grupos` · `GET /api/kernel/cruces` · `POST /api/kernel/cruces/clasificar` | Cruce vigente agrupado, casos y clasificación en bloque |
 
 
+## SUA contra la emisión del IMSS (kernel 0.11.0)
+
+En `/kernel` → pestaña **SUA ↔ IMSS**, arrastra el `.zip` del SUA del mes (sirve el paquete completo, con ZIP dentro de ZIP). Se abre en el navegador y al servidor sólo suben, por registro patronal, el archivo de pago `.SUA` y la emisión del IMSS (`CDEMMO99`, `CDEBMO99`, `CDEMPA99`). Por trabajador y rama se comparan tres lados, al centavo:
+
+- **Kernel**: tramos de SBC de la emisión (EMA del mes, EBA del bimestre) e incapacidades del SUA (C26), redondeo por rama y por tramo (C24).
+- **Emitido**: lo que el IMSS determinó (la emisión no descuenta incapacidades).
+- **Pagado**: lo que trae el `.SUA` (registros 03; su suma se cuadra contra el 05).
+
+Lo que no coincide queda en `cruce_sua` con su causa (`incapacidad`, `sua_distinto_imss`, `calculo_limitado`, `kernel_distinto`, `sin_emision`, `sin_pago`) y se clasifica en bloque: proceso actual mal, explicada o criterio sin resolver. Cada registro deja una ejecución sellada del kernel y sus archivos en R2. Agosto 2026 de PRIME (30 registros, 3,677 trabajadores): el kernel reproduce la emisión al centavo y el pagado más amortización da $47,288,436.13.
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/kernel/sua` (multipart: `encargo_id`, `sua`, `ema`, `eba`, `ema_pa`) · `GET /api/kernel/sua?encargo_id=` | Lee un registro patronal; lista las lecturas vigentes |
+| `GET /api/kernel/sua/lectura?id=` | Reporte completo de una lectura |
+| `GET /api/kernel/sua/grupos?encargo_id=&periodo=` · `GET /api/kernel/sua/cruces?…&causa=&rama=` · `POST /api/kernel/sua/clasificar` | Cruce agrupado por causa y rama, casos y clasificación |
+
+Migración: `wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0017_sua.sql`.
+
 ## Requerimiento de información y portal del cliente (módulos 23, 25 y 27)
 
 - **Requerimiento**: en `/kernel` → pestaña Requerimiento, «Generar requerimiento» crea la lista desde la matriz regla ↔ fuente (la nómina y los XML van como indispensables, D13), con responsable y fecha comprometida. La prenómina y los XML se marcan solos cuando su lectura termina; lo demás se revisa a mano (aceptar o rechazar con motivo). Lo que el cliente sube a la prenómina o a los XML se procesa con un clic.
