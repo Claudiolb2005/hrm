@@ -60,8 +60,9 @@ async function contexto(db, ing, catalogo) {
   const enc = await db.prepare('SELECT * FROM encargo WHERE id = ?1').bind(ing.encargo_id).first();
   const { results: cal } = await db.prepare('SELECT * FROM calendario_nomina WHERE encargo_id = ?1').bind(ing.encargo_id).all();
   const calendario = new Map(cal.map(c => [c.corrida_id, { periodicidad: c.periodicidad, desde: c.desde, hasta: c.hasta, fecha_pago: c.fecha_pago, ordinaria: c.ordinaria === 1 }]));
-  const { results: regs } = await db.prepare('SELECT registro, entidad FROM registro_patronal WHERE empresa_id = ?1 AND entidad IS NOT NULL').bind(enc.empresa_id).all();
+  const { results: regs } = await db.prepare('SELECT registro, entidad, municipio FROM registro_patronal WHERE empresa_id = ?1 AND entidad IS NOT NULL').bind(enc.empresa_id).all();
   return { encargo: enc, encargo_id: enc.id, calendario, ultimaDelMes: ultimasDelMes(calendario), entidades: new Map(regs.map(r => [r.registro, r.entidad])),
+    municipios: new Map(regs.filter(r => r.municipio).map(r => [r.registro, r.municipio])),
     perfil: PERFILES[ing.perfil], catalogo, aplicaAjuste: enc.aplica_ajuste_mensual === 1 };
 }
 
@@ -150,7 +151,7 @@ async function fasePendiente(env, ing) {
       excluidos: Object.entries(sinCalendario).map(([corrida, n]) => ({ corrida, renglones: n, motivo: 'calendario_faltante' })) },
     catalogo_conceptos_cliente: { estado: mapa.no_catalogados.length || mapa.ambiguos.length ? 'incompleta' : 'completa',
       perfil: perfil.id + '@' + perfil.version, excluidos: [...mapa.no_catalogados.map(c => c.encabezado), ...mapa.ambiguos.map(a => a.encabezado + ' (ambiguo)')] },
-    matriz_isn_concepto: { estado: 'incompleta', excluidos: ['Cuadro concepto × entidad sin fundamento por celda (V8); sólo CDMX cargado'] },
+    matriz_isn_concepto: { estado: 'incompleta', excluidos: ['Cuadro concepto × entidad de las 32 entidades sin fundamento por celda (V8)'] },
   };
   if (mapa.cols.fecha_ingreso !== undefined) fuentes.fecha_ingreso = { estado: 'completa' };
   if (ctx.entidades.size) fuentes.entidad_por_registro = { estado: 'incompleta', nota: 'se marca completa cuando todos los registros del archivo tienen entidad' };

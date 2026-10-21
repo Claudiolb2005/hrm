@@ -3,6 +3,26 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.0 — 2026-10-21
+
+- **CALC-IMSS-001 1.2.0, CALC-RCV-001 1.2.0, CALC-INF-001 1.1.0 — tramos de SBC.** La entrada acepta
+  `tramos: [{desde, hasta, sbc_c}]` en lugar de `sbc_c`: sólo cuentan los días de los tramos, cada uno con su SBC, y cada rama
+  se redondea a centavo **por tramo** y se suma (C24 precisado). Contra el SUA y la emisión de agosto 2026 de PRIME
+  (30 registros, 3,677 trabajadores), el kernel reproduce la emisión del IMSS al centavo en las 11 ramas; con un solo
+  redondeo por trabajador quedaban ±1 ¢ en 2,258 renglones con varios tramos. Con incapacidades sin fechas y cambio de SBC
+  en el periodo, el cálculo se limita (no se suponen los días). C14 sin salario diario: aplica si todos los tramos están en el SM.
+- **Lectura del SUA en el portal** (`ingesta/sua-formato.js`, `ingesta/sua.js`, `ingesta/sua-d1.js`, `api/sua.js`, pestaña
+  SUA ↔ IMSS; migración 0017): kernel ↔ emisión del IMSS ↔ pago por trabajador y rama, con causa de cada diferencia,
+  ejecución sellada por registro y clasificación en bloque. Criterio nuevo C26 (por confirmar).
+
+## 0.10.1 — 2026-10-20
+
+- **Municipio por registro patronal** (migración 0016): columna `municipio` en `registro_patronal`, cargada para los 30
+  registros de PRIME desde las cédulas del SUA de agosto. La ingesta lo pasa a CALC-ISN-001 y `/api/kernel/registros` lo acepta.
+- **CALC-ISN-001 1.2.0**: Expo-Chihuahua y Fideicomiso Paso del Norte son UMA × promedio semestral de empleados ÷ 2, de
+  pago semestral (guía SH-001-26): ya no limitan el ISN del mes; la traza dice si aplican al registro. El registro de
+  Chihuahua de PRIME (Z4225442103) está en el municipio de Chihuahua: le aplica Expo-Chihuahua cada semestre.
+
 ## 0.10.0 — 2026-10-20
 
 Casos dorados revisados contra el kernel: 58 de 58 importes al centavo. Aplica desde el 1-ene-2026.
