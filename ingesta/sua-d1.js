@@ -40,11 +40,15 @@ async function ligaPrenomina(db, encargo_id) {
  */
 export async function procesarRegistroSUA(env, { encargo_id, archivos, usuario_id = null, ahora }) {
   const db = env.DB;
-  const enc = await db.prepare('SELECT id, empresa_id, operador_nomina_usuario_id FROM encargo WHERE id = ?1').bind(encargo_id).first();
+  const enc = await db.prepare('SELECT id, empresa_id, operador_nomina_usuario_id, periodo_desde, periodo_hasta FROM encargo WHERE id = ?1').bind(encargo_id).first();
   if (!enc) throw new Error('Encargo no existe');
   if (!archivos || !archivos.sua || !archivos.ema) throw new Error('Faltan archivos: el .SUA y el CDEMMO99 (emisión mensual) son obligatorios');
   const sua = leerArchivoSUA(textoLatin1(archivos.sua.bytes));
   const { patron } = sua;
+  // El mes del pago viene en el archivo: un SUA de otro mes no entra al encargo aunque se haya elegido mal.
+  if (patron.periodo < String(enc.periodo_desde).slice(0, 7) || patron.periodo > String(enc.periodo_hasta).slice(0, 7))
+    throw new Error('El SUA del registro ' + patron.registro + ' es de ' + patron.periodo + ' y el encargo cubre ' + String(enc.periodo_desde).slice(0, 7) +
+      (String(enc.periodo_hasta).slice(0, 7) !== String(enc.periodo_desde).slice(0, 7) ? ' a ' + String(enc.periodo_hasta).slice(0, 7) : '') + ': súbelo en la carga por mes');
   const ema = leerEmision(textoLatin1(archivos.ema.bytes), 'ema');
   const par = Number(patron.periodo.slice(5, 7)) % 2 === 0;
   if (par && !archivos.eba) throw new Error('El pago de ' + patron.periodo + ' incluye el bimestre: falta el CDEBMO99 (EBA)');

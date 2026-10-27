@@ -10,6 +10,7 @@ import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import semilla from '../kernel/data/parametros-2026.js';
 import { metadatosFuente } from '../servicio/expediente.js';
 import { puedeOperar, esCarga, verificarEncargo } from './permisos.js';
+import { limitesMes } from '../ingesta/mes.js';
 
 const MAX_ITEMS = 500;
 const ORIGENES = ['cliente', 'tercero', 'la_casa'];
@@ -20,6 +21,56 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 async function cuerpo(request) {
   try { return await request.json(); } catch { return null; }
+}
+
+// Mes en curso en la Ciudad de México (UTC−6, sin horario de verano desde 2022).
+export const mesActualMX = (ahora = new Date()) => new Date(ahora.getTime() - 6 * 3600e3).toISOString().slice(0, 7);
+const COPIA_ENCARGO = ['nivel', 'origen_nomina', 'operador_nomina_usuario_id', 'aplica_ajuste_mensual', 'tolerancia_individual_c',
+  'tolerancia_agregada_min_c', 'materialidad_bp', 'materialidad_piso_c', 'recurrencia_periodos'];
+const esMensual = (e) => e.periodo_desde.slice(0, 7) === e.periodo_hasta.slice(0, 7);
+
+/**
+ * El encargo abierto de `periodo` (AAAA-MM) para la empresa; si el mes no tiene ninguno, lo abre con la
+ * configuración del último encargo mensual de la empresa. → { status, encargo, creado } o { status, error }.
+ * Un mes cuyo encargo ya se cerró no se reabre solo: la corrección abre un encargo nuevo y eso lo decide HRM.
+ */
+export async function encargoDelMes(db, u, empresa_id, periodo, ahora = new Date()) {
+  const lim = limitesMes(periodo);
+  if (!lim) return { status: 400, error: 'periodo debe ser AAAA-MM' };
+  if (!Number.isInteger(empresa_id)) return { status: 400, error: 'empresa_id requerido' };
+  if (periodo > mesActualMX(ahora)) return { status: 400, error: 'El mes ' + periodo + ' todavía no ocurre: revisa de qué mes es el archivo' };
+  if (periodo < '2020-01') return { status: 400, error: 'Mes fuera de rango: ' + periodo };
+  const delMes = (await db.prepare('SELECT * FROM encargo WHERE empresa_id = ?1 AND periodo_desde = ?2 AND periodo_hasta = ?3 ORDER BY creado_en DESC, rowid DESC')
+    .bind(empresa_id, lim.desde, lim.hasta).all()).results;
+  const abierto = delMes.find(e => e.estado === 'abierto');
+  if (abierto) return { status: 200, encargo: abierto, creado: false };
+  if (delMes.length) return { status: 409, error: 'El encargo de ' + periodo + ' está cerrado: ya no recibe archivos. Si hay que corregirlo, HRM abre un encargo nuevo' };
+  const previos = (await db.prepare('SELECT * FROM encargo WHERE empresa_id = ?1 ORDER BY periodo_desde DESC, creado_en DESC').bind(empresa_id).all()).results;
+  const plantilla = previos.find(esMensual);
+  if (!plantilla) return { status: 409, error: 'La empresa todavía no tiene un encargo mensual del cual tomar la configuración: HRM abre el primero' };
+  const emp = await db.prepare('SELECT slug FROM empresas WHERE id = ?1').bind(empresa_id).first();
+  const base = 'enc_' + String((emp && emp.slug) || empresa_id).toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + periodo.replace('-', '_');
+  const vals = COPIA_ENCARGO.map(k => plantilla[k] === undefined ? null : plantilla[k]);
+  for (let n = 0; n < 5; n++) {
+    const id = n ? base + '_' + (n + 1) : base;
+    if (await db.prepare('SELECT 1 FROM encargo WHERE id = ?1').bind(id).first()) continue;
+    const cols = ['id', 'empresa_id', 'periodo_desde', 'periodo_hasta', 'ejercicio', ...COPIA_ENCARGO];
+    const args = [id, empresa_id, lim.desde, lim.hasta, Number(periodo.slice(0, 4)), ...vals];
+    const insertar = (c, a) => db.prepare('INSERT INTO encargo (' + c.join(', ') + ') VALUES (' + c.map((_, i) => '?' + (i + 1)).join(',') + ')').bind(...a).run();
+    try {
+      try { await insertar([...cols, 'alta', 'creado_por', 'plantilla_encargo_id'], [...args, 'automatica', u && u.id ? u.id : null, plantilla.id]); }
+      catch (x) { if (!/no such column|has no column/i.test(String(x.message))) throw x; await insertar(cols, args); } // sin 0019 aplicada
+    } catch (x) {
+      // Dos cargas a la vez: la otra ya lo abrió.
+      const ya = (await db.prepare('SELECT * FROM encargo WHERE empresa_id = ?1 AND periodo_desde = ?2 AND periodo_hasta = ?3 AND estado = \'abierto\' ORDER BY creado_en DESC').bind(empresa_id, lim.desde, lim.hasta).all()).results[0];
+      if (ya) return { status: 200, encargo: ya, creado: false };
+      if (/UNIQUE|PRIMARY/i.test(String(x.message))) continue;
+      throw x;
+    }
+    const encargo = await db.prepare('SELECT * FROM encargo WHERE id = ?1').bind(id).first();
+    return { status: 201, encargo, creado: true, plantilla: plantilla.id };
+  }
+  return { status: 409, error: 'No se pudo asignar un id al encargo de ' + periodo };
 }
 
 export async function rutasKernel(request, env, u, C, J, ctx) {
@@ -66,6 +117,15 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
       .bind(d.id, Number(d.empresa_id), d.periodo_id ?? null, d.nivel, d.periodo_desde, d.periodo_hasta, Number(d.ejercicio), d.origen_nomina,
         d.operador_nomina_usuario_id ?? null, d.aplica_ajuste_mensual ? 1 : 0).run();
     return J({ ok: true, id: d.id }, 201, C);
+  }
+
+  // Encargo del mes (carga automática, 0019): el navegador detecta el mes del archivo y aquí se resuelve
+  // a qué encargo va. Si el mes no tiene encargo, se abre copiando el último encargo mensual de la empresa.
+  if (p === '/api/kernel/encargo/mes' && m === 'POST') {
+    const d = await cuerpo(request);
+    if (!d || !d.periodo) return J({ error: 'Se espera { empresa_id, periodo: AAAA-MM }' }, 400, C);
+    const r = await encargoDelMes(db, u, Number(esCarga(u) ? u.empresa_id : d.empresa_id), String(d.periodo));
+    return J(r.error ? { error: r.error } : r, r.status, C);
   }
 
   // Ejecuta reglas sobre un lote de entradas canónicas y persiste el resultado sellado.

@@ -39,7 +39,7 @@ export function r2Local() {
     async get(k, o) { if (!m.has(k)) return null; let u8 = m.get(k); if (o?.range) u8 = u8.subarray(o.range.offset, o.range.offset + o.range.length); return obj(u8); } };
 }
 
-export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql', '0008_requerimiento.sql', '0009_maestro_afiliacion.sql', '0010_parametros_valuacion.sql', '0011_cotizacion.sql', '0012_retencion.sql', '0013_parametros_cotejo_oficial.sql', '0014_reglas_174_95_isn_criterios.sql', '0015_casos_dorados_c13_c14_c23_criterios.sql', '0016_municipio_registro_patronal.sql', '0017_sua.sql', '0018_perfil_carga.sql']) {
+export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql', '0008_requerimiento.sql', '0009_maestro_afiliacion.sql', '0010_parametros_valuacion.sql', '0011_cotizacion.sql', '0012_retencion.sql', '0013_parametros_cotejo_oficial.sql', '0014_reglas_174_95_isn_criterios.sql', '0015_casos_dorados_c13_c14_c23_criterios.sql', '0016_municipio_registro_patronal.sql', '0017_sua.sql', '0018_perfil_carga.sql', '0019_encargo_automatico.sql']) {
   const RAIZ = new URL('../../', import.meta.url);
   const db = d1Local();
   db.raw.exec(readFileSync(new URL('schema.sql', RAIZ), 'utf8'));

@@ -8,8 +8,12 @@
 //          y sólo mientras el encargo está abierto.
 //
 // Lo que el perfil «carga» nunca hace (separación de funciones: lo que se audita no se califica a sí mismo):
-// clasificar diferencias o cruces, crear encargos, cambiar registros patronales, procesar o revisar el
-// requerimiento, redactar hallazgos, emitir o cerrar, ver el expediente o el cotizador.
+// clasificar diferencias o cruces, crear o configurar encargos a mano, cambiar registros patronales, procesar
+// o revisar el requerimiento, redactar hallazgos, emitir o cerrar, ver el expediente o el cotizador.
+//
+// Carga automática por mes (0019): el perfil no elige encargo. Con el mes que el portal lee de los archivos,
+// /api/kernel/encargo/mes le da el encargo abierto de ese mes de SU empresa o lo abre copiando la configuración
+// del último encargo mensual (no elige nivel, origen, tolerancia ni materialidad). Un mes cerrado no se reabre.
 //
 // La revisión es por LISTA BLANCA: una ruta del kernel que no está aquí queda cerrada para el perfil, aunque
 // el módulo la abra después. Cada identificador que llega (en la URL o en el JSON) se resuelve a su empresa.
@@ -36,6 +40,7 @@ export const PERMISOS_CARGA = {
   'GET /api/kernel/pbc': G,
   'GET /api/kernel/criterios': G,
   'GET /api/kernel/encargos': { requiere: 'empresa_id' },
+  'POST /api/kernel/encargo/mes': { requiere: 'empresa_id' },
   // Prenómina y reconciliación kernel ↔ nómina
   'POST /api/kernel/ingestas': { multipart: true },
   'GET /api/kernel/ingestas': { requiere: 'encargo_id' },

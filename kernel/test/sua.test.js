@@ -192,6 +192,9 @@ test('portal: guarda archivos en R2, sella la ejecución, deja el cruce para cla
   const env = { DB: db, DOCS: r2Local() };
   const archivos = { sua: { nombre: 'W2608641.SUA', bytes: enc(archivoSUA()) }, ema: { nombre: 'CDEMMO99.txt', bytes: enc(cdemmo()) },
     eba: { nombre: 'CDEBMO99.txt', bytes: enc(cdebmo()) }, ema_pa: { nombre: 'CDEMPA99.txt', bytes: enc(cdempa()) } };
+  // Un SUA de agosto no entra a un encargo de septiembre aunque se haya elegido ese encargo (0019).
+  db.raw.exec("INSERT INTO encargo (id, empresa_id, nivel, periodo_desde, periodo_hasta, ejercicio, origen_nomina, aplica_ajuste_mensual) VALUES ('enc_sep', 1, 'B5+', '2026-09-01', '2026-09-30', 2026, 'cliente', 0)");
+  await assert.rejects(procesarRegistroSUA(env, { encargo_id: 'enc_sep', archivos }), /es de 2026-08 y el encargo cubre 2026-09/);
   await assert.rejects(procesarRegistroSUA(env, { encargo_id: 'enc_s', archivos: { ...archivos, eba: undefined } }), /falta el CDEBMO99/);
   await assert.rejects(procesarRegistroSUA(env, { encargo_id: 'enc_s', archivos: { ...archivos, ema_pa: { nombre: 'x', bytes: enc(cdempa(REG, '07')) } } }), /emisión es de 2026-07/);
   const { id, reporte } = await procesarRegistroSUA(env, { encargo_id: 'enc_s', archivos, usuario_id: 2 });
