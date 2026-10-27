@@ -17,6 +17,7 @@ POST /api/kernel/ingestas (archivo) ──► R2 ──► cola en D1 (tabla ing
 |---|---|
 | `xlsx.js` | Lector XLSX sin dependencias: ZIP por rango, `DecompressionStream('deflate-raw')`, renglón por renglón. Números como texto exacto, nunca float. Validado contra openpyxl en un archivo real de PRIME: 122,840 celdas, 0 diferencias. |
 | `perfiles/prime.js` | Perfil de mapeo declarativo de PrimeWireless (módulo 6): columnas, conceptos y su tipo, columnas del cliente por rubro, corridas. |
+| `mes.js` | ¿De qué mes es el archivo? Señales cierta (periodo del .SUA; `FechaFinalPago` en ≥ 90 % de los XML), fuerte (mes y año en nombre, hoja o título; moda de `FechaEmision` de la metadata) y débil (mes sin año). Sólo se sube sin preguntar si es seguro. Se embebe tal cual en `/kernel` (carga por mes, 0019). |
 | `canonico.js` | Renglón crudo → renglón canónico: centavos exactos, control «suma de conceptos = TOTAL PERCEPCIONES», conceptos no catalogados. |
 | `items.js` | Renglón canónico → entradas del kernel (EXE → ISR; ajuste mensual e ISN en la fase mensual) y movimientos del cliente. |
 | `trabajos.js` | La cola: fases, candado con vencimiento, reintento desde la fase en que quedó. |

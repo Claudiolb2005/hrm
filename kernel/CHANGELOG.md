@@ -3,6 +3,18 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.1 — 2026-10-27
+
+Sin cambio de reglas ni de importes: la huella cambia porque la ingesta suma la detección del mes.
+
+- **Carga por mes** (`ingesta/mes.js`, `POST /api/kernel/encargo/mes`, migración 0019): quien sube los documentos ya no elige
+  el encargo. El portal lee de qué mes es cada archivo (periodo del .SUA; `FechaFinalPago` de los XML; `FechaEmision` de la
+  metadata del SAT; mes y año en el nombre, las hojas o los títulos de la prenómina y el maestro) y lo manda al encargo abierto
+  de ese mes. Si el mes no tiene encargo, lo abre con la configuración del último encargo mensual de la empresa (nivel,
+  origen, tolerancia, materialidad, ajuste mensual; no la carga patronal ni el cierre). Un mes cerrado no se reabre. Si el mes
+  no es seguro, se pide confirmarlo. Decisión de Claudio, 27-oct-2026.
+- **SUA**: un .SUA de un mes fuera del periodo del encargo se rechaza en el servidor, aunque se haya elegido ese encargo.
+
 ## 0.11.0 — 2026-10-21
 
 - **CALC-IMSS-001 1.2.0, CALC-RCV-001 1.2.0, CALC-INF-001 1.1.0 — tramos de SBC.** La entrada acepta

@@ -5,6 +5,11 @@
 // Todo lo que viene de un archivo del cliente se escapa antes de pintarse (esc()).
 // El JS del navegador va sin backticks ni ${…} para no chocar con el template literal.
 
+import { FUNCIONES_MES } from '../ingesta/mes.js';
+
+// Detección del mes (ingesta/mes.js): las mismas funciones que prueba el servidor, embebidas por toString.
+const JS_MES = FUNCIONES_MES.map(f => f.toString()).join('\n');
+
 export function paginaKernel({ CSS, LOGO, AUTH_ADMIN, LOGOUT_FN }) {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Auditoría — HRM</title>
@@ -106,7 +111,7 @@ html body .k-row>label input{width:auto;margin:0}
 
   <div class="k-card solo-carga" style="border-left:4px solid #1a8a8a">
     <h2>Carga de documentos y pruebas</h2>
-    <div class="sub" style="font-size:12px;color:#3d5a6b">Sube aquí los archivos del periodo: prenómina o acumulado, XML de nómina y metadata del SAT, maestro de empleados (pestaña <b>Archivos</b>) y el ZIP del SUA (pestaña <b>SUA ↔ IMSS</b>). El sistema los lee en el servidor, corre el kernel y deja listos los cruces y las diferencias, que puedes consultar. La clasificación de diferencias, los hallazgos y el dictamen los hace HRM. Sólo ves los encargos de tu empresa, y un encargo cerrado ya no recibe archivos.</div>
+    <div class="sub" style="font-size:12px;color:#3d5a6b">Arrastra todos los archivos del mes en <b>Sube los documentos del mes</b> (prenómina o acumulado, ZIP de XML, metadata del SAT, maestro y ZIP del SUA): el sistema detecta de qué mes es cada uno y los manda al encargo de ese mes; si el mes todavía no tiene encargo, lo abre. Si no está seguro del mes, te pide confirmarlo. El sistema los lee en el servidor, corre el kernel y deja listos los cruces y las diferencias, que puedes consultar. La clasificación de diferencias, los hallazgos y el dictamen los hace HRM. Sólo ves los encargos de tu empresa, y un encargo cerrado ya no recibe archivos.</div>
   </div>
   <div class="k-tabs" id="tabs">
     <div class="k-tab act" data-t="archivos">Archivos</div>
@@ -123,6 +128,12 @@ html body .k-row>label input{width:auto;margin:0}
   </div>
 
   <section id="t-archivos">
+    <div class="k-card" style="border-left:4px solid #1a8a8a">
+      <h2>Sube los documentos del mes</h2>
+      <div class="drop" id="dropA">Arrastra aquí todos los archivos juntos (prenómina .xlsx, maestro .xlsx, .zip de XML, .txt de metadata del SAT, .zip del SUA) o <a href="#" onclick="document.getElementById('fAuto').click();return false" style="color:#1a8a8a;font-weight:700">elígelos</a>. El sistema detecta de qué mes es cada uno y lo manda a su encargo; no necesitas elegir el encargo.<input type="file" id="fAuto" multiple accept=".xlsx,.zip,.txt,.csv" class="oculto" onchange="analizarAuto(this.files)"></div>
+      <div id="msgAuto"></div>
+      <div id="detAuto"></div>
+    </div>
     <div class="k-card">
       <h2>Subir prenómina / acumulado</h2>
       <div class="drop" id="drop">Arrastra aquí el Excel o <a href="#" onclick="document.getElementById('fArch').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>. Se procesa en el servidor; puedes cerrar esta pestaña.<input type="file" id="fArch" accept=".xlsx" class="oculto" onchange="subir(this.files[0])"></div>
@@ -481,15 +492,16 @@ async function juntarZip(z,ruta,prof,out){
     }
   }
 }
-async function subirSua(f){
-  if(!ENC){aviso('msgSua','Primero crea o elige un encargo','err');return}
-  if(!f)return;
-  try{await cargarJSZip()}catch(x){aviso('msgSua','No cargó el lector de ZIP; revisa la conexión y recarga','err');return}
+// destino(per) → id del encargo de ese mes (carga por mes); sin destino, el encargo elegido. out: el ZIP ya leído.
+async function subirSua(f,destino,out){
+  if(!destino&&!ENC){aviso('msgSua','Primero crea o elige un encargo','err');return {ok:0,errores:['Sin encargo']}}
+  if(!f)return {ok:0,errores:[]};
+  try{await cargarJSZip()}catch(x){aviso('msgSua','No cargó el lector de ZIP; revisa la conexión y recarga','err');return {ok:0,errores:['Sin lector de ZIP']}}
   aviso('msgSua','Abriendo '+f.name+' en tu navegador…');
   try{
-    var out=[];await juntarZip(await JSZip.loadAsync(f),'',0,out);
+    if(!out){out=[];await juntarZip(await JSZip.loadAsync(f),'',0,out)}
     var suas=out.filter(function(x){return x.k==='sua'});
-    if(!suas.length){aviso('msgSua','El ZIP no trae archivos .SUA','err');return}
+    if(!suas.length){aviso('msgSua','El ZIP no trae archivos .SUA','err');return {ok:0,errores:['El ZIP no trae archivos .SUA']}}
     var periodoDe={};out.forEach(function(x){if(x.k==='ema_pa')periodoDe[x.grupo]=x.per});
     var regs=suas.map(function(s){
       var mismos=out.filter(function(x){return x.k!=='sua'&&x.reg10===s.reg10});
@@ -501,14 +513,16 @@ async function subirSua(f){
     for(var i=0;i<regs.length;i++){
       var r=regs[i];aviso('msgSua','Registro '+(i+1)+' de '+regs.length+': '+r.reg+' ('+r.per+')…');
       if(!r.ema){errores.push(r.reg+': falta la emisión mensual (CDEMMO99)');continue}
-      var fd=new FormData();fd.append('encargo_id',ENC.id);
+      var eid=destino?destino(r.per):ENC.id;if(!eid){errores.push(r.reg+' ('+r.per+'): sin encargo para ese mes');continue}
+      var fd=new FormData();fd.append('encargo_id',eid);
       ['sua','ema','eba','ema_pa'].forEach(function(k){if(r[k])fd.append(k,new Blob([r[k].bytes]),r[k].nombre)});
       try{await api('POST','/api/kernel/sua',fd);ok++}catch(x){errores.push(r.reg+': '+x.message)}
     }
     document.getElementById('fSua').value='';
     document.getElementById('msgSua').innerHTML='<div class="aviso '+(errores.length?'err':'ok')+'">Leídos '+ok+' de '+regs.length+' registros.'+(errores.length?'<br>'+errores.map(esc).join('<br>'):'')+'</div>';
     cargarSua();
-  }catch(x){aviso('msgSua',x.message,'err')}
+    return {ok:ok,total:regs.length,errores:errores};
+  }catch(x){aviso('msgSua',x.message,'err');return {ok:0,errores:[x.message]}}
 }
 function cargarSua(){
   if(!ENC)return;
@@ -560,14 +574,15 @@ function clasificarSua(){
 }
 
 // ── Archivos / ingestas
-function subir(f){
-  if(!ENC){aviso('msgSubir','Primero crea o elige un encargo','err');return}
-  if(!f)return;
-  if(!/\\.xlsx$/i.test(f.name)){aviso('msgSubir','Sólo .xlsx','err');return}
-  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);
+function subir(f,eid){
+  eid=eid||(ENC&&ENC.id);
+  if(!eid){aviso('msgSubir','Primero crea o elige un encargo','err');return Promise.reject(new Error('Sin encargo'))}
+  if(!f)return Promise.resolve();
+  if(!/\\.xlsx$/i.test(f.name)){aviso('msgSubir','Sólo .xlsx','err');return Promise.reject(new Error('Sólo .xlsx'))}
+  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',eid);
   aviso('msgSubir','Subiendo '+f.name+'…');
-  api('POST','/api/kernel/ingestas',fd).then(function(r){aviso('msgSubir','Recibido. Procesando en el servidor…','ok');document.getElementById('fArch').value='';cargarIngestas(r.id)})
-    .catch(function(e){aviso('msgSubir',e.message,'err')});
+  return api('POST','/api/kernel/ingestas',fd).then(function(r){aviso('msgSubir','Recibido. Procesando en el servidor…','ok');document.getElementById('fArch').value='';if(ENC&&ENC.id===eid)cargarIngestas(r.id);return r})
+    .catch(function(e){aviso('msgSubir',e.message,'err');throw e});
 }
 function cargarIngestas(abrir){
   if(!ENC){document.getElementById('tbIng').innerHTML='<tr><td colspan="6" class="vacio">Sin encargo</td></tr>';return}
@@ -826,11 +841,12 @@ var dropM=document.getElementById('dropM');
 ['dragenter','dragover'].forEach(function(e){dropM.addEventListener(e,function(ev){ev.preventDefault();dropM.classList.add('on')})});
 ['dragleave','drop'].forEach(function(e){dropM.addEventListener(e,function(ev){ev.preventDefault();dropM.classList.remove('on')})});
 dropM.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirMaestro(ev.dataTransfer.files[0])});
-function subirMaestro(f){
-  if(!ENC){aviso('msgMae','Primero elige un encargo','err');return}
-  if(!f)return;if(!/\\.xlsx$/i.test(f.name)){aviso('msgMae','El maestro va en .xlsx','err');return}
-  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);aviso('msgMae','Leyendo '+f.name+'…');
-  api('POST','/api/kernel/maestro',fd).then(function(r){aviso('msgMae',r.registros.toLocaleString('es-MX')+' empleados leídos'+(r.cruzado?'. Cruzado con la prenómina.':'. '+(r.motivo||'')),'ok');document.getElementById('fMae').value='';cargarMaestro()}).catch(function(e){aviso('msgMae',e.message,'err')});
+function subirMaestro(f,eid){
+  eid=eid||(ENC&&ENC.id);
+  if(!eid){aviso('msgMae','Primero elige un encargo','err');return Promise.reject(new Error('Sin encargo'))}
+  if(!f)return Promise.resolve();if(!/\\.xlsx$/i.test(f.name)){aviso('msgMae','El maestro va en .xlsx','err');return Promise.reject(new Error('El maestro va en .xlsx'))}
+  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',eid);aviso('msgMae','Leyendo '+f.name+'…');
+  return api('POST','/api/kernel/maestro',fd).then(function(r){aviso('msgMae',r.registros.toLocaleString('es-MX')+' empleados leídos'+(r.cruzado?'. Cruzado con la prenómina.':'. '+(r.motivo||'')),'ok');document.getElementById('fMae').value='';cargarMaestro();return r}).catch(function(e){aviso('msgMae',e.message,'err');throw e});
 }
 function cargarMaestro(){
   if(!ENC)return;
@@ -874,15 +890,16 @@ var dropC=document.getElementById('dropC');
 ['dragenter','dragover'].forEach(function(e){dropC.addEventListener(e,function(ev){ev.preventDefault();dropC.classList.add('on')})});
 ['dragleave','drop'].forEach(function(e){dropC.addEventListener(e,function(ev){ev.preventDefault();dropC.classList.remove('on')})});
 dropC.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirCfdi(ev.dataTransfer.files[0])});
-function subirCfdi(f){
-  if(!ENC){aviso('msgCfdi','Primero crea o elige un encargo','err');return}
-  if(!f)return;
+function subirCfdi(f,eid){
+  eid=eid||(ENC&&ENC.id);
+  if(!eid){aviso('msgCfdi','Primero crea o elige un encargo','err');return Promise.reject(new Error('Sin encargo'))}
+  if(!f)return Promise.resolve();
   var tipo=/\\.zip$/i.test(f.name)?'xml_nomina':/\\.(txt|csv)$/i.test(f.name)?'metadata_sat':null;
-  if(!tipo){aviso('msgCfdi','Sube un .zip con los XML o el .txt de metadata del SAT','err');return}
-  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);fd.append('tipo',tipo);fd.append('llave',document.getElementById('cLla').value);
+  if(!tipo){aviso('msgCfdi','Sube un .zip con los XML o el .txt de metadata del SAT','err');return Promise.reject(new Error('Formato no reconocido'))}
+  var fd=new FormData();fd.append('file',f);fd.append('encargo_id',eid);fd.append('tipo',tipo);fd.append('llave',document.getElementById('cLla').value);
   aviso('msgCfdi','Subiendo '+f.name+'…');
-  api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi','Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';cargarCfdi(r.id)})
-    .catch(function(e){aviso('msgCfdi',e.message,'err')});
+  return api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi','Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';if(ENC&&ENC.id===eid)cargarCfdi(r.id);return r})
+    .catch(function(e){aviso('msgCfdi',e.message,'err');throw e});
 }
 function badgeC(e){var m={pendiente:['b-run','En cola'],leyendo:['b-run','Leyendo'],cruzando:['b-run','Cruzando'],terminado:['b-ok','Terminado'],error:['b-lim','Error']};var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+x[1]+'</span>'}
 function cargarCfdi(abrir){
@@ -1121,6 +1138,129 @@ function cerrarEncargo(){
   if(!confirm('Cerrar el encargo inicia el plazo de 60 días para versiones. No se reabre. ¿Cerrar?'))return;
   api('POST','/api/kernel/encargo/cerrar',{encargo_id:ENC.id}).then(function(r){alert('Cerrado. Versiones posibles hasta '+r.reproceso_hasta.slice(0,10)+'.')}).catch(function(e){alert(e.message)});
 }
+
+// ── Carga por mes: el sistema detecta el mes de cada archivo y lo manda a su encargo (0019)
+${JS_MES}
+var HOY=new Date(Date.now()-6*3600e3).toISOString().slice(0,10);
+var AUTO=[];
+var TIPOS={prenomina:'Prenómina / acumulado',maestro:'Maestro de empleados',xml:'XML de nómina',metadata:'Metadata del SAT',sua:'SUA'};
+function mesTxt(m){if(!m)return '—';var n=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][Number(m.slice(5,7))-1];return n+' '+m.slice(0,4)}
+function mesAnterior(){var a=Number(HOY.slice(0,4)),m=Number(HOY.slice(5,7))-1;if(!m){m=12;a--}return a+'-'+(m<10?'0':'')+m}
+async function analizarArchivo(f){
+  var x={f:f,tipo:null,senales:[],meses:null,error:null};
+  try{
+    if(/\\.zip$/i.test(f.name)){
+      await cargarJSZip();var z=await JSZip.loadAsync(f);
+      var out=[];await juntarZip(z,'',0,out);
+      if(out.some(function(o){return o.k==='sua'})){
+        x.tipo='sua';x.out=out;var ms={};out.forEach(function(o){if(o.k==='sua')ms[o.per]=(ms[o.per]||0)+1});
+        x.meses=Object.keys(ms).sort();x.porMes=ms;
+        x.decision={mes:x.meses[x.meses.length-1],seguro:true,motivo:'el periodo viene en cada archivo .SUA'+(x.meses.length>1?' ('+x.meses.length+' meses)':'')};
+        return x;
+      }
+      var xmls=Object.keys(z.files).filter(function(k){return !z.files[k].dir&&/\\.xml$/i.test(k)});
+      if(!xmls.length){x.error='El ZIP no trae XML ni archivos del SUA';return x}
+      x.tipo='xml';var paso=Math.max(1,Math.floor(xmls.length/300)),fechas=[];
+      for(var i=0;i<xmls.length;i+=paso){var t=await z.files[xmls[i]].async('string');var ff=atributoXml(t,'FechaFinalPago');if(ff)fechas.push(ff)}
+      var sf=senalFechas(fechas,'contenido');if(sf)x.senales.push(sf);
+      mesesEnTexto(f.name,HOY).forEach(function(s){s.fuente='nombre';x.senales.push(s)});
+      x.nota=xmls.length.toLocaleString('es-MX')+' XML';
+    }else if(/\\.(txt|csv)$/i.test(f.name)){
+      x.tipo='metadata';
+      var sm=senalFechas(fechasMetadata(await f.slice(0,8e6).text()),'contenido',0.8,'fuerte');if(sm)x.senales.push(sm);
+      mesesEnTexto(f.name,HOY).forEach(function(s){s.fuente='nombre';x.senales.push(s)});
+    }else if(/\\.xlsx$/i.test(f.name)){
+      await cargarJSZip();var zx=await JSZip.loadAsync(f);
+      var wb=zx.file('xl/workbook.xml'),hojas=wb?hojasLibro(await wb.async('string')):[];
+      var ss=zx.file('xl/sharedStrings.xml'),textos=ss?textosLibro((await ss.async('string')).slice(0,600000),400):[];
+      x.tipo=tipoLibro(hojas);x.senales=senalesLibro(f.name,hojas,textos,HOY);
+    }else{x.error='Formato no reconocido (se esperan .xlsx, .zip, .txt)';return x}
+  }catch(e){x.error='No se pudo abrir: '+e.message;return x}
+  x.decision=decidirMes(x.senales,HOY);
+  return x;
+}
+async function analizarAuto(files){
+  files=Array.prototype.slice.call(files||[]);if(!files.length)return;
+  document.getElementById('detAuto').innerHTML='';
+  aviso('msgAuto','Revisando '+files.length+' archivo'+(files.length>1?'s':'')+' en tu navegador…');
+  AUTO=[];
+  for(var i=0;i<files.length;i++){aviso('msgAuto','Revisando '+files[i].name+' ('+(i+1)+' de '+files.length+')…');AUTO.push(await analizarArchivo(files[i]))}
+  // Contexto del lote: lo que es seguro en un archivo ayuda al que no dice su mes.
+  var votos={};AUTO.forEach(function(x){if(x.decision&&x.decision.seguro&&x.tipo!=='sua')votos[x.decision.mes]=(votos[x.decision.mes]||0)+1;if(x.tipo==='sua')x.meses.forEach(function(m){votos[m]=(votos[m]||0)+1})});
+  var lote=Object.keys(votos).sort(function(a,b){return votos[b]-votos[a]});
+  lote=lote.length===1?lote[0]:null;
+  AUTO.forEach(function(x){
+    if(x.error||x.tipo==='sua'||!x.decision||x.decision.seguro||!lote)return;
+    var fuertes=x.senales.filter(function(s){return s.fuerza!=='debil'});
+    var debiles=x.senales.filter(function(s){return s.fuerza==='debil'});
+    var coincide=debiles.every(function(s){return (s.mes||anioProbable(s.numero,HOY))===lote});
+    if(!fuertes.length&&coincide){x.senales.push({mes:lote,fuerza:'fuerte',fuente:'lote'});x.decision=decidirMes(x.senales,HOY)}
+  });
+  pintarAuto(lote);
+  var dudas=AUTO.filter(function(x){return !x.error&&!x.decision.seguro});
+  if(!dudas.length&&AUTO.some(function(x){return !x.error}))return subirAuto();
+  aviso('msgAuto',dudas.length?'Confirma el mes de '+(dudas.length===1?'1 archivo':dudas.length+' archivos')+' y presiona Subir.':'Ningún archivo se puede subir.',dudas.length?'':'err');
+}
+function pintarAuto(lote){
+  var h='<div class="scroll"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Mes</th><th>Cómo lo supo</th><th>Estado</th></tr></thead><tbody>';
+  AUTO.forEach(function(x,i){
+    var mes;
+    if(x.error)mes='—';
+    else if(x.tipo==='sua')mes=x.meses.map(mesTxt).join(', ');
+    else if(x.decision.seguro)mes='<b>'+esc(mesTxt(x.decision.mes))+'</b>';
+    else mes='<input type="month" class="k-in" data-am="'+i+'" value="'+esc(x.decision.mes||lote||mesAnterior())+'" max="'+HOY.slice(0,7)+'" style="width:150px">';
+    h+='<tr><td class="mono" style="font-size:11px">'+esc(x.f.name)+'</td><td>'+esc(x.tipo?TIPOS[x.tipo]:'—')+(x.nota?' <span class="sub" style="font-size:11px;color:#8ba5b2">'+esc(x.nota)+'</span>':'')+'</td><td>'+mes+'</td>'+
+      '<td style="font-size:12px">'+esc(x.error||x.decision.motivo)+'</td><td id="aE'+i+'">'+(x.error?'<span class="b b-lim">No se sube</span>':x.tipo==='sua'||x.decision.seguro?'<span class="b b-ok">Mes detectado</span>':'<span class="b b-par">Confirma el mes</span>')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(AUTO.some(function(x){return !x.error&&!x.decision.seguro}))h+='<div class="k-row" style="margin-top:10px"><button class="k-btn" id="bAuto">Subir</button><span class="sub" style="font-size:11px;color:#8ba5b2">Si el mes no tiene encargo, el sistema lo abre con la misma configuración del mes anterior.</span></div>';
+  document.getElementById('detAuto').innerHTML=h;
+  var b=document.getElementById('bAuto');if(b)b.addEventListener('click',function(){b.disabled=true;subirAuto()});
+}
+function empresaAuto(){if(CARGA)return U.empresa_id;if(ENC)return ENC.empresa_id;var e=document.getElementById('eEmp');return e&&e.value?Number(e.value):null}
+async function subirAuto(){
+  var emp=empresaAuto();if(!emp){aviso('msgAuto','Elige primero un encargo para saber de qué empresa son los archivos','err');return}
+  document.querySelectorAll('[data-am]').forEach(function(inp){var x=AUTO[Number(inp.dataset.am)];if(inp.value){x.decision.mes=inp.value;x.decision.seguro=true;x.decision.motivo='confirmado por ti'}});
+  var vale=AUTO.filter(function(x){return !x.error&&(x.tipo==='sua'||x.decision.mes)});
+  var meses={};vale.forEach(function(x){(x.tipo==='sua'?x.meses:[x.decision.mes]).forEach(function(m){meses[m]=1})});
+  var encs={},errMes={},abiertos=[];
+  for(var m in meses){
+    aviso('msgAuto','Buscando el encargo de '+mesTxt(m)+'…');
+    try{var r=await api('POST','/api/kernel/encargo/mes',{empresa_id:emp,periodo:m});encs[m]=r.encargo.id;if(r.creado)abiertos.push(mesTxt(m))}catch(e){errMes[m]=e.message}
+  }
+  var orden={prenomina:1,maestro:2,xml:3,metadata:4,sua:5},hechos=0,fallas=0,ultimo=null;
+  vale.sort(function(a,b){return orden[a.tipo]-orden[b.tipo]});
+  for(var i=0;i<vale.length;i++){
+    var x=vale[i],k=AUTO.indexOf(x),st=document.getElementById('aE'+k);
+    var marcar=function(ok,t){if(st)st.innerHTML='<span class="b '+(ok?'b-ok':'b-lim')+'">'+esc(t)+'</span>';if(ok)hechos++;else fallas++};
+    if(st)st.innerHTML='<span class="b b-run">Subiendo…</span>';
+    aviso('msgAuto','Subiendo '+x.f.name+' ('+(i+1)+' de '+vale.length+')…');
+    if(x.tipo==='sua'){
+      var r2=await subirSua(x.f,function(per){return encs[per]||null},x.out);
+      var sinEnc=x.meses.filter(function(m){return errMes[m]}).map(function(m){return mesTxt(m)+': '+errMes[m]});
+      marcar(!r2.errores.length&&!sinEnc.length,(r2.ok||0)+' de '+(r2.total||0)+' registros'+(r2.errores.length||sinEnc.length?' · '+sinEnc.concat(r2.errores).slice(0,3).join(' · '):''));
+      x.meses.forEach(function(m){if(encs[m])ultimo=encs[m]});
+      continue;
+    }
+    var eid=encs[x.decision.mes];
+    if(!eid){marcar(false,errMes[x.decision.mes]||'Sin encargo');continue}
+    try{
+      if(x.tipo==='prenomina')await subir(x.f,eid);
+      else if(x.tipo==='maestro')await subirMaestro(x.f,eid);
+      else await subirCfdi(x.f,eid);
+      marcar(true,'Subido a '+mesTxt(x.decision.mes));ultimo=eid;
+    }catch(e){marcar(false,e.message)}
+  }
+  document.getElementById('fAuto').value='';
+  var b=document.getElementById('bAuto');if(b)b.remove();
+  document.querySelectorAll('[data-am]').forEach(function(inp){inp.disabled=true});
+  aviso('msgAuto',hechos+' de '+vale.length+' archivos subidos'+(abiertos.length?'. Se abrió el encargo de '+abiertos.join(' y '):'')+(fallas?'. Revisa los marcados en rojo.':'. Se procesan en el servidor; puedes cerrar esta pestaña.'),fallas?'err':'ok');
+  if(ultimo)cargarEncargos(ultimo);
+}
+var dropA=document.getElementById('dropA');
+['dragenter','dragover'].forEach(function(e){dropA.addEventListener(e,function(ev){ev.preventDefault();dropA.classList.add('on')})});
+['dragleave','drop'].forEach(function(e){dropA.addEventListener(e,function(ev){ev.preventDefault();dropA.classList.remove('on')})});
+dropA.addEventListener('drop',function(ev){if(ev.dataTransfer.files.length)analizarAuto(ev.dataTransfer.files)});
 
 cargarEstado();cargarEncargos();
 <\/script></body></html>`;
