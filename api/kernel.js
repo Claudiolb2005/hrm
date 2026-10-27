@@ -105,7 +105,8 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     const st = [];
     for (const mv of d.movimientos) {
       if (!Number.isInteger(mv.valor_c)) return J({ error: 'valor_c debe ser entero en centavos', movimiento: mv }, 400, C);
-      const id = mv.id || [d.encargo_id, mv.corrida_id || '', mv.colaborador_id, mv.rubro].join('|');
+      // El perfil carga no elige ids: un id ajeno con INSERT OR IGNORE taparía el renglón de otro encargo.
+      const id = (!esCarga(u) && mv.id) || [d.encargo_id, mv.corrida_id || '', mv.colaborador_id, mv.rubro].join('|');
       st.push(db.prepare('INSERT OR IGNORE INTO movimiento_nomina (id, encargo_id, corrida_id, colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)')
         .bind(id, d.encargo_id, mv.corrida_id || null, String(mv.colaborador_id), mv.rubro, mv.valor_c, d.archivo_sha256, mv.renglon_origen || null));
     }

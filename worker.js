@@ -149,7 +149,7 @@ async function doLogin(req, env, C) {
   const { email, password } = await req.json();
   if (!email || !password) return J({ error: "Campos requeridos" }, 400, C);
   const h = await sha256(password);
-  const r = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.perfil,u.empresa_id,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id WHERE u.email=? AND u.password_hash=? AND u.activo=1").bind(email, h).first();
+  const r = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.perfil,u.empresa_id,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id WHERE lower(u.email)=lower(?) AND u.password_hash=? AND u.activo=1").bind(String(email).trim(), h).first();
   if (!r) return J({ error: "Credenciales inv\xE1lidas" }, 401, C);
   const t = token();
   const user = { id: r.id, email: r.email, nombre: r.nombre, rol: r.rol, perfil: r.perfil || null, empresa_id: r.empresa_id, empresa_nombre: r.empresa_nombre };
@@ -171,7 +171,7 @@ __name(doLogout, "doLogout");
 async function doForgotPassword(req, env, C) {
   const { email } = await req.json();
   if (!email) return J({ error: "Email requerido" }, 400, C);
-  const u = await env.DB.prepare("SELECT id,email,nombre FROM usuarios WHERE email=? AND activo=1").bind(email).first();
+  const u = await env.DB.prepare("SELECT id,email,nombre FROM usuarios WHERE lower(email)=lower(?) AND activo=1").bind(String(email).trim()).first();
   if (!u) return J({ ok: true, message: "Si el correo existe, recibir\xE1s un enlace de recuperaci\xF3n" }, 200, C);
   const t = token();
   const baseUrl = new URL(req.url).origin;

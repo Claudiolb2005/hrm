@@ -90,6 +90,12 @@ test('alcance: sólo su empresa; de otra empresa contesta «no encontrado» sin 
   // Mezclar un id propio con uno ajeno tampoco pasa.
   assert.equal((await pedir('t_carga', 'GET', '/api/kernel/diferencias?encargo_id=enc_p&ejecucion_id=no_existe')).status, 404);
   assert.equal((await pedir('t_carga', 'POST', '/api/kernel/reconciliar', { ejecucion_id: 'no_existe', ingesta_id: 'ing_p' })).status, 404);
+  // Un id repetido en la URL: la revisión y el módulo podrían leer valores distintos.
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/ingestas?encargo_id=enc_otra&encargo_id=enc_p')).status, 400);
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/ingesta?id=ing_o&id=ing_p')).status, 400);
+  // Un id que no es texto ni número tampoco pasa sin revisar.
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/reconciliar', { ejecucion_id: 'x', ingesta_id: ['ing_o'] })).status, 400);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/ingesta/avanzar', { id: { a: 1 } })).status, 400);
   // Una ruta con id exige el id.
   assert.equal((await pedir('t_carga', 'GET', '/api/kernel/ingesta')).status, 400);
   // El estado del kernel sí, sin los conteos de todo el portal.
@@ -116,6 +122,10 @@ test('cargas: por formulario, en encargo abierto de su empresa; nunca por refere
   assert.equal(env.DB.raw.prepare('SELECT creado_por FROM ingesta WHERE id = ?').get(ok.j.id).creado_por, 5, 'queda quién subió');
   // Por referencia a un archivo ya en R2 (podría ser de otro encargo): cerrado.
   assert.equal((await pedir('t_carga', 'POST', '/api/kernel/ingestas', { encargo_id: 'enc_p', r2_key: 'encargos/enc_otra/fuentes/x.xlsx' })).status, 403);
+  // Movimientos: el perfil no elige el id del renglón; siempre sale de su encargo.
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/movimientos', { encargo_id: 'enc_p', archivo_sha256: 'h', movimientos: [{ id: 'enc_otra|SEM35|1|neto', corrida_id: 'SEM35', colaborador_id: '1', rubro: 'neto', valor_c: 100 }] })).status, 201);
+  assert.equal(env.DB.raw.prepare("SELECT count(*) AS n FROM movimiento_nomina WHERE id LIKE 'enc_otra%'").get().n, 0);
+  assert.equal(env.DB.raw.prepare("SELECT count(*) AS n FROM movimiento_nomina WHERE id = 'enc_p|SEM35|1|neto'").get().n, 1);
   // Calendario: dato del cliente; se captura en su encargo abierto, no en uno cerrado.
   const cor = { corrida_id: 'SEM35', periodicidad: 'semanal', desde: '2026-08-24', hasta: '2026-08-30', fecha_pago: '2026-08-28', ordinaria: true };
   assert.equal((await pedir('t_carga', 'POST', '/api/kernel/calendario', { encargo_id: 'enc_p', fuente: 'Calendario PRIME', corridas: [cor] })).status, 200);
@@ -143,4 +153,16 @@ test('alta de usuario: «carga» se guarda como socio con perfil y empresa', asy
   assert.equal((await pedir('t_admin', 'POST', '/api/usuarios', { email: 'nuevo@prime.com', nombre: 'Otra vez', password: '12345678', rol: 'carga', empresa_id: 1 })).status, 409);
   const l = await pedir('t_admin', 'GET', '/api/usuarios');
   assert.equal(l.j.usuarios.find(x => x.email === 'nuevo@prime.com').perfil, 'carga');
+});
+
+test('login: el email no distingue mayúsculas (se guarda en minúsculas al dar de alta)', async () => {
+  const { env } = entorno();
+  const sha = async (x) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(x)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  env.DB.raw.prepare("INSERT INTO usuarios (email, password_hash, nombre, rol, empresa_id, perfil) VALUES ('luis@prime.com', ?, 'Luis', 'socio', 1, 'carga')").run(await sha('clave-segura-1'));
+  let guardado = null;
+  env.SESSIONS.put = async (k, v) => { guardado = JSON.parse(v); };
+  const r = await worker.fetch(new Request('https://clientes-hrm.com/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: ' Luis@Prime.com', password: 'clave-segura-1' }) }), env, {});
+  assert.equal(r.status, 200);
+  assert.equal(guardado.perfil, 'carga');
+  assert.equal(guardado.empresa_id, 1);
 });

@@ -101,13 +101,21 @@ export async function autorizarCarga(request, env, u) {
   if (regla.multipart) return NO(403, 'Tu perfil sube el archivo directamente (formulario), no por referencia a R2');
 
   // Identificadores que llegan: URL y, en POST con JSON, el cuerpo (sólo el primer nivel).
+  // Un parámetro repetido haría que la revisión mire un valor y el módulo use otro: se rechaza.
   const valores = {};
-  for (const [k, v] of url.searchParams) valores[k] = v;
+  for (const k of new Set(url.searchParams.keys())) {
+    if (url.searchParams.getAll(k).length > 1) return NO(400, 'Parámetro repetido: ' + k);
+    valores[k] = url.searchParams.get(k);
+  }
   if (m !== 'GET') {
     if (!tipo.includes('application/json')) return NO(415, 'Se espera JSON');
     const b = await request.clone().json().catch(() => null);
     if (!b || typeof b !== 'object' || Array.isArray(b)) return NO(400, 'JSON inválido');
-    for (const [k, v] of Object.entries(b)) if (v === null || ['string', 'number'].includes(typeof v)) valores[k] = v;
+    for (const [k, v] of Object.entries(b)) {
+      const llave = k === 'id' || k in LLAVES;
+      if (llave && v !== null && !['string', 'number'].includes(typeof v)) return NO(400, k + ' inválido');
+      if (v === null || ['string', 'number'].includes(typeof v)) valores[k] = v;
+    }
   }
   const ids = [];
   if (regla.id) {
