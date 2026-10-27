@@ -1,6 +1,7 @@
 import { rutasKernel } from "./api/kernel.js";
 import { rutasDictamen } from "./api/dictamen.js";
 import { rutasCfdi } from "./api/cfdi.js";
+import { rutasSua } from "./api/sua.js";
 import { rutasMaestro } from "./api/maestro.js";
 import { rutasCotizador } from "./api/cotizador.js";
 import { rutasExpediente } from "./api/expediente.js";
@@ -63,6 +64,10 @@ var worker_default = {
         if (p.startsWith("/api/kernel/cfdi") || p.startsWith("/api/kernel/cruces")) {
           const rc = await rutasCfdi(request, env, u, C, J, ctx);
           if (rc) return rc;
+        }
+        if (p.startsWith("/api/kernel/sua")) {
+          const rs = await rutasSua(request, env, u, C, J);
+          if (rs) return rs;
         }
         if (p.startsWith("/api/kernel/")) return await rutasKernel(request, env, u, C, J, ctx);
         if (p === "/api/reset-password" && m === "POST") return await apiResetPassword(request, env, u, C);

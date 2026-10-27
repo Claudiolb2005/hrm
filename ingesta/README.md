@@ -20,6 +20,9 @@ POST /api/kernel/ingestas (archivo) ──► R2 ──► cola en D1 (tabla ing
 | `canonico.js` | Renglón crudo → renglón canónico: centavos exactos, control «suma de conceptos = TOTAL PERCEPCIONES», conceptos no catalogados. |
 | `items.js` | Renglón canónico → entradas del kernel (EXE → ISR; ajuste mensual e ISN en la fase mensual) y movimientos del cliente. |
 | `trabajos.js` | La cola: fases, candado con vencimiento, reintento desde la fase en que quedó. |
+| `sua-formato.js` | Lector del archivo de pago `.SUA` (ancho fijo 295: registros 02/03/04/05) y de la emisión del IMSS (CDEMMO99, CDEBMO99, CDEMPA99). Controla que la suma de los 03 cuadre con el 05. Layout fijado contra los 30 registros de PRIME de agosto 2026. |
+| `sua.js` | Items del kernel por trabajador (tramos de la emisión, incapacidades del SUA) y cruce de tres lados kernel ↔ emitido ↔ pagado con la causa de cada diferencia. |
+| `sua-d1.js` | Un registro patronal por llamada: R2, ejecución sellada, liga por RFC con la última prenómina y `cruce_sua`. |
 
 ## Lo que nunca hace
 
@@ -30,6 +33,7 @@ POST /api/kernel/ingestas (archivo) ──► R2 ──► cola en D1 (tabla ing
 - **No infiere la entidad de un registro patronal** de un reporte: viene de `registro_patronal`
   (la tabla vieja `bases_isn` tiene Z33… como San Luis Potosí y es Sinaloa).
 - **No da por completo lo que está fuera de la v1:** finiquitos, PTU, conceptos por confirmar (P2).
+- **No supone qué días restar por incapacidad** cuando el SBC cambia dentro del periodo y el SUA no trae las fechas: el cálculo queda limitado (C26).
 
 ## Correr agosto 2026 de PrimeWireless
 
