@@ -2,7 +2,8 @@
 
 Portal automatizado de supervisión mensual de nómina para clientes de **HRM Consultores**.
 Toda la aplicación vive en un único Cloudflare Worker (`worker.js`) que sirve, según el rol:
-panel **admin**, **portal de cliente** (socio) y **visor de reportes**.
+panel **admin**, **portal de cliente** (socio) y **visor de reportes**. El socio con perfil
+**carga** además sube los documentos y corre las pruebas de su empresa en `/kernel` (ver «Perfiles de acceso»).
 
 > ⚠️ **Repo recomendado PRIVADO.** Contiene la lógica completa de la app y los IDs de
 > infraestructura. No incluye secretos (las contraseñas se guardan hasheadas; la API key
@@ -210,6 +211,20 @@ Lo que no coincide queda en `cruce_sua` con su causa (`incapacidad`, `sua_distin
 | `GET /api/kernel/sua/grupos?encargo_id=&periodo=` · `GET /api/kernel/sua/cruces?…&causa=&rama=` · `POST /api/kernel/sua/clasificar` | Cruce agrupado por causa y rama, casos y clasificación |
 
 Migración: `wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0017_sua.sql`.
+
+## Perfiles de acceso (0018)
+
+| Perfil | Quién | Qué puede |
+|---|---|---|
+| `admin` | HRM | Todo |
+| `socio` | Cliente (consulta) | `/portal`: encargos, requerimiento (sube archivos del PBC), hallazgos ya dictaminados, dictámenes de su empresa |
+| `socio` + `perfil = 'carga'` | Persona del cliente que sube los documentos | Lo del socio y, en `/kernel`, sólo en encargos **abiertos** de **su empresa**: sube prenómina, XML/metadata del SAT, maestro y SUA; captura el calendario; avanza y reintenta lecturas; ejecuta y reconcilia; consulta diferencias, cruces, registros y criterios |
+
+El perfil `carga` **no** clasifica diferencias ni cruces, no crea encargos, no cambia registros patronales, no procesa ni revisa el requerimiento, no redacta hallazgos ni emite o cierra: lo que se audita no se califica a sí mismo. La revisión está en `api/permisos.js` por **lista blanca** (`PERMISOS_CARGA`): toda ruta de `/api/kernel/` que no esté ahí contesta 403, y cada identificador que llega (`encargo_id`, `ejecucion_id`, `ingesta_id`, `ingesta_cfdi_id`, `ingesta_sua_id`, `carga_id`, `empresa_id`, o el `id` de la ruta) se resuelve a su empresa; si es de otra, contesta 404. Las cargas por formulario verifican el encargo al leerlo (`verificarEncargo`) y no se aceptan por referencia a un `r2_key`. Al entrar, el perfil va directo a `/kernel`.
+
+Alta: en **Administrador › Usuarios**, rol «Cliente — carga de documentos» y la empresa. Se guarda como `rol = 'socio'`, `perfil = 'carga'` (dos triggers impiden el perfil sin empresa o con otro rol).
+
+Migración: `wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0018_perfil_carga.sql` (sólo agrega la columna; se aplica **antes** del merge porque el login ya la lee).
 
 ## Requerimiento de información y portal del cliente (módulos 23, 25 y 27)
 

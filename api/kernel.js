@@ -9,6 +9,7 @@ import { crearIngesta, avanzar, estadoIngesta, reintentar, PERFILES, RUBROS_ENTE
 import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import semilla from '../kernel/data/parametros-2026.js';
 import { metadatosFuente } from '../servicio/expediente.js';
+import { puedeOperar, esCarga, verificarEncargo } from './permisos.js';
 
 const MAX_ITEMS = 500;
 const ORIGENES = ['cliente', 'tercero', 'la_casa'];
@@ -26,7 +27,7 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   const p = url.pathname;
   const m = request.method;
   if (!p.startsWith('/api/kernel/')) return null;
-  if (u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
+  if (!puedeOperar(u)) return J({ error: 'Forbidden' }, 403, C);
   const db = env.DB;
 
   // Estado e integridad: matriz completa y catálogo en D1 idéntico a la semilla del código.
@@ -41,7 +42,7 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
       version_parametros_d1: vD1, version_parametros_semilla: vSemilla, parametros_integros: vD1 === vSemilla,
       reglas_sin_fuente_obligatoria: sinFuentes, matriz_d1_vs_codigo: await compararMatriz(db),
       puede_arrancar: sinFuentes.length === 0,
-      conteos: { parametros: catalogo.filas.length, encargos: await cuenta('encargo'), ejecuciones: await cuenta('ejecucion'), calculos: await cuenta('calculo_kernel') },
+      conteos: esCarga(u) ? undefined : { parametros: catalogo.filas.length, encargos: await cuenta('encargo'), ejecuciones: await cuenta('ejecucion'), calculos: await cuenta('calculo_kernel') },
     }, 200, C);
   }
 
@@ -104,7 +105,8 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     const st = [];
     for (const mv of d.movimientos) {
       if (!Number.isInteger(mv.valor_c)) return J({ error: 'valor_c debe ser entero en centavos', movimiento: mv }, 400, C);
-      const id = mv.id || [d.encargo_id, mv.corrida_id || '', mv.colaborador_id, mv.rubro].join('|');
+      // El perfil carga no elige ids: un id ajeno con INSERT OR IGNORE taparía el renglón de otro encargo.
+      const id = (!esCarga(u) && mv.id) || [d.encargo_id, mv.corrida_id || '', mv.colaborador_id, mv.rubro].join('|');
       st.push(db.prepare('INSERT OR IGNORE INTO movimiento_nomina (id, encargo_id, corrida_id, colaborador_id, rubro, valor_c, archivo_sha256, renglon_origen) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)')
         .bind(id, d.encargo_id, mv.corrida_id || null, String(mv.colaborador_id), mv.rubro, mv.valor_c, d.archivo_sha256, mv.renglon_origen || null));
     }
@@ -194,12 +196,15 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
       const f = fd.get('file');
       encargo_id = fd.get('encargo_id'); perfil = fd.get('perfil') || perfil;
       if (!f || !f.name || !encargo_id) return J({ error: 'Faltan campos: file, encargo_id' }, 400, C);
+      const ve = await verificarEncargo(db, u, encargo_id);
+      if (ve) return J({ error: ve.error }, ve.status, C);
       if (f.size > 95 * 1024 * 1024) return J({ error: 'El archivo excede 95MB' }, 413, C);
       archivo_nombre = f.name;
       r2_key = 'encargos/' + encargo_id + '/fuentes/' + Date.now() + '_' + f.name.replace(/[^\w.\- ]+/g, '_');
       await env.DOCS.put(r2_key, f.stream(), { httpMetadata: { contentType: f.type || 'application/octet-stream' }, customMetadata: await metadatosFuente(db, encargo_id, 'prenomina') });
     } else {
       const d = await cuerpo(request);
+      if (esCarga(u)) return J({ error: 'Tu perfil sube el archivo directamente, no por referencia a R2' }, 403, C);
       if (!d || !d.encargo_id || !d.r2_key) return J({ error: 'Se espera multipart (file, encargo_id) o JSON { encargo_id, r2_key }' }, 400, C);
       ({ encargo_id, r2_key } = d); perfil = d.perfil || perfil; archivo_nombre = d.archivo_nombre;
     }

@@ -9,6 +9,7 @@
 // /api/kernel/cruces/clasificar     POST { ingesta_cfdi_id, tipo, rubro, dif_c?, corrida_id?, cubeta, motivo, criterio_id? }
 import { metadatosFuente } from '../servicio/expediente.js';
 import { crearIngestaCfdi, avanzarCfdi, estadoIngestaCfdi, reintentarCfdi } from '../ingesta/cfdi.js';
+import { puedeOperar, esCarga, verificarEncargo } from './permisos.js';
 
 export const CUBETAS_CRUCE = ['proceso_mal', 'explicada', 'criterio_sin_resolver'];
 async function cuerpo(request) { try { return await request.json(); } catch { return null; } }
@@ -25,13 +26,15 @@ export async function rutasCfdi(request, env, u, C, J, ctx) {
   const url = new URL(request.url);
   const p = url.pathname, m = request.method, db = env.DB;
   if (!p.startsWith('/api/kernel/cfdi') && !p.startsWith('/api/kernel/cruces')) return null;
-  if (u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
+  if (!puedeOperar(u)) return J({ error: 'Forbidden' }, 403, C);
 
   if (p === '/api/kernel/cfdi' && m === 'POST') {
     const fd = await request.formData().catch(() => null);
     const f = fd && fd.get('file');
     const encargo_id = fd && fd.get('encargo_id');
     if (!f || !f.name || !encargo_id) return J({ error: 'Faltan campos: file, encargo_id' }, 400, C);
+    const ve = await verificarEncargo(db, u, encargo_id);
+    if (ve) return J({ error: ve.error }, ve.status, C);
     const tipo = fd.get('tipo') || (/\.zip$/i.test(f.name) ? 'xml_nomina' : 'metadata_sat');
     if (tipo === 'xml_nomina' && !/\.zip$/i.test(f.name)) return J({ error: 'Los XML van en un .zip' }, 400, C);
     if (tipo === 'metadata_sat' && !/\.(txt|csv)$/i.test(f.name)) return J({ error: 'La metadata del SAT es el .txt de la descarga masiva' }, 400, C);
