@@ -7,6 +7,7 @@
 // /api/kernel/sua/cruces        GET  ?encargo_id&periodo&causa&rama[&registro] → renglones
 // /api/kernel/sua/clasificar    POST { encargo_id, periodo, causa, rama?, registro?, cubeta, motivo, criterio_id? }
 import { procesarRegistroSUA } from '../ingesta/sua-d1.js';
+import { puedeOperar, esCarga, verificarEncargo } from './permisos.js';
 
 export const CUBETAS_SUA = ['proceso_mal', 'explicada', 'criterio_sin_resolver'];
 const LIMITE_ARCHIVO = 20 * 1024 * 1024;
@@ -27,12 +28,14 @@ export async function rutasSua(request, env, u, C, J) {
   const url = new URL(request.url);
   const p = url.pathname, m = request.method, db = env.DB;
   if (!p.startsWith('/api/kernel/sua')) return null;
-  if (u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
+  if (!puedeOperar(u)) return J({ error: 'Forbidden' }, 403, C);
 
   if (p === '/api/kernel/sua' && m === 'POST') {
     const fd = await request.formData().catch(() => null);
     const encargo_id = fd && fd.get('encargo_id');
     if (!encargo_id) return J({ error: 'Falta encargo_id' }, 400, C);
+    const ve = await verificarEncargo(db, u, encargo_id);
+    if (ve) return J({ error: ve.error }, ve.status, C);
     const archivos = {};
     for (const k of ['sua', 'ema', 'eba', 'ema_pa']) {
       const f = fd.get(k);

@@ -73,19 +73,23 @@ html body .k-row>label input{width:auto;margin:0}
 .scroll{overflow-x:auto}
 .scroll.alto{max-height:460px;overflow-y:auto}
 .scroll.alto thead th{position:sticky;top:0;background:#fff}
+.modo-carga .solo-admin{display:none!important}
+.solo-carga{display:none}
+.modo-carga .solo-carga{display:block}
+.modo-carga a.solo-carga{display:inline-flex}
 </style></head><body>
 <div class="top"><div class="top-l"><img src="${LOGO}" alt="HRM"><span style="color:#1a8a8a;font-weight:700">Auditoría · Kernel</span></div>
-<div class="top-r"><span id="uN" style="color:#5a7a8a;font-size:13px"></span><a href="/admin" class="bo">← Administrador</a><button class="bo br" onclick="logout()">Salir</button></div></div>
+<div class="top-r"><span id="uN" style="color:#5a7a8a;font-size:13px"></span><a href="/admin" class="bo solo-admin">← Administrador</a><a href="/portal" class="bo solo-carga">← Portal</a><button class="bo br" onclick="logout()">Salir</button></div></div>
 <div class="k-wrap">
   <div class="k-hd">
     <div><h1>Auditoría de nómina</h1><div class="sub" id="kEstado">Cargando estado del kernel…</div></div>
     <div class="k-row">
       <select id="selEnc" class="k-sel" onchange="cambiarEncargo()"></select>
-      <button class="k-btn sec" onclick="toggle('frmEnc')">Nuevo encargo</button>
+      <button class="k-btn sec solo-admin" onclick="toggle('frmEnc')">Nuevo encargo</button>
     </div>
   </div>
 
-  <div id="frmEnc" class="k-card oculto">
+  <div id="frmEnc" class="k-card oculto solo-admin">
     <h2>Nuevo encargo</h2>
     <div class="frm">
       <div><label>Empresa</label><select id="eEmp" class="k-sel"></select></div>
@@ -100,18 +104,22 @@ html body .k-row>label input{width:auto;margin:0}
     <div class="sub" style="margin-top:8px;font-size:11px;color:#8ba5b2">Con origen «la casa» el entregable es revisión de control interno y quien operó la nómina no puede revisar (N1).</div>
   </div>
 
+  <div class="k-card solo-carga" style="border-left:4px solid #1a8a8a">
+    <h2>Carga de documentos y pruebas</h2>
+    <div class="sub" style="font-size:12px;color:#3d5a6b">Sube aquí los archivos del periodo: prenómina o acumulado, XML de nómina y metadata del SAT, maestro de empleados (pestaña <b>Archivos</b>) y el ZIP del SUA (pestaña <b>SUA ↔ IMSS</b>). El sistema los lee en el servidor, corre el kernel y deja listos los cruces y las diferencias, que puedes consultar. La clasificación de diferencias, los hallazgos y el dictamen los hace HRM. Sólo ves los encargos de tu empresa, y un encargo cerrado ya no recibe archivos.</div>
+  </div>
   <div class="k-tabs" id="tabs">
     <div class="k-tab act" data-t="archivos">Archivos</div>
-    <div class="k-tab" data-t="requerimiento">Requerimiento <span class="n" id="nReq">0</span></div>
+    <div class="k-tab solo-admin" data-t="requerimiento">Requerimiento <span class="n" id="nReq">0</span></div>
     <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
     <div class="k-tab" data-t="cfdi">Nómina ↔ CFDI <span class="n" id="nCru">0</span></div>
     <div class="k-tab" data-t="sua">SUA ↔ IMSS <span class="n" id="nSua">0</span></div>
-    <div class="k-tab" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
+    <div class="k-tab solo-admin" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
     <div class="k-tab" data-t="calendario">Calendario</div>
     <div class="k-tab" data-t="registros">Registros patronales</div>
     <div class="k-tab" data-t="criterios">Criterios</div>
-    <div class="k-tab" data-t="cotizador">Cotizador</div>
-    <div class="k-tab" data-t="expediente">Expediente</div>
+    <div class="k-tab solo-admin" data-t="cotizador">Cotizador</div>
+    <div class="k-tab solo-admin" data-t="expediente">Expediente</div>
   </div>
 
   <section id="t-archivos">
@@ -153,7 +161,7 @@ html body .k-row>label input{width:auto;margin:0}
     </div>
     <div class="k-card oculto" id="clasC">
       <h2 id="clasCT">Clasificar</h2>
-      <div class="frm">
+      <div class="frm solo-admin">
         <div><label>Cubeta</label><select id="xCub" class="k-sel" onchange="document.getElementById('xCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
           <option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="explicada">Explicada (no es incumplimiento)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
         <div id="xCritW" class="oculto"><label>Criterio de la bitácora</label><select id="xCrit" class="k-sel"></select></div>
@@ -182,7 +190,7 @@ html body .k-row>label input{width:auto;margin:0}
     </div>
     <div class="k-card oculto" id="clasS">
       <h2 id="clasST">Clasificar</h2>
-      <div class="frm">
+      <div class="frm solo-admin">
         <div><label>Cubeta</label><select id="sCub" class="k-sel" onchange="document.getElementById('sCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
           <option value="explicada">Explicada (no es incumplimiento)</option><option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
         <div id="sCritW" class="oculto"><label>Criterio de la bitácora</label><select id="sCrit" class="k-sel"></select></div>
@@ -213,7 +221,7 @@ html body .k-row>label input{width:auto;margin:0}
     </div>
     <div class="k-card oculto" id="clasif">
       <h2 id="clasifT">Clasificar</h2>
-      <div class="frm">
+      <div class="frm solo-admin">
         <div><label>Cubeta</label><select id="cCub" class="k-sel" onchange="document.getElementById('cCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
           <option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="kernel_mal">Kernel mal (se corrige)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
         <div id="cCritW" class="oculto"><label>Criterio de la bitácora</label><select id="cCrit" class="k-sel"></select></div>
@@ -316,10 +324,12 @@ html body .k-row>label input{width:auto;margin:0}
       <h2>Registros patronales</h2>
       <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">La entidad es la del centro de trabajo; nunca se infiere de un reporte. Claves: <span class="mono">AGS BC BCS CAMP CHIS CHIH CDMX COAH COL DGO GTO GRO HGO JAL MEX MICH MOR NAY NL OAX PUE QRO QROO SLP SIN SON TAB TAMS TLAX VER YUC ZAC</span></div>
       <div class="scroll"><table class="k-tbl"><thead><tr><th>Registro</th><th>Entidad</th><th class="num">Prima RT %</th><th>Vigencia</th><th>Fuente</th></tr></thead><tbody id="tbReg"></tbody></table></div>
+      <div class="solo-admin">
       <h3>Cargar (uno por renglón: registro, entidad, prima %, desde, hasta)</h3>
       <textarea id="rTxt" class="k-in" style="width:100%;min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12px" placeholder="Y6079749104, CDMX, 0.50, 2026-03-01, 2027-02-28&#10;Z3337346103, SIN, 0.50, 2026-03-01, 2027-02-28"></textarea>
       <div class="frm"><div style="grid-column:span 3"><label>Fuente</label><input id="rFue" class="k-in" placeholder="SUA agosto 2026"></div><div><button class="k-btn" onclick="guardarRegistros()">Guardar registros</button></div></div>
       <div id="msgReg"></div>
+      </div>
     </div>
   </section>
 
@@ -365,7 +375,9 @@ html body .k-row>label input{width:auto;margin:0}
 <script>
 ${AUTH_ADMIN}
 ${LOGOUT_FN}
-document.getElementById('uN').textContent = U.nombre || U.email || '';
+document.getElementById('uN').textContent = (U.nombre || U.email || '') + (U.rol !== 'admin' && U.empresa_nombre ? ' · ' + U.empresa_nombre.split(' ')[0] : '');
+var CARGA = U.rol !== 'admin';
+if (CARGA) document.body.classList.add('modo-carga');
 var ENC = null, ENCS = [], ING = null, POLL = null, GRUPO = null, CRITS = [];
 var REGLAS = {'CALC-EXE-001':'Exenciones y base','CALC-SUB-001':'Subsidio','CALC-ISR-SEM-001':'ISR semanal','CALC-ISR-CAT-001':'ISR catorcenal','CALC-ISR-AJM-001':'Ajuste mensual ISR','CALC-ISR-EXT-001':'ISR pagos extra','CALC-IMSS-001':'IMSS','CALC-RCV-001':'RCV','CALC-INF-001':'INFONAVIT','CALC-ISN-001':'ISN'};
 var CUBETAS = {proceso_mal:'Hallazgo',kernel_mal:'Kernel mal',criterio_sin_resolver:'Criterio'};
@@ -418,7 +430,8 @@ function cargarEstado(){
 }
 
 function cargarEncargos(sel){
-  return Promise.all([api('GET','/api/kernel/encargos'),api('GET','/api/empresas')]).then(function(r){
+  var pEmp=CARGA?Promise.resolve({empresas:[{id:U.empresa_id,nombre:U.empresa_nombre||'Mi empresa'}]}):api('GET','/api/empresas');
+  return Promise.all([api('GET','/api/kernel/encargos'+(CARGA?'?empresa_id='+encodeURIComponent(U.empresa_id):'')),pEmp]).then(function(r){
     ENCS=r[0].encargos||[];var emps=r[1].empresas||[];
     var nom={};emps.forEach(function(e){nom[e.id]=e.nombre});
     document.getElementById('eEmp').innerHTML=emps.map(function(e){return '<option value="'+e.id+'">'+esc(e.nombre)+'</option>'}).join('');
@@ -603,7 +616,7 @@ function pintarIngesta(){
     var rc=rep.reconciliacion;
     h+='<h3>Reconciliación contra la nómina</h3><div class="kpis">'+[['Coinciden',rc.coincidencias],['Coinciden (limitados)',rc.coincidencias_limitadas],['Diferencias',rc.diferencias],['Limitados',rc.limitados],['Sin par en nómina',rc.sin_par_cliente],['Sin par en kernel',rc.sin_par_kernel]]
       .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
-    h+='<button class="k-btn sec" onclick="irDiferencias()">Clasificar diferencias →</button>';
+    h+='<button class="k-btn sec" onclick="irDiferencias()">'+(CARGA?'Ver diferencias →':'Clasificar diferencias →')+'</button>';
   }
   d.innerHTML=h;
 }
@@ -842,7 +855,7 @@ function cargarAfiliacion(){
     w.innerHTML=(r.aceptacion.aceptado?'<div class="aviso ok">Todos los casos están clasificados.</div>':'<div class="aviso">Faltan <b>'+r.aceptacion.sin_clasificar+'</b> casos por clasificar.</div>')+
       '<div class="scroll alto"><table class="k-tbl"><thead><tr><th>Caso</th><th>Colaborador</th><th>Corrida</th><th>Fecha</th><th class="num">Percepciones</th><th>Cubeta</th></tr></thead><tbody>'+
       l.map(function(c){return '<tr><td>'+esc(TIPOA[c.tipo])+'</td><td class="mono">'+esc(c.colaborador_id)+'</td><td>'+esc(c.corrida_id)+'</td><td>'+esc(c.fuente_fecha+' '+c.fecha_evento)+'</td><td class="num">'+pesos(c.percepciones_c)+'</td><td>'+(c.cubeta?'<span class="b b-neu">'+esc(CUBC[c.cubeta])+'</span> <span style="font-size:11px;color:#5a7a8a">'+esc(c.motivo)+'</span>':'—')+'</td></tr>'}).join('')+'</tbody></table></div>'+
-      '<div class="frm"><div><label>Casos</label><select id="aTip" class="k-sel"><option value="pago_despues_de_baja">Pagos después de la baja</option><option value="pago_antes_de_alta">Pagos antes del alta</option></select></div>'+
+      '<div class="frm solo-admin"><div><label>Casos</label><select id="aTip" class="k-sel"><option value="pago_despues_de_baja">Pagos después de la baja</option><option value="pago_antes_de_alta">Pagos antes del alta</option></select></div>'+
       '<div><label>Cubeta</label><select id="aCub" class="k-sel"><option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="explicada">Explicada (no es incumplimiento)</option></select></div>'+
       '<div style="grid-column:span 2"><label>Motivo</label><input id="aMot" class="k-in" placeholder="Ej. sueldo pagado después de la baja ante el IMSS"></div><div><button class="k-btn" onclick="clasificarAfi()">Clasificar</button></div></div>';
   });

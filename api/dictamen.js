@@ -5,6 +5,7 @@
 // Cualquier usuario autenticado, limitado a su empresa: /api/dictamenes, /api/dictamen
 //
 // La propuesta se calcula al vuelo; lo emitido se congela con su huella y no cambia (la base lo impide).
+import { esCarga } from './permisos.js';
 import { requerimientoDe } from './requerimiento.js';
 import { cargarCatalogo } from '../kernel/src/d1.js';
 import { REGLAS_V1, valuarOmision, sumarValuaciones, saldosAFavor, umbralMaterialidad, evaluarMaterialidad, efectoHallazgo, estadoModulos, proponerOpinion, opinionFinal, validarReproceso,
@@ -156,7 +157,7 @@ export async function rutasDictamen(request, env, u, C, J) {
   }
 
   if (!p.startsWith('/api/kernel/')) return null;
-  if (u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
+  if (u.rol !== 'admin') return esCarga(u) ? null : J({ error: 'Forbidden' }, 403, C);
   const leerEncargo = async (id) => id ? db.prepare('SELECT * FROM encargo WHERE id = ?1').bind(id).first() : null;
 
   // ── Configuración del encargo: tolerancia (T4), materialidad (T5) y carga patronal ──

@@ -12,6 +12,7 @@ import { avanzar as avanzarIngestas } from "./ingesta/trabajos.js";
 import { paginaKernel } from "./paginas/kernel.js";
 import { paginaDictamen } from "./paginas/dictamen.js";
 import { aplicarTema } from "./paginas/tema.js";
+import { esCarga, autorizarCarga } from "./api/permisos.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -41,6 +42,11 @@ var worker_default = {
       if (p.startsWith("/api/")) {
         const u = await auth(request, env);
         if (!u) return J({ error: "No autorizado" }, 401, C);
+        // Perfil «carga de documentos»: lista blanca y alcance a su empresa antes de cualquier ruta del kernel.
+        if (esCarga(u)) {
+          const no = await autorizarCarga(request, env, u);
+          if (no) return J({ error: no.error }, no.status, C);
+        }
         if (p.startsWith("/api/kernel/") || p === "/api/dictamenes" || p === "/api/dictamen") {
           const rd = await rutasDictamen(request, env, u, C, J);
           if (rd) return rd;
@@ -101,7 +107,7 @@ var worker_default = {
       if (p === "/" || p === "/login") return H(pageLogin());
       if (p === "/recover") return H(pageRecover());
       if (p === "/admin") return H(pageAdmin());
-      if (p === "/kernel") return H(paginaKernel({ CSS, LOGO, AUTH_ADMIN, LOGOUT_FN }));
+      if (p === "/kernel") return H(paginaKernel({ CSS, LOGO, AUTH_ADMIN: AUTH_OPERA, LOGOUT_FN }));
       if (p === "/motor-auditoria.js") return new Response(MOTOR_AUDITORIA_JS, { headers: { "Content-Type": "application/javascript;charset=utf-8", "Cache-Control": "no-cache" } });
       if (p === "/portal") return H(pagePortal());
       if (p === "/reporte") return H(pageReporte());
@@ -143,10 +149,10 @@ async function doLogin(req, env, C) {
   const { email, password } = await req.json();
   if (!email || !password) return J({ error: "Campos requeridos" }, 400, C);
   const h = await sha256(password);
-  const r = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.empresa_id,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id WHERE u.email=? AND u.password_hash=? AND u.activo=1").bind(email, h).first();
+  const r = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.perfil,u.empresa_id,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id WHERE u.email=? AND u.password_hash=? AND u.activo=1").bind(email, h).first();
   if (!r) return J({ error: "Credenciales inv\xE1lidas" }, 401, C);
   const t = token();
-  const user = { id: r.id, email: r.email, nombre: r.nombre, rol: r.rol, empresa_id: r.empresa_id, empresa_nombre: r.empresa_nombre };
+  const user = { id: r.id, email: r.email, nombre: r.nombre, rol: r.rol, perfil: r.perfil || null, empresa_id: r.empresa_id, empresa_nombre: r.empresa_nombre };
   await env.SESSIONS.put(t, JSON.stringify(user), { expirationTtl: 604800 });
   return J({ token: t, user }, 200, C);
 }
@@ -229,15 +235,26 @@ async function apiCrearEmpresa(req, env, u, C) {
 __name(apiCrearEmpresa, "apiCrearEmpresa");
 async function apiUsuarios(env, u, C) {
   if (u.rol !== "admin") return J({ error: "Forbidden" }, 403, C);
-  const { results } = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.empresa_id,u.activo,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id ORDER BY u.nombre").all();
+  const { results } = await env.DB.prepare("SELECT u.id,u.email,u.nombre,u.rol,u.perfil,u.empresa_id,u.activo,e.nombre as empresa_nombre FROM usuarios u LEFT JOIN empresas e ON u.empresa_id=e.id ORDER BY u.nombre").all();
   return J({ usuarios: results }, 200, C);
 }
 __name(apiUsuarios, "apiUsuarios");
 async function apiCrearUsuario(req, env, u, C) {
   if (u.rol !== "admin") return J({ error: "Forbidden" }, 403, C);
   const d = await req.json();
+  if (!d || !d.email || !d.nombre || !d.password) return J({ error: "Nombre, email y contrase\xF1a requeridos" }, 400, C);
+  if (String(d.password).length < 8) return J({ error: "La contrase\xF1a debe tener al menos 8 caracteres" }, 400, C);
+  // «carga» = usuario del cliente (socio) con perfil de carga de documentos; siempre ligado a una empresa.
+  const carga = d.rol === "carga";
+  const rol = carga ? "socio" : d.rol;
+  if (!["admin", "socio"].includes(rol)) return J({ error: "Rol: admin, socio o carga" }, 400, C);
+  if (rol === "socio" && !d.empresa_id) return J({ error: "Un usuario del cliente necesita empresa" }, 400, C);
   const h = await sha256(d.password);
-  await env.DB.prepare("INSERT INTO usuarios(email,password_hash,nombre,rol,empresa_id)VALUES(?,?,?,?,?)").bind(d.email, h, d.nombre, d.rol, d.empresa_id || null).run();
+  try {
+    await env.DB.prepare("INSERT INTO usuarios(email,password_hash,nombre,rol,empresa_id,perfil)VALUES(?,?,?,?,?,?)").bind(String(d.email).trim().toLowerCase(), h, d.nombre, rol, rol === "admin" ? null : Number(d.empresa_id), carga ? "carga" : null).run();
+  } catch (e) {
+    return J({ error: /UNIQUE/.test(e.message) ? "Ya existe un usuario con ese email" : e.message }, 409, C);
+  }
   return J({ ok: true }, 201, C);
 }
 __name(apiCrearUsuario, "apiCrearUsuario");
@@ -1061,6 +1078,7 @@ input:focus,select:focus{border-color:#1a8a8a}
 `;
 var UI_FN = `function showLoading(t,s){var o=document.getElementById('__ldo');if(!o){o=document.createElement('div');o.id='__ldo';o.className='ldo';o.innerHTML='<div class="ldo-c"><div class="ldo-sp"></div><div class="ldo-t" id="__ldoT">Cargando...</div><div class="ldo-s" id="__ldoS"></div><div class="ldo-pb" id="__ldoPB"><div class="ldo-pf" id="__ldoPF"></div></div></div>';document.body.appendChild(o);}document.getElementById('__ldoT').textContent=t||'Cargando...';document.getElementById('__ldoS').textContent=s||'';document.getElementById('__ldoPB').classList.remove('sh');document.getElementById('__ldoPF').style.width='0%';o.classList.add('sh');}function setLoadingProgress(p,s){var pb=document.getElementById('__ldoPB'),pf=document.getElementById('__ldoPF'),ss=document.getElementById('__ldoS');if(pb)pb.classList.add('sh');if(pf)pf.style.width=Math.max(0,Math.min(100,p))+'%';if(ss&&s!==undefined)ss.textContent=s;}function setLoadingText(t,s){var tt=document.getElementById('__ldoT'),ss=document.getElementById('__ldoS');if(tt&&t)tt.textContent=t;if(ss&&s!==undefined)ss.textContent=s;}function hideLoading(){var o=document.getElementById('__ldo');if(o)o.classList.remove('sh');}function confirmAction(opts){return new Promise(function(res){var c=document.createElement('div');c.className='cfm sh';var icon=opts.danger?'!':'?';var iconCls=opts.danger?'':' ok';var btnCls=opts.danger?'':' ok';c.innerHTML='<div class="cfm-c"><div class="cfm-i'+iconCls+'">'+icon+'</div><div class="cfm-t">'+(opts.title||'\xBFConfirmar?')+'</div><div class="cfm-m">'+(opts.msg||'')+'</div><div class="cfm-bt"><button class="cfm-c1" id="__cfmN">'+(opts.cancel||'Cancelar')+'</button><button class="cfm-c2'+btnCls+'" id="__cfmY">'+(opts.ok||'Confirmar')+'</button></div></div>';document.body.appendChild(c);document.getElementById('__cfmY').onclick=function(){c.remove();res(true);};document.getElementById('__cfmN').onclick=function(){c.remove();res(false);};c.onclick=function(e){if(e.target===c){c.remove();res(false);}};});}`;
 var AUTH_ADMIN = "var tk=localStorage.getItem('hrm_token'),U=JSON.parse(localStorage.getItem('hrm_user')||'{}');if(!tk||U.rol!=='admin')window.location.href='/';";
+var AUTH_OPERA = "var tk=localStorage.getItem('hrm_token'),U=JSON.parse(localStorage.getItem('hrm_user')||'{}');if(!tk||!(U.rol==='admin'||(U.rol==='socio'&&U.perfil==='carga')))window.location.href='/';";
 var AUTH_ANY = "var tk=localStorage.getItem('hrm_token'),U=JSON.parse(localStorage.getItem('hrm_user')||'{}');if(!tk)window.location.href='/';";
 var LOGOUT_FN = "async function logout(){var ok=true;if(typeof confirmAction==='function'){ok=await confirmAction({title:'Cerrar sesi\xF3n',msg:'Saldr\xE1s del portal HRM. Tendr\xE1s que iniciar sesi\xF3n de nuevo.',ok:'Salir',danger:false});}else{ok=confirm('\xBFCerrar sesi\xF3n?');}if(!ok)return;fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+tk,'Content-Type':'application/json'}});localStorage.removeItem('hrm_token');localStorage.removeItem('hrm_user');window.location.href='/';}";
 var FMT_FN = "var fmt=function(n){return new Intl.NumberFormat('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)};";
@@ -1200,7 +1218,7 @@ document.getElementById('lf').addEventListener('submit', async function(e) {
     localStorage.setItem('hrm_token', d.token);
     localStorage.setItem('hrm_user', JSON.stringify(d.user));
     if(lgo){document.getElementById('__lgoT').textContent='Cargando portal...';}
-    window.location.href = d.user.rol === 'admin' ? '/admin' : '/portal';
+    window.location.href = d.user.rol === 'admin' ? '/admin' : (d.user.perfil === 'carga' ? '/kernel' : '/portal');
   } catch (x) {
     if(lgo)lgo.classList.remove('sh');
     err.textContent = 'Error de conexi\xF3n'; err.style.display = 'block';
@@ -1368,7 +1386,7 @@ input[type=file]{display:none}
 </div>
 </div>
 <div class="mo" id="mo-empresa"><div class="mo-c"><h2>Nuevo cliente</h2><div class="sub">Registra una empresa para gestionar su n\xF3mina</div><label>Raz\xF3n social</label><input id="en"><div class="fr"><div><label>RFC</label><input id="er"></div><div><label>Slug</label><input id="es" placeholder="nombre-corto"></div></div><div style="display:flex;gap:10px;margin-top:12px"><button class="btn" onclick="cE()">Crear cliente</button><button class="bo" onclick="hideMo()">Cancelar</button></div></div></div>
-<div class="mo" id="mo-usuario"><div class="mo-c"><h2>Gesti\xF3n de usuarios</h2><div class="sub">Administra accesos al portal</div><div id="uList" style="max-height:220px;overflow-y:auto;margin-bottom:14px"></div><h3 style="font-size:13px;font-weight:700;margin-bottom:10px;padding-top:12px;border-top:1px solid #e8f1f4">Agregar usuario</h3><div class="fr"><div><label>Nombre</label><input id="un"></div><div><label>Email</label><input id="ue" type="email"></div></div><div class="fr"><div><label>Contrase\xF1a</label><input id="up" type="password"></div><div><label>Rol</label><select id="ur"><option value="socio">Socio</option><option value="admin">Admin</option></select></div></div><label>Empresa</label><select id="ux"><option value="">\u2014 Sin empresa \u2014</option></select><div style="display:flex;gap:10px;margin-top:12px"><button class="btn" onclick="cU()">Crear usuario</button><button class="bo" onclick="hideMo()">Cerrar</button></div></div></div>
+<div class="mo" id="mo-usuario"><div class="mo-c"><h2>Gesti\xF3n de usuarios</h2><div class="sub">Administra accesos al portal</div><div id="uList" style="max-height:220px;overflow-y:auto;margin-bottom:14px"></div><h3 style="font-size:13px;font-weight:700;margin-bottom:10px;padding-top:12px;border-top:1px solid #e8f1f4">Agregar usuario</h3><div class="fr"><div><label>Nombre</label><input id="un"></div><div><label>Email</label><input id="ue" type="email"></div></div><div class="fr"><div><label>Contrase\xF1a</label><input id="up" type="password"></div><div><label>Rol</label><select id="ur"><option value="socio">Cliente (consulta)</option><option value="carga">Cliente \u2014 carga de documentos</option><option value="admin">Admin (HRM)</option></select></div></div><label>Empresa</label><select id="ux"><option value="">\u2014 Sin empresa \u2014</option></select><div style="display:flex;gap:10px;margin-top:12px"><button class="btn" onclick="cU()">Crear usuario</button><button class="bo" onclick="hideMo()">Cerrar</button></div></div></div>
 <script>
 ${AUTH_ADMIN}
 ${LOGOUT_FN}
@@ -1410,7 +1428,7 @@ async function loadAll(){
   var r3=await fetch('/api/usuarios',{headers:H});
   if(r3.ok){var us=(await r3.json()).usuarios||[];
   var ul=document.getElementById('uList');if(ul){ul.innerHTML='';
-  us.forEach(function(u){ul.innerHTML+='<div class="dr"><div class="ini" style="width:28px;height:28px;font-size:10px;border-radius:6px">'+u.nombre.substring(0,2).toUpperCase()+'</div><span class="dn">'+u.nombre+'</span><span class="dtp">'+u.rol+'</span><span style="color:#8ba5b2;font-size:10px">'+u.email+'</span><button class="bo" style="font-size:10px;padding:3px 8px;margin-left:auto" onclick="resetPw('+u.id+',&#39;'+u.nombre.replace(/'/g,'')+'&#39;)">Reset</button></div>'})}}
+  us.forEach(function(u){ul.innerHTML+='<div class="dr"><div class="ini" style="width:28px;height:28px;font-size:10px;border-radius:6px">'+u.nombre.substring(0,2).toUpperCase()+'</div><span class="dn">'+u.nombre+'</span><span class="dtp">'+(u.perfil==='carga'?'carga':u.rol)+(u.empresa_nombre?' \xB7 '+u.empresa_nombre.split(' ')[0]:'')+'</span><span style="color:#8ba5b2;font-size:10px">'+u.email+'</span><button class="bo" style="font-size:10px;padding:3px 8px;margin-left:auto" onclick="resetPw('+u.id+',&#39;'+u.nombre.replace(/'/g,'')+'&#39;)">Reset</button></div>'})}}
   if(CE)selE(CE.id);
   hideLoading();
   }catch(err){
@@ -1869,7 +1887,8 @@ async function cU(){
   var rol=document.getElementById('ur').value;
   var empresa_id=document.getElementById('ux').value||null;
   if(!nombre||!email||!password){toast('Completa nombre, email y contrase\xF1a',false);return;}
-  if(password.length<6){toast('La contrase\xF1a debe tener al menos 6 caracteres',false);return;}
+  if(password.length<8){toast('La contrase\xF1a debe tener al menos 8 caracteres',false);return;}
+  if(rol!=='admin'&&!empresa_id){toast('Elige la empresa del cliente',false);return;}
   showLoading('Creando usuario...');
   try{
     var r=await fetch('/api/usuarios',{method:'POST',headers:H,body:JSON.stringify({nombre:nombre,email:email,password:password,rol:rol,empresa_id:empresa_id})});
@@ -3398,6 +3417,7 @@ ${FMT_FN}
 ${UI_FN}
 document.getElementById('uN').textContent = U.empresa_nombre || '';
 document.getElementById('wt').textContent = 'Bienvenido, ' + U.nombre;
+if (U.perfil === 'carga') { var aK = document.createElement('a'); aK.href = '/kernel'; aK.className = 'bo'; aK.textContent = 'Carga y pruebas'; document.getElementById('uN').after(aK); }
 if (U.empresa_nombre) document.getElementById('ws').textContent = 'Reportes de n\xF3mina \u2014 ' + U.empresa_nombre;
 var tk_h={'Authorization':'Bearer '+tk};
 function dlFile(key,name,btn){var _t=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='...';}fetch('/api/download?key='+encodeURIComponent(key),{headers:tk_h}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();}).then(function(b){var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=name||'archivo';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove();},100);if(btn){btn.disabled=false;btn.textContent=_t;}}).catch(function(e){alert('Error al descargar: '+e.message);if(btn){btn.disabled=false;btn.textContent=_t;}});}
