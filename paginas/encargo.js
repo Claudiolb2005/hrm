@@ -18,10 +18,13 @@ ${CSS}
 .e-sec{margin-top:30px}
 .e-sec h2{font-size:16px;font-weight:650;color:#0D2B31;margin:0 0 4px}
 .e-sec .sub{font-size:12.5px;color:#5E7479;margin:0 0 12px}
-.it{background:#fff;border:1px solid #DCE5E3;border-radius:12px;padding:14px 16px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:6px 16px;align-items:start}
+.it{background:#fff;border:1px solid #DCE5E3;border-radius:12px;padding:14px 16px;margin-bottom:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+.it .acc{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.it .msg{grid-column:1/-1;margin:0}.it .msg:empty{display:none}
+.it .t{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
 .it.esencial{border-left:4px solid #12857F}
 .it b{font-size:14px;color:#10252B;font-weight:600}
-.it .d{font-size:12.5px;color:#5E7479;line-height:1.5}
+.it .d{font-size:13px;color:#5E7479;line-height:1.5;margin-top:2px}
 .it .ar{grid-column:1/-1;font-size:12px;color:#3d5a6b;border-top:1px dashed #DCE5E3;padding-top:8px;margin-top:4px}
 .chip{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .pendiente{background:#FFF3D6;color:#7a5600}.entregada{background:#E6F2FB;color:#1f5f99}.completa{background:#E3F6EE;color:#0d5c44}
@@ -38,13 +41,14 @@ ${CSS}
 .hz .f textarea{grid-column:1/-1;min-height:54px}
 .hz .acc{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;font-size:12.5px;color:#3d5a6b}
 .hz .h{font-size:12px;color:#5E7479;margin-top:10px;border-top:1px dashed #DCE5E3;padding-top:8px;line-height:1.6}
-.tag{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;background:#EEF3F2;color:#3d5a6b;margin-left:4px}
+.tag{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;background:#EEF3F2;color:#3d5a6b;white-space:nowrap}
+.tag.ind{background:#E3F4F2;color:#0d5c57}
 .tag.mat,.tag.alto{background:#FCE8E4;color:#9b2c1d}.tag.medio{background:#FFF3D6;color:#7a5600}
 .dl a{display:inline-flex;flex-direction:column;padding:8px 14px;border:1px solid #DCE5E3;border-radius:10px;text-decoration:none;color:#10252B;background:#fff;margin:0 8px 8px 0;font-size:13px}
 .dl a small{color:#5E7479;font-size:11px}
 .msg{font-size:12px;margin-top:6px}.msg.ok{color:#0d5c44}.msg.err{color:#9b2c1d}
 .vacio{color:#5E7479;font-size:13px;padding:30px 0;text-align:center}
-@media(max-width:640px){.it{grid-template-columns:1fr}.hz .f{grid-template-columns:1fr}.e-wrap{padding:20px 16px 56px}}
+@media(max-width:640px){.it{grid-template-columns:1fr}.it .acc{justify-content:flex-start}.hz .f{grid-template-columns:1fr}.e-wrap{padding:20px 16px 56px}.e-hd h1{font-size:21px}.e-paso{min-width:140px}}
 </style></head><body>
 <div class="top"><div class="top-l"><img src="${LOGO}" alt="HRM"></div>
 <div class="top-r"><span id="uN" style="font-size:12px"></span><a href="/portal" class="bo" id="volver">Informes</a><button class="bo br" onclick="logout()">Salir</button></div></div>
@@ -61,6 +65,16 @@ var EST={pendiente:'Pendiente',entregada:'Entregada, en revisión',completa:'Com
 var ESTH={abierto:'Abierto',en_correccion:'En corrección',corregido:'Corregido',confirmado:'Confirmado',resuelto_por_reproceso:'Resuelto por reproceso',superado:'Superado'};
 var OPS={conforme:'Conforme',conforme_con_observaciones:'Conforme con observaciones',con_salvedades:'Con salvedades',adverso:'Adverso',sin_opinion:'Sin opinión'};
 var ID=new URLSearchParams(location.search).get('id'),D=null;
+// Nombre y explicación de cada documento en palabras del cliente; si llega uno nuevo se usa la descripción del catálogo.
+var DOCS={prenomina:['Prenómina del periodo','Excel con la nómina de cada semana o catorcena del mes.'],xml_nomina:['XML de nómina','Un .zip con los XML timbrados del mes.'],
+  catalogo_conceptos_cliente:['Catálogo de conceptos de nómina','La lista de percepciones y deducciones que usan.'],entidad_por_registro:['Estado de cada registro patronal','En qué estado está el centro de trabajo de cada registro.'],
+  faltas_incapacidades:['Faltas e incapacidades','Por trabajador, con sus fechas.'],fecha_ingreso:['Fechas de ingreso y baja','Fecha de ingreso de cada trabajador y, en finiquitos, la de baja.'],
+  maestro_empleados:['Maestro de empleados','Excel con activos, bajas y finiquitos del periodo.'],matriz_isn_concepto:['Conceptos que pagan impuesto estatal (ISN)','Qué conceptos de la nómina pagan ISN en cada estado.'],
+  prima_rt_registro:['Prima de riesgo de trabajo','La prima vigente de cada registro patronal.'],sua_eba:['SUA bimestral (EBA)','El archivo del SUA o la EBA del bimestre.'],sua_ema:['SUA mensual (EMA)','El archivo del SUA o la EMA del mes.'],
+  acumulado_anual_exenciones:['Acumulado anual de nómina','Lo pagado a cada trabajador de enero al mes anterior.'],convenio_fondo_ahorro:['Convenio del fondo de ahorro','El convenio y la política de retiros.'],
+  declaraciones_isn:['Declaraciones de impuesto estatal (ISN)','Las declaraciones del mes de cada estado.'],movimientos_idse:['Movimientos del IDSE','Altas, bajas y cambios de salario ante el IMSS.']};
+function rango(a,b){var d1=new Date(a+'T12:00:00'),d2=new Date(b+'T12:00:00');if(isNaN(d1)||isNaN(d2))return a+' a '+b;var o={day:'numeric',month:'long',year:'numeric'};
+  return d1.getMonth()===d2.getMonth()&&d1.getFullYear()===d2.getFullYear()?d1.getDate()+' al '+d2.toLocaleDateString('es-MX',o):d1.toLocaleDateString('es-MX',o)+' al '+d2.toLocaleDateString('es-MX',o)}
 function api(m,p,b){var o={method:m,headers:{'Authorization':'Bearer '+tk}};if(b instanceof FormData)o.body=b;else if(b){o.headers['Content-Type']='application/json';o.body=JSON.stringify(b)}
   return fetch(p,o).then(function(r){if(r.status===401){localStorage.removeItem('hrm_token');location.href='/';throw new Error('Sesión vencida')}return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Error');return j})})}
 function cargar(){api('GET','/api/encargo?id='+encodeURIComponent(ID)).then(function(r){D=r;pintar()}).catch(function(e){document.getElementById('raiz').innerHTML='<div class="vacio">'+esc(e.message)+'</div>'})}
@@ -68,23 +82,26 @@ function pintar(){
   var e=D.encargo,req=D.requerimiento,hs=D.hallazgos,h='';
   var mes=new Date(e.periodo_desde+'T12:00:00').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
   document.title='Revisión '+mes+' — HRM';
-  h+='<div class="e-hd"><h1>Tu revisión de nómina · '+esc(mes)+'</h1><div class="c">'+esc(e.empresa)+(e.rfc?' ('+esc(e.rfc)+')':'')+' · '+esc(e.periodo_desde)+' a '+esc(e.periodo_hasta)+(e.cerrado_en?' · cerrado el '+esc(dia(e.cerrado_en)):'')+'</div></div>';
+  h+='<div class="e-hd"><h1>Tu revisión de nómina · '+esc(mes)+'</h1><div class="c">'+esc(e.empresa)+(e.rfc?' ('+esc(e.rfc)+')':'')+' · del '+esc(rango(e.periodo_desde,e.periodo_hasta))+(e.cerrado_en?' · cerrado el '+esc(dia(e.cerrado_en)):'')+'</div></div>';
   var pend=req.filter(function(x){return x.estado_efectivo==='pendiente'||x.estado_efectivo==='incompleta'}).length;
   var abiertos=hs.filter(function(x){return ['abierto','en_correccion','confirmado'].indexOf(x.estatus)>=0}).length;
   var dic=D.dictamenes[0];
   h+='<div class="e-bar"><div class="e-paso"><div class="n">'+pend+'</div><div class="l">'+(pend===1?'documento por entregar o completar':'documentos por entregar o completar')+'</div></div>'+
-    '<div class="e-paso"><div class="n">'+abiertos+'</div><div class="l">hallazgos con corrección pendiente</div></div>'+
-    '<div class="e-paso"><div class="n" style="font-size:17px;padding-top:5px">'+(dic?esc(OPS[dic.opinion]):'En revisión')+'</div><div class="l">'+(dic?'dictamen versión '+dic.version+', '+esc(dia(dic.emitido_en)):'todavía sin dictamen')+'</div></div></div>';
+    '<div class="e-paso"><div class="n">'+abiertos+'</div><div class="l">'+(abiertos===1?'hallazgo por corregir':'hallazgos por corregir')+'</div></div>'+
+    '<div class="e-paso"><div class="n" style="font-size:17px;padding-top:5px">'+(dic?esc(OPS[dic.opinion]):'En revisión')+'</div><div class="l">'+(dic?'dictamen versión '+dic.version+', '+esc(dia(dic.emitido_en)):'HRM está revisando tu nómina')+'</div></div></div>';
 
-  h+='<section class="e-sec"><h2 id="requerimiento">Lo que necesitamos de ti</h2><div class="sub">Sin la nómina del periodo y los XML originales no podemos emitir opinión. Lo que falte se declara en el dictamen como limitación, con la fecha en que se pidió.</div>';
+  h+='<section class="e-sec"><h2 id="requerimiento">Lo que necesitamos de ti</h2><div class="sub">Sube cada documento en su renglón con el botón <b>Subir archivo</b>. Los marcados como <b>Indispensable</b> son necesarios para terminar la revisión.</div>';
   h+=req.length?req.map(function(x,i){
     var st=x.vencida?'<span class="chip vencida">Vencida</span>':'<span class="chip '+x.estado_efectivo+'">'+EST[x.estado_efectivo]+'</span>';
     var ar=x.archivos.map(function(a){return esc(a.nombre)+' · '+esc(dia(a.subido_en))+(a.revision==='rechazado'?' · <b style="color:#9b2c1d">rechazado</b>: '+esc(a.nota_revision):a.revision==='aceptado'?' · aceptado':' · en revisión')}).join('<br>');
-    var ev=x.evidencia&&x.evidencia.detalle&&x.evidencia.detalle.length?'<div class="d" style="margin-top:4px">'+esc(x.evidencia.detalle.join('; '))+'</div>':'';
-    return '<div class="it'+(x.esencial?' esencial':'')+'"><div><b>'+esc(x.descripcion)+'</b>'+(x.esencial?' <span class="tag">indispensable</span>':x.obligatoria?'':' <span class="tag">opcional</span>')+
-      '<div class="d">Pedido el '+esc(dia(x.solicitado_en))+(x.fecha_compromiso?' · entrega comprometida '+esc(dia(x.fecha_compromiso)):'')+(x.responsable?' · responsable: '+esc(x.responsable):'')+'</div>'+ev+(x.nota?'<div class="d">'+esc(x.nota)+'</div>':'')+'</div>'+
-      '<div style="text-align:right">'+st+(x.estado_efectivo!=='completa'&&x.estado_efectivo!=='no_aplica'&&!e.cerrado_en?'<div style="margin-top:8px"><label class="btn sec" style="display:inline-block">Subir archivo<input type="file" data-i="'+i+'" style="display:none"></label></div>':'')+'<div class="msg" id="m'+i+'"></div></div>'+
-      (ar?'<div class="ar">'+ar+'</div>':'')+'</div>'}).join(''):'<div class="vacio">Todavía no hay requerimiento para este periodo.</div>';
+    var cli=U.rol!=='admin',dn=DOCS[x.fuente_clave]||[x.descripcion,''];
+    // Al cliente no se le muestra el detalle técnico de lo que falta; HRM lo ve al revisar el archivo.
+    var ev=x.evidencia&&x.evidencia.detalle&&x.evidencia.detalle.length?'<div class="d" style="margin-top:4px">'+(cli&&x.estado_efectivo==='incompleta'?'Recibimos el archivo, pero le falta información. HRM te dirá qué completar.':cli?'':esc(x.evidencia.detalle.join('; ')))+'</div>':'';
+    return '<div class="it'+(x.esencial?' esencial':'')+'"><div><div class="t"><b>'+esc(cli?dn[0]:x.descripcion)+'</b>'+(x.esencial?'<span class="tag ind">Indispensable</span>':x.obligatoria?'':'<span class="tag">Opcional</span>')+'</div>'+
+      (cli&&dn[1]?'<div class="d">'+esc(dn[1])+'</div>':'')+
+      (cli?(x.fecha_compromiso?'<div class="d">Entregar antes del '+esc(dia(x.fecha_compromiso))+'</div>':''):'<div class="d">Pedido el '+esc(dia(x.solicitado_en))+(x.fecha_compromiso?' · entrega comprometida '+esc(dia(x.fecha_compromiso)):'')+(x.responsable?' · responsable: '+esc(x.responsable):'')+'</div>')+ev+(x.nota?'<div class="d">'+esc(x.nota)+'</div>':'')+'</div>'+
+      '<div class="acc">'+st+(x.estado_efectivo!=='completa'&&x.estado_efectivo!=='no_aplica'&&!e.cerrado_en?'<label class="btn sec" style="display:inline-block">Subir archivo<input type="file" data-i="'+i+'" style="display:none"></label>':'')+'</div>'+
+      '<div class="msg" id="m'+i+'"></div>'+(ar?'<div class="ar">'+ar+'</div>':'')+'</div>'}).join(''):'<div class="vacio">Todavía no hay documentos pedidos para este periodo.</div>';
   h+='</section>';
 
   h+='<section class="e-sec"><h2 id="hallazgos">Hallazgos y plan de corrección</h2><div class="sub">Propón quién lo corrige y para cuándo. HRM lo marca como corregido cuando revisa la evidencia.</div>';

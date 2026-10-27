@@ -77,13 +77,51 @@ html body .k-row>label input{width:auto;margin:0}
 .solo-carga{display:none}
 .modo-carga .solo-carga{display:block}
 .modo-carga a.solo-carga{display:inline-flex}
+.modo-carga span.solo-carga,.modo-carga b.solo-carga{display:inline}
+/* Legibilidad: encabezados de columnas numéricas alineados con sus cifras; nada por debajo de 11px. */
+.k-tbl th.num{text-align:right}
+.k-tbl th{font-size:11px}
+.b{font-size:11px}
+.frm label{font-size:11px}
+.k-tab .n{font-size:11px}
+.k-tab{flex:1 0 auto;min-width:0;padding:9px 14px}
+.modo-carga .k-tab[data-t=archivos]{order:1}.modo-carga .k-tab[data-t=calendario]{order:2}.modo-carga .k-tab[data-t=sua]{order:3}.modo-carga .k-tab[data-t=cfdi]{order:4}.modo-carga .k-tab[data-t=diferencias]{order:5}
+.kpi .l{font-size:11px;line-height:1.3}
+.kpi .v{overflow-wrap:anywhere}
+.k-card h2{line-height:1.35}
+.k-card .sub{line-height:1.55}
+.k-hd>div{min-width:0}
+.k-hd .k-row{flex:1 1 280px;justify-content:flex-end}
+html body #selEnc{width:auto;max-width:100%;min-width:220px}
+.k-hd .k-row{flex-wrap:nowrap}
+.paso{display:flex;gap:12px;align-items:flex-start;margin:8px 0;font-size:13.5px;color:#1a2e3a;line-height:1.5}
+.paso i{flex:none;width:24px;height:24px;border-radius:50%;background:#1a8a8a;color:#fff;font-style:normal;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+.ayuda{font-size:13px;color:#3d5a6b;line-height:1.55;margin:0 0 12px}
+.drop{font-size:13px;line-height:1.5}
+.k-tbl td{line-height:1.4}
+@media(max-width:640px){
+  .k-wrap{padding:16px 14px 48px}
+  .k-hd h1{font-size:19px}
+  .k-hd .k-row{justify-content:stretch;flex-wrap:wrap}
+  .k-hd .k-row>*{flex:1 1 100%}
+  html body #selEnc{min-width:0;width:100%}
+  .k-card{padding:16px 14px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi .v{font-size:17px}
+  .frm{grid-template-columns:1fr}
+  .frm>div{grid-column:auto!important}
+  .k-tab{min-width:0;flex:0 0 auto;padding:9px 14px}
+  .top-l>span{display:none}
+  .scroll .k-tbl{min-width:600px}
+}
 </style></head><body>
-<div class="top"><div class="top-l"><img src="${LOGO}" alt="HRM"><span style="color:#1a8a8a;font-weight:700">Auditoría · Kernel</span></div>
-<div class="top-r"><span id="uN" style="color:#5a7a8a;font-size:13px"></span><a href="/admin" class="bo solo-admin">← Administrador</a><a href="/portal" class="bo solo-carga">← Portal</a><button class="bo br" onclick="logout()">Salir</button></div></div>
+<div class="top"><div class="top-l"><img src="${LOGO}" alt="HRM"><span style="color:#1a8a8a;font-weight:700" id="kMarca">Auditoría · Kernel</span></div>
+<div class="top-r"><span id="uN" style="color:#5a7a8a;font-size:13px"></span><a href="/admin" class="bo solo-admin">← Administrador</a><a href="/portal" class="bo solo-carga">← Mis informes</a><button class="bo br" onclick="logout()">Salir</button></div></div>
 <div class="k-wrap">
   <div class="k-hd">
-    <div><h1>Auditoría de nómina</h1><div class="sub" id="kEstado">Cargando estado del kernel…</div></div>
+    <div><h1 id="kTit">Auditoría de nómina</h1><div class="sub solo-admin" id="kEstado">Cargando estado del kernel…</div><div class="sub solo-carga" id="kEmp" style="font-size:13px;color:#5a7a8a"></div></div>
     <div class="k-row">
+      <span class="solo-carga" style="font-size:13px;font-weight:600;color:#3d5a6b">Periodo</span>
       <select id="selEnc" class="k-sel" onchange="cambiarEncargo()"></select>
       <button class="k-btn sec solo-admin" onclick="toggle('frmEnc')">Nuevo encargo</button>
     </div>
@@ -105,59 +143,69 @@ html body .k-row>label input{width:auto;margin:0}
   </div>
 
   <div class="k-card solo-carga" style="border-left:4px solid #1a8a8a">
-    <h2>Carga de documentos y pruebas</h2>
-    <div class="sub" style="font-size:12px;color:#3d5a6b">Sube aquí los archivos del periodo: prenómina o acumulado, XML de nómina y metadata del SAT, maestro de empleados (pestaña <b>Archivos</b>) y el ZIP del SUA (pestaña <b>SUA ↔ IMSS</b>). El sistema los lee en el servidor, corre el kernel y deja listos los cruces y las diferencias, que puedes consultar. La clasificación de diferencias, los hallazgos y el dictamen los hace HRM. Sólo ves los encargos de tu empresa, y un encargo cerrado ya no recibe archivos.</div>
+    <h2>Cómo subir tus documentos</h2>
+    <div class="paso"><i>1</i><div>Elige el <b>periodo</b> en la parte de arriba.</div></div>
+    <div class="paso"><i>2</i><div>En <b>Subir archivos</b>, arrastra cada archivo a su recuadro o da clic en <b>elegir archivo</b>.</div></div>
+    <div class="paso"><i>3</i><div>Espera a que diga <span class="b b-ok">Listo</span>. Si dice <span class="b b-lim">Error</span>, revisa que sea el archivo correcto y vuelve a subirlo.</div></div>
+    <div class="ayuda" style="margin:10px 0 0">HRM revisa los resultados y te avisa si falta algo. Puedes cerrar esta página mientras se procesan los archivos.</div>
   </div>
+  <div id="encCerrado" class="aviso oculto"></div>
   <div class="k-tabs" id="tabs">
-    <div class="k-tab act" data-t="archivos">Archivos</div>
+    <div class="k-tab act" data-t="archivos"><span class="solo-admin">Archivos</span><span class="solo-carga">Subir archivos</span></div>
     <div class="k-tab solo-admin" data-t="requerimiento">Requerimiento <span class="n" id="nReq">0</span></div>
-    <div class="k-tab" data-t="diferencias">Diferencias <span class="n" id="nPend">0</span></div>
-    <div class="k-tab" data-t="cfdi">Nómina ↔ CFDI <span class="n" id="nCru">0</span></div>
-    <div class="k-tab" data-t="sua">SUA ↔ IMSS <span class="n" id="nSua">0</span></div>
+    <div class="k-tab" data-t="diferencias"><span class="solo-admin">Diferencias</span><span class="solo-carga">Resultado nómina</span> <span class="n" id="nPend">0</span></div>
+    <div class="k-tab" data-t="cfdi"><span class="solo-admin">Nómina ↔ CFDI</span><span class="solo-carga">Resultado XML</span> <span class="n" id="nCru">0</span></div>
+    <div class="k-tab" data-t="sua"><span class="solo-admin">SUA ↔ IMSS</span><span class="solo-carga">Resultado SUA</span> <span class="n" id="nSua">0</span></div>
     <div class="k-tab solo-admin" data-t="dictamen">Hallazgos y dictamen <span class="n" id="nHal">0</span></div>
-    <div class="k-tab" data-t="calendario">Calendario</div>
-    <div class="k-tab" data-t="registros">Registros patronales</div>
-    <div class="k-tab" data-t="criterios">Criterios</div>
+    <div class="k-tab" data-t="calendario"><span class="solo-admin">Calendario</span><span class="solo-carga">Fechas de pago</span></div>
+    <div class="k-tab solo-admin" data-t="registros">Registros patronales</div>
+    <div class="k-tab solo-admin" data-t="criterios">Criterios</div>
     <div class="k-tab solo-admin" data-t="cotizador">Cotizador</div>
     <div class="k-tab solo-admin" data-t="expediente">Expediente</div>
   </div>
 
   <section id="t-archivos">
     <div class="k-card">
-      <h2>Subir prenómina / acumulado</h2>
-      <div class="drop" id="drop">Arrastra aquí el Excel o <a href="#" onclick="document.getElementById('fArch').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>. Se procesa en el servidor; puedes cerrar esta pestaña.<input type="file" id="fArch" accept=".xlsx" class="oculto" onchange="subir(this.files[0])"></div>
+      <h2><span class="solo-carga">1 · </span>Prenómina o acumulado del mes</h2>
+      <div class="ayuda solo-carga">El Excel (.xlsx) con la nómina del periodo.</div>
+      <div class="drop" id="drop">Arrastra aquí el Excel (.xlsx) o <a href="#" onclick="document.getElementById('fArch').click();return false" style="color:#1a8a8a;font-weight:700">elige el archivo</a>.<input type="file" id="fArch" accept=".xlsx" class="oculto" onchange="subir(this.files[0])"></div>
       <div id="msgSubir"></div>
-    </div>
-    <div class="k-card">
-      <h2>Ingestas del encargo</h2>
-      <div class="scroll"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Estado</th><th>Avance</th><th class="num">Renglones</th><th>Actualizado</th><th></th></tr></thead><tbody id="tbIng"></tbody></table></div>
+      <h3 style="margin-top:16px"><span class="solo-admin">Ingestas del encargo</span><span class="solo-carga">Archivos recibidos</span></h3>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Estado</th><th>Avance</th><th class="num">Renglones</th><th>Actualizado</th><th class="solo-admin"></th></tr></thead><tbody id="tbIng"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detIng"></div>
     <div class="k-card">
-      <h2>XML de nómina y estado ante el SAT</h2>
-      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Los XML originales del periodo en un .zip (no el export de One Facture) y, para saber cuáles siguen vigentes, el .txt de metadata de la descarga masiva del SAT. Sin los XML el dictamen sale sin opinión (D13).</div>
-      <div class="frm" style="margin:0 0 10px"><div><label>Cruzar por</label><select id="cLla" class="k-sel"><option value="num_empleado">Número de empleado</option><option value="rfc">RFC del receptor</option></select></div></div>
-      <div class="drop" id="dropC">Arrastra aquí el .zip de XML o el .txt de metadata, o <a href="#" onclick="document.getElementById('fCfdi').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>.<input type="file" id="fCfdi" accept=".zip,.txt" class="oculto" onchange="subirCfdi(this.files[0])"></div>
+      <h2><span class="solo-carga">2 · </span>XML de nómina<span class="solo-admin"> y estado ante el SAT</span></h2>
+      <div class="sub solo-admin" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Los XML originales del periodo en un .zip (no el export de One Facture) y, para saber cuáles siguen vigentes, el .txt de metadata de la descarga masiva del SAT. Sin los XML el dictamen sale sin opinión (D13).</div>
+      <div class="ayuda solo-carga">Un .zip con los XML timbrados del mes. Si la tienes, sube también la metadata (.txt) de la descarga masiva del SAT.</div>
+      <div class="frm solo-admin" style="margin:0 0 10px"><div><label>Cruzar por</label><select id="cLla" class="k-sel"><option value="num_empleado">Número de empleado</option><option value="rfc">RFC del receptor</option></select></div></div>
+      <div class="drop" id="dropC">Arrastra aquí el .zip de XML o el .txt de metadata, o <a href="#" onclick="document.getElementById('fCfdi').click();return false" style="color:#1a8a8a;font-weight:700">elige el archivo</a>.<input type="file" id="fCfdi" accept=".zip,.txt" class="oculto" onchange="subirCfdi(this.files[0])"></div>
       <div id="msgCfdi"></div>
-      <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num">Entradas</th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
+      <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num"><span class="solo-admin">Entradas</span><span class="solo-carga">Leídos</span></th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detCfdi"></div>
     <div class="k-card">
-      <h2>Maestro de empleados</h2>
-      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Fechas de alta y baja por trabajador para detectar pagos a personas sin alta o ya dadas de baja (siempre material). Sólo se guardan número de empleado, RFC, fechas y grupo de nómina.</div>
-      <div class="drop" id="dropM">Arrastra aquí el .xlsx del maestro (HC con hojas de activos, bajas y finiquitos) o <a href="#" onclick="document.getElementById('fMae').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>.<input type="file" id="fMae" accept=".xlsx" class="oculto" onchange="subirMaestro(this.files[0])"></div>
+      <h2><span class="solo-carga">3 · </span>Maestro de empleados</h2>
+      <div class="sub solo-admin" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Fechas de alta y baja por trabajador para detectar pagos a personas sin alta o ya dadas de baja (siempre material). Sólo se guardan número de empleado, RFC, fechas y grupo de nómina.</div>
+      <div class="ayuda solo-carga">El Excel (.xlsx) con activos, bajas y finiquitos del periodo.</div>
+      <div class="drop" id="dropM">Arrastra aquí el Excel (.xlsx) del maestro o <a href="#" onclick="document.getElementById('fMae').click();return false" style="color:#1a8a8a;font-weight:700">elige el archivo</a>.<input type="file" id="fMae" accept=".xlsx" class="oculto" onchange="subirMaestro(this.files[0])"></div>
       <div id="msgMae"></div>
       <div id="detMae"></div>
+    </div>
+    <div class="k-card solo-carga" id="cardSuaCarga">
+      <h2>4 · SUA del mes</h2>
+      <div class="ayuda">El .zip del SUA del mes. También sirve el paquete completo con todas las carpetas de los registros patronales.</div>
     </div>
   </section>
 
   <section id="t-cfdi" class="oculto">
     <div class="k-card">
-      <h2>Cruce nómina ↔ CFDI</h2>
-      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Percepciones, ISR retenido y neto del CFDI contra la nómina, por colaborador y corrida, al centavo (criterio C11). Lo que coincide no aparece.</div>
+      <h2><span class="solo-admin">Cruce nómina ↔ CFDI</span><span class="solo-carga">Nómina contra XML timbrados</span></h2>
+      <div class="sub solo-admin" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Percepciones, ISR retenido y neto del CFDI contra la nómina, por colaborador y corrida, al centavo (criterio C11). Lo que coincide no aparece.</div>
+      <div class="ayuda solo-carga">Comparamos lo pagado en la nómina con lo timbrado en los XML, persona por persona. Sólo aparece lo que no coincide; HRM lo revisa.</div>
       <div id="aceptC"></div>
-      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Paquete</label><select id="selCf" class="k-sel" onchange="cargarCruces()"></select></div>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Tipo</th><th>Rubro</th><th class="num">CFDI − nómina</th><th>Corrida</th><th class="num">Casos</th><th class="num">Pendientes</th><th>Cubeta</th></tr></thead><tbody id="tbCru"></tbody></table></div>
+      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Archivo de XML</label><select id="selCf" class="k-sel" onchange="cargarCruces()"></select></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Tipo</th><th>Concepto</th><th class="num">CFDI − nómina</th><th>Nómina</th><th class="num">Casos</th><th class="num">Pendientes</th><th><span class="solo-admin">Cubeta</span><span class="solo-carga">Revisión HRM</span></th></tr></thead><tbody id="tbCru"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="clasC">
       <h2 id="clasCT">Clasificar</h2>
@@ -169,24 +217,25 @@ html body .k-row>label input{width:auto;margin:0}
         <div><button class="k-btn" onclick="clasificarCruces()">Clasificar grupo</button></div>
       </div>
       <h3>Casos</h3>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Nómina</th><th class="num">CFDI</th><th>UUID</th><th></th></tr></thead><tbody id="tbCruC"></tbody></table></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Nómina</th><th class="num">Importe nómina</th><th class="num">Importe CFDI</th><th>Folio fiscal (UUID)</th><th></th></tr></thead><tbody id="tbCruC"></tbody></table></div>
     </div>
   </section>
 
   <section id="t-sua" class="oculto">
     <div class="k-card">
-      <h2>SUA contra la emisión del IMSS</h2>
-      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Por trabajador y rama: lo que <b>calcula el kernel</b> (tramos de SBC de la emisión del IMSS e incapacidades del SUA, criterio C26), lo que <b>emitió el IMSS</b> (EMA/EBA) y lo que <b>se pagó</b> en el archivo .SUA. Al centavo, sin tolerancia (C24). Lo que coincide en los tres lados no aparece.</div>
-      <div class="drop" id="dropS">Arrastra aquí el .zip del SUA del mes (también sirve el paquete completo) o <a href="#" onclick="document.getElementById('fSua').click();return false" style="color:#1a8a8a;font-weight:700">elígelo</a>. Se abre en tu navegador y al servidor sólo suben, por registro patronal, el .SUA y los archivos de la emisión (CDEMMO99, CDEBMO99, CDEMPA99).<input type="file" id="fSua" accept=".zip" class="oculto" onchange="subirSua(this.files[0])"></div>
-      <div id="msgSua"></div>
+      <h2><span class="solo-admin">SUA contra la emisión del IMSS</span><span class="solo-carga">Resultado del SUA</span></h2>
+      <div class="sub solo-admin" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Por trabajador y rama: lo que <b>calcula el kernel</b> (tramos de SBC de la emisión del IMSS e incapacidades del SUA, criterio C26), lo que <b>emitió el IMSS</b> (EMA/EBA) y lo que <b>se pagó</b> en el archivo .SUA. Al centavo, sin tolerancia (C24). Lo que coincide en los tres lados no aparece.</div>
+      <div class="ayuda solo-carga">Comparamos lo que se pagó en el SUA con lo que emitió el IMSS y con nuestro cálculo. Sólo aparece lo que no coincide; HRM lo revisa. El SUA se sube en <b>Subir archivos</b>.</div>
+      <div id="suaSubida"><div class="drop" id="dropS">Arrastra aquí el .zip del SUA del mes<span class="solo-admin"> (también sirve el paquete completo)</span> o <a href="#" onclick="document.getElementById('fSua').click();return false" style="color:#1a8a8a;font-weight:700">elige el archivo</a>.<span class="solo-admin"> Se abre en tu navegador y al servidor sólo suben, por registro patronal, el .SUA y los archivos de la emisión (CDEMMO99, CDEBMO99, CDEMPA99).</span><input type="file" id="fSua" accept=".zip" class="oculto" onchange="subirSua(this.files[0])"></div>
+      <div id="msgSua"></div></div>
       <div class="k-row" style="margin:10px 0"><label style="font-size:12px;color:#5a7a8a">Periodo</label><select id="selSuaPer" class="k-sel" onchange="pintarSua()"></select></div>
       <div id="kpiSua"></div>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro</th><th>Entidad</th><th class="num">Trab.</th><th class="num">Pagado SUA</th><th class="num">Kernel</th><th class="num">Emitido IMSS</th><th class="num">Pagado − kernel</th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th>Cuadre</th></tr></thead><tbody id="tbSua"></tbody></table></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro patronal</th><th>Estado</th><th class="num">Trabajadores</th><th class="num">Pagado SUA</th><th class="num"><span class="solo-admin">Kernel</span><span class="solo-carga">Cálculo HRM</span></th><th class="num">Emitido IMSS</th><th class="num"><span class="solo-admin">Pagado − kernel</span><span class="solo-carga">Pagado − cálculo</span></th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th><span class="solo-admin">Cuadre</span><span class="solo-carga">Archivo</span></th></tr></thead><tbody id="tbSua"></tbody></table></div>
     </div>
     <div class="k-card">
-      <h2>Diferencias por causa y rama</h2>
+      <h2><span class="solo-admin">Diferencias por causa y rama</span><span class="solo-carga">Diferencias por motivo y concepto</span></h2>
       <div id="aceptS"></div>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Causa</th><th>Rama</th><th class="num">Casos</th><th class="num">Registros</th><th class="num">Pagado − kernel</th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th>Cubeta</th></tr></thead><tbody id="tbSuaG"></tbody></table></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Motivo</th><th>Concepto</th><th class="num">Casos</th><th class="num">Registros</th><th class="num"><span class="solo-admin">Pagado − kernel</span><span class="solo-carga">Pagado − cálculo</span></th><th class="num">Pagado − emitido</th><th class="num">Pendientes</th><th><span class="solo-admin">Cubeta</span><span class="solo-carga">Revisión HRM</span></th></tr></thead><tbody id="tbSuaG"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="clasS">
       <h2 id="clasST">Clasificar</h2>
@@ -198,7 +247,7 @@ html body .k-row>label input{width:auto;margin:0}
         <div><button class="k-btn" onclick="clasificarSua()">Clasificar grupo</button></div>
       </div>
       <h3>Casos (los de mayor importe primero)</h3>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro</th><th>Colaborador</th><th>NSS</th><th class="num">Kernel</th><th class="num">Emitido</th><th class="num">Pagado</th><th class="num">Días / incap.</th><th class="num">Tramos</th><th></th></tr></thead><tbody id="tbSuaC"></tbody></table></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Registro</th><th>Colaborador</th><th>NSS</th><th class="num"><span class="solo-admin">Kernel</span><span class="solo-carga">Cálculo HRM</span></th><th class="num">Emitido</th><th class="num">Pagado</th><th class="num">Días / incap.</th><th class="num">Tramos</th><th></th></tr></thead><tbody id="tbSuaC"></tbody></table></div>
     </div>
   </section>
 
@@ -214,10 +263,11 @@ html body .k-row>label input{width:auto;margin:0}
 
   <section id="t-diferencias" class="oculto">
     <div class="k-card">
-      <h2>Diferencias kernel vs nómina</h2>
+      <h2><span class="solo-admin">Diferencias kernel vs nómina</span><span class="solo-carga">Nómina contra nuestro cálculo</span></h2>
+      <div class="ayuda solo-carga">Recalculamos impuestos y cuotas con la prenómina y lo comparamos con lo que trae tu nómina. Sólo aparece lo que no coincide; HRM lo revisa.</div>
       <div id="acept"></div>
-      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Ejecución</label><select id="selEj" class="k-sel" onchange="cargarGrupos()"></select></div>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Regla</th><th>Rubro</th><th class="num">Diferencia</th><th class="num">Casos</th><th class="num">Pendientes</th><th>Cubeta</th><th></th></tr></thead><tbody id="tbGr"></tbody></table></div>
+      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a"><span class="solo-admin">Ejecución</span><span class="solo-carga">Cálculo del</span></label><select id="selEj" class="k-sel" onchange="cargarGrupos()"></select></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Concepto</th><th>Rubro</th><th class="num">Diferencia</th><th class="num">Casos</th><th class="num">Pendientes</th><th><span class="solo-admin">Cubeta</span><span class="solo-carga">Revisión HRM</span></th><th></th></tr></thead><tbody id="tbGr"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="clasif">
       <h2 id="clasifT">Clasificar</h2>
@@ -229,7 +279,7 @@ html body .k-row>label input{width:auto;margin:0}
         <div><button class="k-btn" onclick="clasificarGrupo()">Clasificar grupo</button></div>
       </div>
       <h3>Casos del grupo</h3>
-      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Kernel</th><th class="num">Nómina</th><th class="num">Diferencia</th><th>Origen</th><th></th></tr></thead><tbody id="tbCasos"></tbody></table></div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Nómina</th><th class="num"><span class="solo-admin">Kernel</span><span class="solo-carga">Cálculo HRM</span></th><th class="num">Tu nómina</th><th class="num">Diferencia</th><th>Renglón</th><th></th></tr></thead><tbody id="tbCasos"></tbody></table></div>
     </div>
   </section>
 
@@ -302,18 +352,19 @@ html body .k-row>label input{width:auto;margin:0}
 
   <section id="t-calendario" class="oculto">
     <div class="k-card">
-      <h2>Calendario de nómina</h2>
-      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Sin calendario no hay fecha de pago ni periodicidad: los renglones de una corrida sin calendario se excluyen y se declaran.</div>
-      <div class="scroll"><table class="k-tbl"><thead><tr><th>Corrida</th><th>Periodicidad</th><th>Desde</th><th>Hasta</th><th>Pago</th><th>Tipo</th><th>Fuente</th></tr></thead><tbody id="tbCal"></tbody></table></div>
-      <h3>Agregar o corregir corrida</h3>
+      <h2><span class="solo-admin">Calendario de nómina</span><span class="solo-carga">Fechas de pago de cada nómina</span></h2>
+      <div class="sub solo-admin" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Sin calendario no hay fecha de pago ni periodicidad: los renglones de una corrida sin calendario se excluyen y se declaran.</div>
+      <div class="ayuda solo-carga">Necesitamos la fecha de pago de cada nómina del mes. Si falta alguna, agrégala abajo. Para corregir una, da clic en su renglón.</div>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>Nómina</th><th>Periodicidad</th><th>Desde</th><th>Hasta</th><th>Fecha de pago</th><th>Tipo</th><th>Fuente</th></tr></thead><tbody id="tbCal"></tbody></table></div>
+      <h3>Agregar o corregir una nómina</h3>
       <div class="frm">
-        <div><label>Corrida</label><input id="kCor" class="k-in" placeholder="SEM35 o BONO_SEM_32"></div>
+        <div><label>Nómina</label><input id="kCor" class="k-in" placeholder="SEM35 o BONO_SEM_32"></div>
         <div><label>Periodicidad</label><select id="kPer" class="k-sel"><option>semanal</option><option>catorcenal</option><option>quincenal</option><option>decenal</option><option>mensual</option></select></div>
         <div><label>Desde</label><input id="kDes" class="k-in" type="date"></div>
         <div><label>Hasta</label><input id="kHas" class="k-in" type="date"></div>
         <div><label>Fecha de pago</label><input id="kPag" class="k-in" type="date"></div>
         <div><label>Tipo</label><select id="kOrd" class="k-sel"><option value="1">Ordinaria</option><option value="0">Extra (corrida aparte)</option></select></div>
-        <div style="grid-column:span 2"><label>Fuente</label><input id="kFue" class="k-in" placeholder="Calendario de pagos PRIME 2026"></div>
+        <div style="grid-column:span 2"><label>¿De dónde sale la fecha?</label><input id="kFue" class="k-in" placeholder="Calendario de pagos 2026"></div>
         <div><button class="k-btn" onclick="guardarCorrida()">Guardar</button></div>
       </div>
     </div>
@@ -377,10 +428,22 @@ ${AUTH_ADMIN}
 ${LOGOUT_FN}
 document.getElementById('uN').textContent = (U.nombre || U.email || '') + (U.rol !== 'admin' && U.empresa_nombre ? ' · ' + U.empresa_nombre.split(' ')[0] : '');
 var CARGA = U.rol !== 'admin';
-if (CARGA) document.body.classList.add('modo-carga');
+if (CARGA) {
+  document.body.classList.add('modo-carga');
+  document.title = 'Carga de documentos — HRM';
+  document.getElementById('kTit').textContent = 'Carga de documentos';
+  document.getElementById('kMarca').textContent = 'Carga de documentos';
+  document.getElementById('kEmp').textContent = U.empresa_nombre || '';
+  document.getElementById('cardSuaCarga').appendChild(document.getElementById('suaSubida'));
+}
+var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function mesDe(f){var m=/^(\\d{4})-(\\d{2})/.exec(f||'');if(!m)return f||'';var t=MESES[Number(m[2])-1]||m[2];return t.charAt(0).toUpperCase()+t.slice(1)+' '+m[1]}
+function sinEncargo(){return CARGA?'Primero elige el periodo':'Primero crea o elige un encargo'}
 var ENC = null, ENCS = [], ING = null, POLL = null, GRUPO = null, CRITS = [];
 var REGLAS = {'CALC-EXE-001':'Exenciones y base','CALC-SUB-001':'Subsidio','CALC-ISR-SEM-001':'ISR semanal','CALC-ISR-CAT-001':'ISR catorcenal','CALC-ISR-AJM-001':'Ajuste mensual ISR','CALC-ISR-EXT-001':'ISR pagos extra','CALC-IMSS-001':'IMSS','CALC-RCV-001':'RCV','CALC-INF-001':'INFONAVIT','CALC-ISN-001':'ISN'};
 var CUBETAS = {proceso_mal:'Hallazgo',kernel_mal:'Kernel mal',criterio_sin_resolver:'Criterio'};
+var RUBROS = {isr:'ISR',isn:'Impuesto estatal (ISN)',subsidio:'Subsidio al empleo',rcv:'RCV',rcv_patronal:'RCV patronal',neto:'Neto pagado',isr_separacion:'ISR de finiquito',infonavit:'INFONAVIT',imss:'IMSS',imss_patronal:'IMSS patronal',imss_obrera:'IMSS obrero',ceav_obrera:'CEAV obrera',base_gravable_isr:'Base gravable ISR',percepciones:'Percepciones'};
+function rubro(r){return RUBROS[r]||r}
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function pesos(c){if(c==null)return '—';var n=Number(c),s=n<0?'-':'';n=Math.abs(n);return s+'$'+Math.floor(n/100).toLocaleString('es-MX')+'.'+String(n%100).padStart(2,'0')}
@@ -398,6 +461,7 @@ function aviso(id,txt,tipo){document.getElementById(id).innerHTML=txt?'<div clas
 function badgeEstado(e){
   var m={completo:['b-ok','Completo'],universo_parcial:['b-par','Universo parcial'],limitacion_alcance:['b-lim','Limitación al alcance'],
     terminado:['b-ok','Terminado'],error:['b-lim','Error'],pendiente:['b-run','En cola'],calculando:['b-run','Calculando'],mensual:['b-run','Ajuste mensual'],cerrando:['b-run','Sellando']};
+  if(CARGA)m=Object.assign(m,{terminado:['b-ok','Listo'],pendiente:['b-run','En espera'],calculando:['b-run','Procesando'],mensual:['b-run','Procesando'],cerrando:['b-run','Procesando']});
   var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+esc(x[1])+'</span>';
 }
 
@@ -436,7 +500,7 @@ function cargarEncargos(sel){
     var nom={};emps.forEach(function(e){nom[e.id]=e.nombre});
     document.getElementById('eEmp').innerHTML=emps.map(function(e){return '<option value="'+e.id+'">'+esc(e.nombre)+'</option>'}).join('');
     var s=document.getElementById('selEnc');
-    s.innerHTML=ENCS.length?ENCS.map(function(e){return '<option value="'+esc(e.id)+'">'+esc((nom[e.empresa_id]||'Empresa '+e.empresa_id).split(' ')[0]+' · '+e.periodo_desde.slice(0,7)+' · '+e.id)+'</option>'}).join(''):'<option value="">Sin encargos</option>';
+    s.innerHTML=ENCS.length?ENCS.map(function(e){return '<option value="'+esc(e.id)+'">'+esc(CARGA?mesDe(e.periodo_desde)+(e.estado==='cerrado'?' (cerrado)':''):(nom[e.empresa_id]||'Empresa '+e.empresa_id).split(' ')[0]+' · '+e.periodo_desde.slice(0,7)+' · '+e.id)+'</option>'}).join(''):'<option value="">'+(CARGA?'Todavía no hay periodos abiertos':'Sin encargos')+'</option>';
     var guardado=null;try{guardado=localStorage.getItem('hrm_kernel_enc')}catch(x){}
     var elegido=sel||guardado;if(elegido&&ENCS.some(function(e){return e.id===elegido}))s.value=elegido;
     cambiarEncargo();
@@ -445,6 +509,7 @@ function cargarEncargos(sel){
 function cambiarEncargo(){
   var id=document.getElementById('selEnc').value;ENC=ENCS.filter(function(e){return e.id===id})[0]||null;
   try{if(ENC)localStorage.setItem('hrm_kernel_enc',ENC.id)}catch(x){}
+  var ec=document.getElementById('encCerrado');ec.classList.toggle('oculto',!(ENC&&ENC.estado==='cerrado'));ec.textContent=CARGA?'Este periodo ya está cerrado: puedes consultarlo, pero ya no recibe archivos.':'Encargo cerrado: ya no recibe archivos.';
   ING=null;document.getElementById('detIng').classList.add('oculto');
   cargarIngestas();cargarCfdi();cargarMaestro();cargarSua();
   var act=document.querySelector('.k-tab.act');if(act&&act.dataset.t!=='archivos')act.click();
@@ -462,6 +527,7 @@ var SUAL=[],GSUA=null;
 var CAUSAS={incapacidad:'Incapacidad: la emisión no la descuenta',sua_distinto_imss:'SUA distinto al IMSS (días o SBC)',calculo_limitado:'Cálculo limitado',kernel_distinto:'Kernel distinto de ambos',sin_emision:'Pagado sin emisión',sin_pago:'Emitido sin pago'};
 var RAMASN={cuota_fija:'Cuota fija',excedente:'Excedente 3 UMA',dinero:'Prest. en dinero',gmp:'Gastos médicos pens.',rt:'Riesgo de trabajo',iv:'Invalidez y vida',guarderias:'Guarderías',retiro:'Retiro',ceav_patronal:'CEAV patronal',ceav_obrera:'CEAV obrera',infonavit:'INFONAVIT'};
 var CUBS={proceso_mal:'Hallazgo',explicada:'Explicada',criterio_sin_resolver:'Criterio'};
+if(CARGA)CAUSAS={incapacidad:'Incapacidades que el IMSS no descontó',sua_distinto_imss:'El SUA trae otro salario o días que el IMSS',calculo_limitado:'Falta la fecha de una incapacidad',kernel_distinto:'Nuestro cálculo es distinto',sin_emision:'Pagado sin emisión del IMSS',sin_pago:'Emitido por el IMSS sin pago'};
 function cargarJSZip(){if(window.JSZip)return Promise.resolve();return new Promise(function(ok,mal){var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=ok;sc.onerror=mal;document.head.appendChild(sc)})}
 function latin(u8){var s='';for(var i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return s}
 async function juntarZip(z,ruta,prof,out){
@@ -482,14 +548,14 @@ async function juntarZip(z,ruta,prof,out){
   }
 }
 async function subirSua(f){
-  if(!ENC){aviso('msgSua','Primero crea o elige un encargo','err');return}
+  if(!ENC){aviso('msgSua',sinEncargo(),'err');return}
   if(!f)return;
   try{await cargarJSZip()}catch(x){aviso('msgSua','No cargó el lector de ZIP; revisa la conexión y recarga','err');return}
   aviso('msgSua','Abriendo '+f.name+' en tu navegador…');
   try{
     var out=[];await juntarZip(await JSZip.loadAsync(f),'',0,out);
     var suas=out.filter(function(x){return x.k==='sua'});
-    if(!suas.length){aviso('msgSua','El ZIP no trae archivos .SUA','err');return}
+    if(!suas.length){aviso('msgSua','El ZIP no trae archivos .SUA; revisa que sea el SUA del mes','err');return}
     var periodoDe={};out.forEach(function(x){if(x.k==='ema_pa')periodoDe[x.grupo]=x.per});
     var regs=suas.map(function(s){
       var mismos=out.filter(function(x){return x.k!=='sua'&&x.reg10===s.reg10});
@@ -499,14 +565,14 @@ async function subirSua(f){
     });
     var ok=0,errores=[];
     for(var i=0;i<regs.length;i++){
-      var r=regs[i];aviso('msgSua','Registro '+(i+1)+' de '+regs.length+': '+r.reg+' ('+r.per+')…');
-      if(!r.ema){errores.push(r.reg+': falta la emisión mensual (CDEMMO99)');continue}
+      var r=regs[i];aviso('msgSua','Subiendo registro patronal '+(i+1)+' de '+regs.length+': '+r.reg+'…');
+      if(!r.ema){errores.push(r.reg+': '+(CARGA?'el ZIP no trae la emisión del IMSS de este registro':'falta la emisión mensual (CDEMMO99)'));continue}
       var fd=new FormData();fd.append('encargo_id',ENC.id);
       ['sua','ema','eba','ema_pa'].forEach(function(k){if(r[k])fd.append(k,new Blob([r[k].bytes]),r[k].nombre)});
       try{await api('POST','/api/kernel/sua',fd);ok++}catch(x){errores.push(r.reg+': '+x.message)}
     }
     document.getElementById('fSua').value='';
-    document.getElementById('msgSua').innerHTML='<div class="aviso '+(errores.length?'err':'ok')+'">Leídos '+ok+' de '+regs.length+' registros.'+(errores.length?'<br>'+errores.map(esc).join('<br>'):'')+'</div>';
+    document.getElementById('msgSua').innerHTML='<div class="aviso '+(errores.length?'err':'ok')+'">'+(CARGA?'Listo: se recibieron '+ok+' de '+regs.length+' registros patronales.':'Leídos '+ok+' de '+regs.length+' registros.')+(errores.length?'<br>'+errores.map(esc).join('<br>'):'')+'</div>';
     cargarSua();
   }catch(x){aviso('msgSua',x.message,'err')}
 }
@@ -526,15 +592,15 @@ function cargarSua(){
 function pintarSua(){
   var per=document.getElementById('selSuaPer').value;document.getElementById('clasS').classList.add('oculto');GSUA=null;
   var l=SUAL.filter(function(x){return x.periodo===per});
-  if(!l.length){document.getElementById('tbSua').innerHTML='<tr><td colspan="10" class="vacio">Sube el .zip del SUA del mes.</td></tr>';document.getElementById('kpiSua').innerHTML='';document.getElementById('tbSuaG').innerHTML='';document.getElementById('aceptS').innerHTML='';return}
+  if(!l.length){document.getElementById('tbSua').innerHTML='<tr><td colspan="10" class="vacio">'+(CARGA?'Todavía no hay SUA de este periodo. Súbelo en «Subir archivos».':'Sube el .zip del SUA del mes.')+'</td></tr>';document.getElementById('kpiSua').innerHTML='';document.getElementById('tbSuaG').innerHTML='';document.getElementById('aceptS').innerHTML='';return}
   var T={p:0,k:0,e:0,n:0,pen:0,c:0};
   document.getElementById('tbSua').innerHTML=l.map(function(x){var t=x.totales||{};T.p+=t.pagado_c||0;T.k+=t.kernel_c||0;T.e+=t.emitido_c||0;T.n+=x.trabajadores;T.pen+=x.pendientes||0;T.c+=x.cuadre_interno?1:0;
-    return '<tr><td class="mono"><b>'+esc(x.registro)+'</b></td><td>'+esc(x.entidad||'—')+'</td><td class="num">'+x.trabajadores+'</td><td class="num">'+pesos(t.pagado_c)+'</td><td class="num">'+pesos(t.kernel_c)+'</td><td class="num">'+pesos(t.emitido_c)+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.kernel_c||0))+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.emitido_c||0))+'</td><td class="num">'+(x.pendientes||0)+'</td><td>'+(x.cuadre_interno?'<span class="b b-ok">03 = 05</span>':'<span class="b b-lim">No cuadra</span>')+(x.prima_distinta?' <span class="b b-par">Prima RT distinta</span>':'')+'</td></tr>'}).join('');
-  document.getElementById('kpiSua').innerHTML='<div class="kpis">'+[['Registros',l.length],['Trabajadores',T.n.toLocaleString('es-MX')],['Pagado SUA',pesos(T.p)],['Kernel',pesos(T.k)],['Emitido IMSS',pesos(T.e)],['Pagado − kernel',pesos(T.p-T.k)],['Pagado − emitido',pesos(T.p-T.e)],['Cuadre interno',T.c+' de '+l.length]].map(function(k){return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v" style="font-size:16px">'+k[1]+'</div></div>'}).join('')+'</div>'+
-    '<div class="sub" style="font-size:11px;color:#8ba5b2">Importes sin amortización de créditos INFONAVIT ni actualizaciones. «Pagado − kernel» negativo: el SUA pagó menos de lo que la ley pide con los datos del IMSS.</div>';
+    return '<tr><td class="mono"><b>'+esc(x.registro)+'</b></td><td>'+esc(x.entidad||'—')+'</td><td class="num">'+x.trabajadores+'</td><td class="num">'+pesos(t.pagado_c)+'</td><td class="num">'+pesos(t.kernel_c)+'</td><td class="num">'+pesos(t.emitido_c)+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.kernel_c||0))+'</td><td class="num">'+pesos((t.pagado_c||0)-(t.emitido_c||0))+'</td><td class="num">'+(x.pendientes||0)+'</td><td>'+(x.cuadre_interno?'<span class="b b-ok">'+(CARGA?'Completo':'03 = 05')+'</span>':'<span class="b b-lim">'+(CARGA?'Incompleto':'No cuadra')+'</span>')+(x.prima_distinta?' <span class="b b-par">Prima RT distinta</span>':'')+'</td></tr>'}).join('');
+  document.getElementById('kpiSua').innerHTML='<div class="kpis">'+[['Registros patronales',l.length],['Trabajadores',T.n.toLocaleString('es-MX')],['Pagado SUA',pesos(T.p)],[CARGA?'Cálculo HRM':'Kernel',pesos(T.k)],['Emitido IMSS',pesos(T.e)],[CARGA?'Pagado − cálculo':'Pagado − kernel',pesos(T.p-T.k)],['Pagado − emitido',pesos(T.p-T.e)],[CARGA?'Archivos completos':'Cuadre interno',T.c+' de '+l.length]].map(function(k){return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v" style="font-size:16px">'+k[1]+'</div></div>'}).join('')+'</div>'+
+    '<div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:10px">'+(CARGA?'Importes sin amortización de créditos INFONAVIT. Un importe negativo significa que el SUA pagó menos de lo calculado.':'Importes sin amortización de créditos INFONAVIT ni actualizaciones. «Pagado − kernel» negativo: el SUA pagó menos de lo que la ley pide con los datos del IMSS.')+'</div>';
   api('GET','/api/kernel/sua/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&periodo='+encodeURIComponent(per)).then(function(r){
     var a=r.aceptacion;window.SUAG=r.grupos;
-    document.getElementById('aceptS').innerHTML=r.total===0?'<div class="aviso ok">Kernel, emisión y pago coinciden en todo.</div>':(a.aceptado?'<div class="aviso ok">Todo el cruce está clasificado.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.</div>');
+    document.getElementById('aceptS').innerHTML=r.total===0?'<div class="aviso ok">'+(CARGA?'Todo coincide: el SUA, el IMSS y nuestro cálculo.':'Kernel, emisión y pago coinciden en todo.')+'</div>':(a.aceptado?'<div class="aviso ok">'+(CARGA?'HRM ya revisó todas las diferencias.':'Todo el cruce está clasificado.')+'</div>':'<div class="aviso">'+(CARGA?'HRM está revisando <b>'+a.sin_clasificar+'</b> de '+r.total+' diferencias. No tienes que hacer nada.':'Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.')+'</div>');
     document.getElementById('tbSuaG').innerHTML=r.grupos.map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(CAUSAS[g.causa]||g.causa)+'</td><td>'+esc(RAMASN[g.rama]||g.rama)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.registros+'</td><td class="num">'+pesos(g.pagado_menos_kernel_c)+'</td><td class="num">'+pesos(g.pagado_menos_emitido_c)+'</td><td class="num">'+g.pendientes+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBS[g.cubeta])+'</span>':'')+'</td></tr>'}).join('');
     document.querySelectorAll('#tbSuaG tr.click').forEach(function(tr){tr.addEventListener('click',function(){verGrupoSua(window.SUAG[Number(tr.dataset.i)],tr)})});
   }).catch(function(e){document.getElementById('aceptS').innerHTML='<div class="aviso err">'+esc(e.message)+'</div>'});
@@ -542,7 +608,7 @@ function pintarSua(){
 function verGrupoSua(g,tr){
   GSUA=g;document.querySelectorAll('#tbSuaG tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
   document.getElementById('clasS').classList.remove('oculto');
-  document.getElementById('clasST').textContent='Clasificar: '+(CAUSAS[g.causa]||g.causa)+' · '+(RAMASN[g.rama]||g.rama)+' ('+g.n+' casos)';
+  document.getElementById('clasST').textContent=(CARGA?'Detalle: ':'Clasificar: ')+(CAUSAS[g.causa]||g.causa)+' · '+(RAMASN[g.rama]||g.rama)+' ('+g.n+' casos)';
   var sug={incapacidad:'La emisión no descuenta incapacidades; el SUA sí (C26)',sua_distinto_imss:'El SUA trae días o SBC distintos a la emisión del IMSS',calculo_limitado:'Incapacidad sin fechas con cambio de SBC: falta el detalle de incapacidades'};
   document.getElementById('sMot').value=sug[g.causa]||'';
   document.getElementById('sCub').value=g.causa==='sua_distinto_imss'||g.causa==='sin_pago'?'proceso_mal':'explicada';
@@ -561,12 +627,12 @@ function clasificarSua(){
 
 // ── Archivos / ingestas
 function subir(f){
-  if(!ENC){aviso('msgSubir','Primero crea o elige un encargo','err');return}
+  if(!ENC){aviso('msgSubir',sinEncargo(),'err');return}
   if(!f)return;
-  if(!/\\.xlsx$/i.test(f.name)){aviso('msgSubir','Sólo .xlsx','err');return}
+  if(!/\\.xlsx$/i.test(f.name)){aviso('msgSubir','Este recuadro sólo recibe Excel (.xlsx)','err');return}
   var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);
   aviso('msgSubir','Subiendo '+f.name+'…');
-  api('POST','/api/kernel/ingestas',fd).then(function(r){aviso('msgSubir','Recibido. Procesando en el servidor…','ok');document.getElementById('fArch').value='';cargarIngestas(r.id)})
+  api('POST','/api/kernel/ingestas',fd).then(function(r){aviso('msgSubir',CARGA?'Recibido. Lo estamos procesando; puedes cerrar esta página.':'Recibido. Procesando en el servidor…','ok');document.getElementById('fArch').value='';cargarIngestas(r.id)})
     .catch(function(e){aviso('msgSubir',e.message,'err')});
 }
 function cargarIngestas(abrir){
@@ -575,8 +641,8 @@ function cargarIngestas(abrir){
     var l=r.ingestas||[];
     document.getElementById('tbIng').innerHTML=l.length?l.map(function(i){
       var av=i.lotes_total?Math.round(100*i.lotes_hechos/i.lotes_total):0;
-      return '<tr class="click'+(ING&&ING.id===i.id?' sel':'')+'" data-id="'+esc(i.id)+'"><td>'+esc(i.archivo_nombre)+'</td><td>'+badgeEstado(i.estado)+'</td><td><div class="bar"><i style="width:'+av+'%"></i></div></td><td class="num">'+(i.renglones==null?'—':Number(i.renglones).toLocaleString('es-MX'))+'</td><td>'+fecha(i.actualizado_en)+'</td><td class="mono">'+esc(i.id)+'</td></tr>';
-    }).join(''):'<tr><td colspan="6" class="vacio">Todavía no hay archivos en este encargo.</td></tr>';
+      return '<tr class="click'+(ING&&ING.id===i.id?' sel':'')+'" data-id="'+esc(i.id)+'"><td>'+esc(i.archivo_nombre)+'</td><td>'+badgeEstado(i.estado)+'</td><td><div class="bar"><i style="width:'+av+'%"></i></div></td><td class="num">'+(i.renglones==null?'—':Number(i.renglones).toLocaleString('es-MX'))+'</td><td>'+fecha(i.actualizado_en)+'</td><td class="mono solo-admin">'+esc(i.id)+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" class="vacio">'+(CARGA?'Todavía no has subido la prenómina de este periodo.':'Todavía no hay archivos en este encargo.')+'</td></tr>';
     document.querySelectorAll('#tbIng tr.click').forEach(function(tr){tr.addEventListener('click',function(){verIngesta(tr.dataset.id)})});
     var activa=l.filter(function(i){return ['pendiente','calculando','mensual','cerrando'].indexOf(i.estado)>=0})[0];
     if(abrir)verIngesta(abrir);else if(!ING&&l[0])verIngesta(l[0].id);
@@ -592,6 +658,7 @@ function reintentar(){api('POST','/api/kernel/ingesta/reintentar',{id:ING.id}).t
 function pintarIngesta(){
   var i=ING,d=document.getElementById('detIng'),rep=i.reporte||{},h='';
   d.classList.remove('oculto');
+  if(CARGA){d.innerHTML=resumenIngestaCliente(i,rep);return}
   h+='<div class="k-row" style="justify-content:space-between"><h2 style="margin:0">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeEstado(i.estado)+
     (['pendiente','calculando','mensual','cerrando'].indexOf(i.estado)>=0?'<button class="k-btn peq" onclick="avanzar()">Avanzar ahora</button>':'')+
     (i.estado==='error'?'<button class="k-btn peq" onclick="reintentar()">Reintentar</button>':'')+'</div></div>';
@@ -620,6 +687,22 @@ function pintarIngesta(){
   }
   d.innerHTML=h;
 }
+// Lo que ve el cliente de un archivo subido: si ya quedó, qué le falta y qué hacer; sin datos internos del cálculo.
+function resumenIngestaCliente(i,rep){
+  var enCurso=['pendiente','calculando','mensual','cerrando'].indexOf(i.estado)>=0,h='';
+  h+='<div class="k-row" style="justify-content:space-between;gap:12px"><h2 style="margin:0;overflow-wrap:anywhere">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeEstado(i.estado)+
+    (enCurso?'<button class="k-btn peq" onclick="avanzar()">Continuar ahora</button>':'')+(i.estado==='error'?'<button class="k-btn peq" onclick="reintentar()">Reintentar</button>':'')+'</div></div>';
+  if(enCurso)h+='<div class="k-row" style="margin:12px 0"><div class="bar" style="flex:1"><i style="width:'+(i.avance||0)+'%"></i></div><span class="num" style="font-size:12px;color:#5a7a8a">'+(i.avance||0)+'%</span></div><div class="ayuda">Lo estamos procesando. Puedes cerrar esta página; el avance se guarda.</div>';
+  if(i.estado==='error')h+='<div class="aviso err">No pudimos leer este archivo. Revisa que sea la prenómina del periodo en Excel (.xlsx) y vuelve a subirlo. Si el problema sigue, avisa a HRM.</div>';
+  if(rep.renglones!=null&&!enCurso)h+='<div class="aviso ok">Se leyeron <b>'+Number(rep.renglones).toLocaleString('es-MX')+'</b> renglones del archivo.</div>';
+  var sinCal=Object.keys(rep.sin_calendario||{});
+  if(sinCal.length)h+='<div class="aviso">Faltan las fechas de pago de: '+sinCal.map(function(c){return '<b>'+esc(c)+'</b>'}).join(', ')+'. Agrégalas en <b>Fechas de pago</b> y vuelve a subir este archivo.</div>';
+  if(rep.mapa&&rep.mapa.no_catalogados&&rep.mapa.no_catalogados.length)h+='<div class="aviso">Hay conceptos que no reconocimos ('+rep.mapa.no_catalogados.map(esc).join(', ')+'). HRM los revisará; no tienes que hacer nada.</div>';
+  if(rep.reconciliacion){var rc=rep.reconciliacion,dif=Number(rc.diferencias||0)+Number(rc.sin_par_cliente||0)+Number(rc.sin_par_kernel||0);
+    h+='<div class="kpis" style="margin-top:12px;max-width:520px">'+[['Coinciden',Number(rc.coincidencias||0)+Number(rc.coincidencias_limitadas||0)],['Con diferencia',dif]].map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
+    h+='<div class="ayuda">Comparamos la nómina con nuestro cálculo. HRM revisa las diferencias.</div><button class="k-btn sec" onclick="irDiferencias()">Ver diferencias →</button>'}
+  return h;
+}
 function irDiferencias(){document.querySelector('.k-tab[data-t="diferencias"]').click()}
 
 // ── Diferencias
@@ -634,7 +717,7 @@ function cargarEjecuciones(){
     CRITS=r[1].criterios||[];
     document.getElementById('cCrit').innerHTML=CRITS.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
     var l=r[0].ejecuciones||[];var s=document.getElementById('selEj');
-    s.innerHTML=l.length?l.map(function(e){return '<option value="'+esc(e.id)+'">'+esc(fecha(e.calculado_en)+' · '+Number(e.n_calculos||0).toLocaleString('es-MX')+' cálculos · '+e.id)+'</option>'}).join(''):'<option value="">Sin ejecuciones selladas</option>';
+    s.innerHTML=l.length?l.map(function(e){return '<option value="'+esc(e.id)+'">'+esc(fecha(e.calculado_en)+' · '+Number(e.n_calculos||0).toLocaleString('es-MX')+' cálculos'+(CARGA?'':' · '+e.id))+'</option>'}).join(''):'<option value="">'+(CARGA?'Todavía no hay cálculos: sube la prenómina':'Sin ejecuciones selladas')+'</option>';
     if(ING&&ING.ejecucion_id&&l.some(function(e){return e.id===ING.ejecucion_id}))s.value=ING.ejecucion_id;
     cargarGrupos();
   });
@@ -642,13 +725,13 @@ function cargarEjecuciones(){
 function cargarGrupos(){
   var ej=document.getElementById('selEj').value;
   document.getElementById('clasif').classList.add('oculto');GRUPO=null;
-  if(!ej){document.getElementById('tbGr').innerHTML='<tr><td colspan="7" class="vacio">Sin ejecuciones.</td></tr>';document.getElementById('acept').innerHTML='';return}
+  if(!ej){document.getElementById('tbGr').innerHTML='<tr><td colspan="7" class="vacio">'+(CARGA?'Todavía no hay resultados para este periodo.':'Sin ejecuciones.')+'</td></tr>';document.getElementById('acept').innerHTML='';return}
   api('GET','/api/kernel/diferencias/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ej)).then(function(r){
     var a=r.aceptacion;
-    document.getElementById('acept').innerHTML=r.total===0?'<div class="aviso ok">Sin diferencias en esta ejecución.</div>':
-      (a.aceptado?'<div class="aviso ok">Todas las diferencias están clasificadas: la ejecución pasa el criterio de aceptación.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar.toLocaleString('es-MX')+'</b> de '+r.total.toLocaleString('es-MX')+' diferencias por clasificar. Pasa con cero sin clasificar.</div>');
+    document.getElementById('acept').innerHTML=r.total===0?'<div class="aviso ok">'+(CARGA?'Todo coincide con nuestro cálculo.':'Sin diferencias en esta ejecución.')+'</div>':
+      (a.aceptado?'<div class="aviso ok">'+(CARGA?'HRM ya revisó todas las diferencias.':'Todas las diferencias están clasificadas: la ejecución pasa el criterio de aceptación.')+'</div>':'<div class="aviso">'+(CARGA?'HRM está revisando <b>'+a.sin_clasificar.toLocaleString('es-MX')+'</b> de '+r.total.toLocaleString('es-MX')+' diferencias. No tienes que hacer nada.':'Faltan <b>'+a.sin_clasificar.toLocaleString('es-MX')+'</b> de '+r.total.toLocaleString('es-MX')+' diferencias por clasificar. Pasa con cero sin clasificar.')+'</div>');
     document.getElementById('tbGr').innerHTML=(r.grupos||[]).map(function(g,i){
-      return '<tr class="click" data-i="'+i+'"><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+'</td><td>'+esc(g.rubro)+'</td><td class="num">'+pesos(g.diferencia_c)+'</td><td class="num">'+g.n+(g.limitados?' <span class="b b-par">'+g.limitados+' lim.</span>':'')+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBETAS[g.cubeta]||g.cubeta)+'</span>':'—')+'</td><td><button class="k-btn peq sec">Ver</button></td></tr>';
+      return '<tr class="click" data-i="'+i+'"><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+'</td><td>'+esc(rubro(g.rubro))+'</td><td class="num">'+pesos(g.diferencia_c)+'</td><td class="num">'+g.n+(g.limitados?' <span class="b b-par">'+g.limitados+' lim.</span>':'')+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBETAS[g.cubeta]||g.cubeta)+'</span>':'—')+'</td><td><button class="k-btn peq sec">Ver</button></td></tr>';
     }).join('')||'<tr><td colspan="7" class="vacio">Sin diferencias.</td></tr>';
     document.querySelectorAll('#tbGr tr.click').forEach(function(tr){tr.addEventListener('click',function(){abrirGrupo(r.grupos[Number(tr.dataset.i)],tr)})});
     document.getElementById('nPend').textContent=a.sin_clasificar;
@@ -657,7 +740,7 @@ function cargarGrupos(){
 function abrirGrupo(g,tr){
   GRUPO=g;document.querySelectorAll('#tbGr tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
   document.getElementById('clasif').classList.remove('oculto');
-  document.getElementById('clasifT').textContent='Clasificar · '+(REGLAS[g.regla_id]||g.regla_id)+' · '+pesos(g.diferencia_c)+' · '+g.pendientes+' pendientes de '+g.n;
+  document.getElementById('clasifT').textContent=(CARGA?'Detalle · ':'Clasificar · ')+(REGLAS[g.regla_id]||g.regla_id)+' · '+pesos(g.diferencia_c)+' · '+g.pendientes+' pendientes de '+g.n;
   var ej=document.getElementById('selEj').value;
   api('GET','/api/kernel/diferencias?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ej)+'&regla_id='+encodeURIComponent(g.regla_id)+'&rubro='+encodeURIComponent(g.rubro)+'&diferencia_c='+g.diferencia_c+'&limit=200').then(function(r){
     document.getElementById('tbCasos').innerHTML=r.diferencias.map(function(x){
@@ -827,7 +910,7 @@ var dropM=document.getElementById('dropM');
 ['dragleave','drop'].forEach(function(e){dropM.addEventListener(e,function(ev){ev.preventDefault();dropM.classList.remove('on')})});
 dropM.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirMaestro(ev.dataTransfer.files[0])});
 function subirMaestro(f){
-  if(!ENC){aviso('msgMae','Primero elige un encargo','err');return}
+  if(!ENC){aviso('msgMae',sinEncargo(),'err');return}
   if(!f)return;if(!/\\.xlsx$/i.test(f.name)){aviso('msgMae','El maestro va en .xlsx','err');return}
   var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);aviso('msgMae','Leyendo '+f.name+'…');
   api('POST','/api/kernel/maestro',fd).then(function(r){aviso('msgMae',r.registros.toLocaleString('es-MX')+' empleados leídos'+(r.cruzado?'. Cruzado con la prenómina.':'. '+(r.motivo||'')),'ok');document.getElementById('fMae').value='';cargarMaestro()}).catch(function(e){aviso('msgMae',e.message,'err')});
@@ -837,12 +920,12 @@ function cargarMaestro(){
   api('GET','/api/kernel/maestro?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
     MAE=(r.cargas||[])[0]||null;var d=document.getElementById('detMae');
     if(!MAE){d.innerHTML='';return}
-    var rep=MAE.reporte||{},h='<div class="sub mono" style="color:#8ba5b2;margin:10px 0">'+esc(MAE.archivo_nombre)+' · '+Number(MAE.registros).toLocaleString('es-MX')+' empleados · SHA-256 '+esc(MAE.archivo_sha256.slice(0,16))+'…</div>';
+    var rep=MAE.reporte||{},h=CARGA?'<div class="aviso ok">Recibido: <b>'+esc(MAE.archivo_nombre)+'</b> · '+Number(MAE.registros).toLocaleString('es-MX')+' empleados.</div>':'<div class="sub mono" style="color:#8ba5b2;margin:10px 0">'+esc(MAE.archivo_nombre)+' · '+Number(MAE.registros).toLocaleString('es-MX')+' empleados · SHA-256 '+esc(MAE.archivo_sha256.slice(0,16))+'…</div>';
     if(rep.revisados!=null){
       h+='<div class="kpis">'+[['Pagos revisados',rep.revisados],['Después de la baja',(rep.por_tipo||{}).pago_despues_de_baja],['Antes del alta',(rep.por_tipo||{}).pago_antes_de_alta],['Pagados sin maestro',rep.sin_maestro],['Activos con baja (inconsistencia)',rep.inconsistencias]]
         .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
-      h+='<div class="k-row" style="margin-bottom:8px"><button class="k-btn peq sec" onclick="recruzarMaestro()">Volver a cruzar</button></div><div id="tbAfiW"></div>';
-    } else h+='<div class="aviso">Falta la prenómina terminada para cruzar. <button class="k-btn peq sec" onclick="recruzarMaestro()">Cruzar ahora</button></div>';
+      h+='<div class="k-row" style="margin-bottom:8px"><button class="k-btn peq sec" onclick="recruzarMaestro()">'+(CARGA?'Volver a comparar':'Volver a cruzar')+'</button></div><div id="tbAfiW"></div>';
+    } else h+=CARGA?'<div class="aviso">Lo compararemos con la prenómina en cuanto esté lista. <button class="k-btn peq sec" onclick="recruzarMaestro()">Comparar ahora</button></div>':'<div class="aviso">Falta la prenómina terminada para cruzar. <button class="k-btn peq sec" onclick="recruzarMaestro()">Cruzar ahora</button></div>';
     d.innerHTML=h;
     if(rep.revisados!=null)cargarAfiliacion();
   });
@@ -852,8 +935,8 @@ function cargarAfiliacion(){
   api('GET','/api/kernel/afiliacion?carga_id='+encodeURIComponent(MAE.id)).then(function(r){
     var l=r.casos||[],w=document.getElementById('tbAfiW');if(!w)return;
     if(!l.length){w.innerHTML='<div class="aviso ok">Ningún pago a personas sin alta o ya dadas de baja.</div>';return}
-    w.innerHTML=(r.aceptacion.aceptado?'<div class="aviso ok">Todos los casos están clasificados.</div>':'<div class="aviso">Faltan <b>'+r.aceptacion.sin_clasificar+'</b> casos por clasificar.</div>')+
-      '<div class="scroll alto"><table class="k-tbl"><thead><tr><th>Caso</th><th>Colaborador</th><th>Corrida</th><th>Fecha</th><th class="num">Percepciones</th><th>Cubeta</th></tr></thead><tbody>'+
+    w.innerHTML=(r.aceptacion.aceptado?'<div class="aviso ok">'+(CARGA?'HRM ya revisó todos los casos.':'Todos los casos están clasificados.')+'</div>':'<div class="aviso">'+(CARGA?'HRM revisará <b>'+r.aceptacion.sin_clasificar+'</b> casos.':'Faltan <b>'+r.aceptacion.sin_clasificar+'</b> casos por clasificar.')+'</div>')+
+      '<div class="scroll alto"><table class="k-tbl"><thead><tr><th>Caso</th><th>Colaborador</th><th>Nómina</th><th>Fecha</th><th class="num">Percepciones</th><th>'+(CARGA?'Revisión HRM':'Cubeta')+'</th></tr></thead><tbody>'+
       l.map(function(c){return '<tr><td>'+esc(TIPOA[c.tipo])+'</td><td class="mono">'+esc(c.colaborador_id)+'</td><td>'+esc(c.corrida_id)+'</td><td>'+esc(c.fuente_fecha+' '+c.fecha_evento)+'</td><td class="num">'+pesos(c.percepciones_c)+'</td><td>'+(c.cubeta?'<span class="b b-neu">'+esc(CUBC[c.cubeta])+'</span> <span style="font-size:11px;color:#5a7a8a">'+esc(c.motivo)+'</span>':'—')+'</td></tr>'}).join('')+'</tbody></table></div>'+
       '<div class="frm solo-admin"><div><label>Casos</label><select id="aTip" class="k-sel"><option value="pago_despues_de_baja">Pagos después de la baja</option><option value="pago_antes_de_alta">Pagos antes del alta</option></select></div>'+
       '<div><label>Cubeta</label><select id="aCub" class="k-sel"><option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="explicada">Explicada (no es incumplimiento)</option></select></div>'+
@@ -875,23 +958,23 @@ var dropC=document.getElementById('dropC');
 ['dragleave','drop'].forEach(function(e){dropC.addEventListener(e,function(ev){ev.preventDefault();dropC.classList.remove('on')})});
 dropC.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])subirCfdi(ev.dataTransfer.files[0])});
 function subirCfdi(f){
-  if(!ENC){aviso('msgCfdi','Primero crea o elige un encargo','err');return}
+  if(!ENC){aviso('msgCfdi',sinEncargo(),'err');return}
   if(!f)return;
   var tipo=/\\.zip$/i.test(f.name)?'xml_nomina':/\\.(txt|csv)$/i.test(f.name)?'metadata_sat':null;
   if(!tipo){aviso('msgCfdi','Sube un .zip con los XML o el .txt de metadata del SAT','err');return}
   var fd=new FormData();fd.append('file',f);fd.append('encargo_id',ENC.id);fd.append('tipo',tipo);fd.append('llave',document.getElementById('cLla').value);
   aviso('msgCfdi','Subiendo '+f.name+'…');
-  api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi','Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';cargarCfdi(r.id)})
+  api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi',CARGA?'Recibido. Lo estamos procesando; puedes cerrar esta página.':'Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';cargarCfdi(r.id)})
     .catch(function(e){aviso('msgCfdi',e.message,'err')});
 }
-function badgeC(e){var m={pendiente:['b-run','En cola'],leyendo:['b-run','Leyendo'],cruzando:['b-run','Cruzando'],terminado:['b-ok','Terminado'],error:['b-lim','Error']};var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+x[1]+'</span>'}
+function badgeC(e){var m={pendiente:['b-run','En cola'],leyendo:['b-run','Leyendo'],cruzando:['b-run','Cruzando'],terminado:['b-ok','Terminado'],error:['b-lim','Error']};if(CARGA)m=Object.assign(m,{pendiente:['b-run','En espera'],leyendo:['b-run','Procesando'],cruzando:['b-run','Procesando'],terminado:['b-ok','Listo']});var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+x[1]+'</span>'}
 function cargarCfdi(abrir){
   if(!ENC){document.getElementById('tbCfdi').innerHTML='';return}
   api('GET','/api/kernel/cfdi?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
     var l=r.ingestas||[];
     document.getElementById('tbCfdi').innerHTML=l.length?l.map(function(i){var av=i.lotes_total?Math.round(100*i.lotes_hechos/i.lotes_total):0;
       return '<tr class="click'+(CFI&&CFI.id===i.id?' sel':'')+'" data-id="'+esc(i.id)+'"><td>'+esc(i.archivo_nombre)+'</td><td>'+(i.tipo==='xml_nomina'?'XML de nómina':'Metadata SAT')+'</td><td>'+badgeC(i.estado)+'</td><td><div class="bar"><i style="width:'+av+'%"></i></div></td><td class="num">'+(i.entradas==null?'—':Number(i.entradas).toLocaleString('es-MX'))+'</td><td>'+fecha(i.actualizado_en)+'</td></tr>'}).join('')
-      :'<tr><td colspan="6" class="vacio">Sin XML ni metadata en este encargo.</td></tr>';
+      :'<tr><td colspan="6" class="vacio">'+(CARGA?'Todavía no has subido XML de este periodo.':'Sin XML ni metadata en este encargo.')+'</td></tr>';
     document.querySelectorAll('#tbCfdi tr.click').forEach(function(tr){tr.addEventListener('click',function(){verCfdi(tr.dataset.id)})});
     if(abrir)verCfdi(abrir);
     var activa=l.some(function(i){return ['pendiente','leyendo','cruzando'].indexOf(i.estado)>=0});
@@ -903,6 +986,7 @@ function verCfdi(id){api('GET','/api/kernel/cfdi/ingesta?id='+encodeURIComponent
 function accionCfdi(ruta,b){api('POST',ruta,b).then(function(){cargarCfdi(CFI.id)}).catch(function(e){alert(e.message)})}
 function pintarCfdi(){
   var i=CFI,rep=i.reporte||{},d=document.getElementById('detCfdi'),h='';d.classList.remove('oculto');
+  if(CARGA){d.innerHTML=resumenCfdiCliente(i,rep);return}
   h+='<div class="k-row" style="justify-content:space-between"><h2 style="margin:0">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeC(i.estado)+
     (['pendiente','leyendo','cruzando'].indexOf(i.estado)>=0?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/avanzar&#39;,{id:CFI.id})">Avanzar ahora</button>':'')+
     (i.estado==='error'?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/reintentar&#39;,{id:CFI.id})">Reintentar</button>':'')+
@@ -928,24 +1012,41 @@ function pintarCfdi(){
   }
   d.innerHTML=h;
 }
+function resumenCfdiCliente(i,rep){
+  var enCurso=['pendiente','leyendo','cruzando'].indexOf(i.estado)>=0,h='',n=function(x){return Number(x||0).toLocaleString('es-MX')};
+  h+='<div class="k-row" style="justify-content:space-between;gap:12px"><h2 style="margin:0;overflow-wrap:anywhere">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeC(i.estado)+
+    (enCurso?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/avanzar&#39;,{id:CFI.id})">Continuar ahora</button>':'')+
+    (i.estado==='error'?'<button class="k-btn peq" onclick="accionCfdi(&#39;/api/kernel/cfdi/reintentar&#39;,{id:CFI.id})">Reintentar</button>':'')+'</div></div>';
+  if(enCurso)h+='<div class="ayuda" style="margin-top:10px">Lo estamos procesando. Puedes cerrar esta página.</div>';
+  if(i.estado==='error')h+='<div class="aviso err">No pudimos leer este archivo. Revisa que sea '+(i.tipo==='xml_nomina'?'un .zip con los XML de nómina':'el .txt de metadata de la descarga masiva del SAT')+' y vuelve a subirlo.</div>';
+  if(i.tipo==='metadata_sat'&&rep.registros!=null)h+='<div class="aviso ok">Se leyeron <b>'+n(rep.registros)+'</b> folios: '+n(rep.vigentes)+' vigentes y '+n(rep.cancelados)+' cancelados.</div>';
+  if(rep.cruce){var c=rep.cruce,pt=c.por_tipo||{};
+    h+='<div class="kpis" style="margin-top:12px">'+[['XML leídos',rep.comprobantes],['Válidos',rep.validos],['Repetidos',rep.duplicados],['Coinciden con la nómina',c.coincidencias],['Con diferencia',Number(c.con_diferencia||0)+Number(pt.sin_cfdi||0)+Number(pt.sin_nomina||0)]]
+      .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+n(x[1])+'</div></div>'}).join('')+'</div>';
+    var sc=Object.keys(rep.sin_corrida||{}).reduce(function(t,k){return t+Number(rep.sin_corrida[k]||0)},0);
+    if(sc)h+='<div class="aviso">'+n(sc)+' XML no corresponden a ninguna nómina del periodo o no se pudieron leer. HRM los revisará.</div>';
+    if(rep.sin_estado_sat)h+='<div class="aviso">'+n(rep.sin_estado_sat)+' XML sin estado ante el SAT. Si la tienes, sube la metadata (.txt) de la descarga masiva.</div>';
+    h+='<button class="k-btn sec" style="margin-top:10px" onclick="document.querySelector(&#39;.k-tab[data-t=cfdi]&#39;).click()">Ver resultado →</button>'}
+  return h;
+}
 function cargarPaquetes(){
   if(!ENC)return;
   Promise.all([api('GET','/api/kernel/cfdi?encargo_id='+encodeURIComponent(ENC.id)),api('GET','/api/kernel/criterios')]).then(function(r){
     var l=(r[0].ingestas||[]).filter(function(i){return i.tipo==='xml_nomina'&&i.estado==='terminado'});
     document.getElementById('xCrit').innerHTML=(r[1].criterios||[]).map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
     var s=document.getElementById('selCf');
-    s.innerHTML=l.length?l.map(function(i){return '<option value="'+esc(i.id)+'">'+esc(i.archivo_nombre+' · '+fecha(i.actualizado_en))+'</option>'}).join(''):'<option value="">Sin paquetes de XML cruzados</option>';
+    s.innerHTML=l.length?l.map(function(i){return '<option value="'+esc(i.id)+'">'+esc(i.archivo_nombre+' · '+fecha(i.actualizado_en))+'</option>'}).join(''):'<option value="">'+(CARGA?'Sin XML procesados':'Sin paquetes de XML cruzados')+'</option>';
     if(CFI&&l.some(function(i){return i.id===CFI.id}))s.value=CFI.id;
     cargarCruces();
   });
 }
 function cargarCruces(){
   var id=document.getElementById('selCf').value;document.getElementById('clasC').classList.add('oculto');GCRU=null;
-  if(!id){document.getElementById('tbCru').innerHTML='<tr><td colspan="7" class="vacio">Sube el .zip de XML en Archivos.</td></tr>';document.getElementById('aceptC').innerHTML='';return}
+  if(!id){document.getElementById('tbCru').innerHTML='<tr><td colspan="7" class="vacio">'+(CARGA?'Todavía no hay XML de este periodo. Súbelos en «Subir archivos».':'Sube el .zip de XML en Archivos.')+'</td></tr>';document.getElementById('aceptC').innerHTML='';return}
   api('GET','/api/kernel/cruces/grupos?ingesta_cfdi_id='+encodeURIComponent(id)).then(function(r){
     var a=r.aceptacion;document.getElementById('nCru').textContent=a.sin_clasificar;
-    document.getElementById('aceptC').innerHTML=r.total===0?'<div class="aviso ok">La nómina y los CFDI coinciden en todo lo cruzado.</div>':(a.aceptado?'<div class="aviso ok">Todo el cruce está clasificado.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.</div>');
-    document.getElementById('tbCru').innerHTML=(r.grupos||[]).map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(TIPOC[g.tipo])+'</td><td>'+esc(g.rubro)+'</td><td class="num">'+(g.dif_c==null?'—':pesos(g.dif_c))+'</td><td>'+esc(g.corrida_id||'—')+'</td><td class="num">'+g.n+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBC[g.cubeta])+'</span>':'—')+'</td></tr>'}).join('')||'<tr><td colspan="7" class="vacio">Sin cruces pendientes.</td></tr>';
+    document.getElementById('aceptC').innerHTML=r.total===0?'<div class="aviso ok">La nómina y los XML coinciden en todo.</div>':(a.aceptado?'<div class="aviso ok">'+(CARGA?'HRM ya revisó todas las diferencias.':'Todo el cruce está clasificado.')+'</div>':'<div class="aviso">'+(CARGA?'HRM está revisando <b>'+a.sin_clasificar+'</b> de '+r.total+' diferencias. No tienes que hacer nada.':'Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.')+'</div>');
+    document.getElementById('tbCru').innerHTML=(r.grupos||[]).map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(TIPOC[g.tipo])+'</td><td>'+esc(rubro(g.rubro))+'</td><td class="num">'+(g.dif_c==null?'—':pesos(g.dif_c))+'</td><td>'+esc(g.corrida_id||'—')+'</td><td class="num">'+g.n+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBC[g.cubeta])+'</span>':'—')+'</td></tr>'}).join('')||'<tr><td colspan="7" class="vacio">Sin cruces pendientes.</td></tr>';
     document.querySelectorAll('#tbCru tr.click').forEach(function(tr){tr.addEventListener('click',function(){abrirCruce(r.grupos[Number(tr.dataset.i)],tr)})});
   });
 }
@@ -953,7 +1054,7 @@ function filtroGrupoC(g){var f={ingesta_cfdi_id:document.getElementById('selCf')
 function abrirCruce(g,tr){
   GCRU=g;document.querySelectorAll('#tbCru tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
   document.getElementById('clasC').classList.remove('oculto');
-  document.getElementById('clasCT').textContent='Clasificar · '+TIPOC[g.tipo]+' · '+g.rubro+(g.dif_c!=null?' · '+pesos(g.dif_c):'')+(g.corrida_id?' · '+g.corrida_id:'')+' · '+(g.pendientes||0)+' pendientes de '+g.n;
+  document.getElementById('clasCT').textContent=(CARGA?'Detalle · ':'Clasificar · ')+TIPOC[g.tipo]+' · '+rubro(g.rubro)+(g.dif_c!=null?' · '+pesos(g.dif_c):'')+(g.corrida_id?' · '+g.corrida_id:'')+' · '+(g.pendientes||0)+' pendientes de '+g.n;
   var f=filtroGrupoC(g),q=Object.keys(f).map(function(k){return k+'='+encodeURIComponent(f[k])}).join('&');
   api('GET','/api/kernel/cruces?'+q).then(function(r){
     document.getElementById('tbCruC').innerHTML=r.cruces.map(function(x){return '<tr><td class="mono">'+esc(x.colaborador_llave)+'</td><td>'+esc(x.corrida_id)+'</td><td class="num">'+pesos(x.nomina_c)+'</td><td class="num">'+pesos(x.cfdi_c)+'</td><td class="mono" style="max-width:260px">'+esc(x.uuids||'—')+'</td><td>'+(x.cubeta?'<span class="b b-neu">'+esc(CUBC[x.cubeta])+'</span>':'')+'</td></tr>'}).join('');

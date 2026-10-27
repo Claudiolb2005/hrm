@@ -266,7 +266,7 @@ async function apiPeriodos(req, env, u, C) {
     q = eid ? "SELECT p.*,e.nombre as empresa_nombre FROM periodos p JOIN empresas e ON p.empresa_id=e.id WHERE p.empresa_id=? ORDER BY p.anio DESC," + MESES_ORDER : "SELECT p.*,e.nombre as empresa_nombre FROM periodos p JOIN empresas e ON p.empresa_id=e.id ORDER BY p.anio DESC," + MESES_ORDER;
     a = eid ? [eid] : [];
   } else {
-    q = 'SELECT p.*,e.nombre as empresa_nombre FROM periodos p JOIN empresas e ON p.empresa_id=e.id WHERE p.empresa_id=? AND p.estado="publicado" ORDER BY p.anio DESC,' + MESES_ORDER;
+    q = 'SELECT p.*,e.nombre as empresa_nombre FROM periodos p JOIN empresas e ON p.empresa_id=e.id WHERE p.empresa_id=? AND p.estado=\'publicado\' ORDER BY p.anio DESC,' + MESES_ORDER;
     a = [u.empresa_id];
   }
   const st = a.length ? env.DB.prepare(q).bind(...a) : env.DB.prepare(q);
@@ -3417,7 +3417,7 @@ ${FMT_FN}
 ${UI_FN}
 document.getElementById('uN').textContent = U.empresa_nombre || '';
 document.getElementById('wt').textContent = 'Bienvenido, ' + U.nombre;
-if (U.perfil === 'carga') { var aK = document.createElement('a'); aK.href = '/kernel'; aK.className = 'bo'; aK.textContent = 'Carga y pruebas'; document.getElementById('uN').after(aK); }
+if (U.perfil === 'carga') { var aK = document.createElement('a'); aK.href = '/kernel'; aK.className = 'bo'; aK.textContent = 'Subir documentos'; document.getElementById('uN').after(aK); }
 if (U.empresa_nombre) document.getElementById('ws').textContent = 'Reportes de n\xF3mina \u2014 ' + U.empresa_nombre;
 var tk_h={'Authorization':'Bearer '+tk};
 function dlFile(key,name,btn){var _t=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='...';}fetch('/api/download?key='+encodeURIComponent(key),{headers:tk_h}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();}).then(function(b){var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=name||'archivo';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove();},100);if(btn){btn.disabled=false;btn.textContent=_t;}}).catch(function(e){alert('Error al descargar: '+e.message);if(btn){btn.disabled=false;btn.textContent=_t;}});}
@@ -3538,6 +3538,7 @@ th{padding:10px 12px;text-align:right;font-size:10px;text-transform:uppercase;le
 td{padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-size:11px;border-bottom:1px solid #d0dfe6;color:#3d5a6b}td:first-child{text-align:left;font-family:'Segoe UI',sans-serif;font-weight:600;color:#1a2e3a}
 tr.tot td{font-weight:800;color:#1a2e3a;border-top:2px solid #b8ced8;background:#f0f6f8}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.g2{grid-template-columns:1fr}}
 .callout{background:#f8fbfc;border:1px solid #d0dfe6;border-radius:10px;padding:16px;color:#3d5a6b;font-size:13px;line-height:1.7;border-left:4px solid #1a8a8a;margin-top:16px}
 .act-item{display:flex;gap:12px;background:#f8fbfc;border:1px solid #d0dfe6;border-radius:10px;padding:14px 16px;margin-top:10px}
 .act-n{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;background:rgba(212,146,10,.08);color:#d4920a;font-family:'Courier New',monospace}
@@ -3632,6 +3633,7 @@ tr.tot td{font-weight:800;color:#1a2e3a;border-top:2px solid #b8ced8;background:
 ${AUTH_ANY}
 ${LOGOUT_FN}
 ${FMT_FN}
+var mx=function(n){n=Number(n)||0;return (n<-0.004?'-':'')+'$'+fmt(Math.abs(n))};
 ${UI_FN}
 document.getElementById('uN').textContent=U.empresa_nombre||'';
 var pid=new URLSearchParams(window.location.search).get('id');
@@ -3655,7 +3657,7 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
     '<section class="cuadre3" id="cuadre3" aria-label="Cuadre de tres fuentes">'+
       '<div class="c3-cab"><div><h2>Cuadre de tres fuentes</h2><p>El neto de la nómina contra lo timbrado en CFDI y lo dispersado en bancos.</p></div><span class="c3-est" id="c3Est">Calculando…</span></div>'+
       '<div class="c3-fila">'+
-        '<div class="c3-n"><span>Nómina · neto</span><b>$'+fmt(p.total_neto)+'</b><i>Base de comparación</i></div>'+
+        '<div class="c3-n"><span>Nómina · neto</span><b>'+mx(p.total_neto)+'</b><i>Base de comparación</i></div>'+
         '<div class="c3-l" id="c3L1"><span id="c3D1">—</span></div>'+
         '<div class="c3-n"><span>CFDI timbrados</span><b id="c3V1">—</b><i id="c3S1"></i></div>'+
         '<div class="c3-l" id="c3L2"><span id="c3D2">—</span></div>'+
@@ -3663,9 +3665,9 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
       '</div>'+
     '</section>'+
     '<div class="res-fig">'+
-      '<div><span>Percepciones</span><b>$'+fmt(p.total_percepciones)+'</b></div>'+
-      '<div><span>Deducciones</span><b class="neg">$'+fmt(p.total_deducciones)+'</b></div>'+
-      '<div><span>Neto pagado</span><b>$'+fmt(p.total_neto)+'</b></div>'+
+      '<div><span>Percepciones</span><b>'+mx(p.total_percepciones)+'</b></div>'+
+      '<div><span>Deducciones</span><b class="neg">'+mx(p.total_deducciones)+'</b></div>'+
+      '<div><span>Neto pagado</span><b>'+mx(p.total_neto)+'</b></div>'+
     '</div>'+
     '<div class="res-det">'+
       '<div class="kpi res-p"><div class="res-h"><span>Colaboradores</span><b>'+p.total_empleados.toLocaleString()+'</b></div><div class="res-g" id="empGrid"></div></div>'+
@@ -3686,10 +3688,10 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
     function pinta(n,total,dif){
       var v=document.getElementById('c3V'+n),d=document.getElementById('c3D'+n),l=document.getElementById('c3L'+n),sb=document.getElementById('c3S'+n);
       if(total==null){v.textContent='Sin dato';sb.textContent='Fuente no cargada';l.className='c3-l falta';d.textContent='sin fuente';return null}
-      v.textContent='$'+fmt(total);var a=Math.abs(dif||0);
+      v.textContent=''+mx(total);var a=Math.abs(dif||0);
       d.textContent=a<0.005?'0.00':(dif>0?'+':'−')+fmt(a);
       l.className='c3-l '+(a<0.005?'ok':a<=5?'casi':'dif');
-      sb.textContent=a<0.005?'Cuadra al centavo':'Diferencia de $'+fmt(a);
+      sb.textContent=a<0.005?'Cuadra al centavo':'Diferencia de '+mx(a);
       return a;
     }
     var a1=pinta(1,s1.cfdi_total,s1.cfdi_dif),a2=pinta(2,s1.disp_total,s1.disp_dif);
@@ -3712,21 +3714,21 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
   var s7d=window.RD['sec7']||{};var s8d=window.RD['sec8']||{};
   var impTotal=(s7d.total_trabajador||0)+(s8d.total_patron||0);
   var impV=document.getElementById('impTotalV');
-  if(impV)impV.textContent='$'+fmt(impTotal);
+  if(impV)impV.textContent=''+mx(impTotal);
   var impG=document.getElementById('impGrid');
   if(impG){
     var h='<div>';
     h+='<div class="res-sub">Retenido al trabajador</div>';
     [{l:'ISR',v:s7d.total_isr},{l:'IMSS+RCV',v:s7d.total_imss},{l:'Infonavit',v:s7d.total_info},{l:'FONACOT',v:s7d.total_fon}].forEach(function(r){
-      h+='<div class="res-r"><span>'+r.l+'</span><b>$'+fmt(r.v||0)+'</b></div>';
+      h+='<div class="res-r"><span>'+r.l+'</span><b>'+mx(r.v||0)+'</b></div>';
     });
-    h+='<div class="res-r tot"><span>Subtotal</span><b>$'+fmt(s7d.total_trabajador||0)+'</b></div>';
+    h+='<div class="res-r tot"><span>Subtotal</span><b>'+mx(s7d.total_trabajador||0)+'</b></div>';
     h+='</div><div>';
     h+='<div class="res-sub">A cargo del patr\xF3n</div>';
     [{l:'IMSS',v:s8d.total_imss},{l:'RCV',v:s8d.total_rcv},{l:'Infonavit',v:s8d.total_info},{l:'Imp. estatal',v:s8d.isn_total}].forEach(function(r){
-      h+='<div class="res-r"><span>'+r.l+'</span><b>$'+fmt(r.v||0)+'</b></div>';
+      h+='<div class="res-r"><span>'+r.l+'</span><b>'+mx(r.v||0)+'</b></div>';
     });
-    h+='<div class="res-r tot"><span>Subtotal</span><b>$'+fmt(s8d.total_patron||0)+'</b></div>';
+    h+='<div class="res-r tot"><span>Subtotal</span><b>'+mx(s8d.total_patron||0)+'</b></div>';
     h+='</div>';
     h+='<div id="impPdfLink" style="grid-column:1/-1;text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid #e8f1f4"><span style="color:#8ba5b2;font-size:10px">Cargando PDF...</span></div>';
     impG.innerHTML=h;
@@ -3750,7 +3752,7 @@ function toggle(id){var el=document.getElementById(id);el.classList.toggle('open
         }
       }else{
         if(banner)banner.innerHTML='<div style="background:#f0f6f8;border:1px dashed #b8ced8;border-radius:12px;padding:14px 18px;margin-bottom:20px;color:#5f7d8a;font-size:12px;font-style:italic;text-align:center">PDF de impuestos a\xFAn no disponible para este periodo.</div>';
-        if(el)el.innerHTML='<span style="color:#8ba5b2;font-size:10px;font-style:italic">PDF de impuestos a\xFAn no disponible</span>';
+        if(el)el.innerHTML='';
       }
     }).catch(function(){
       var banner=document.getElementById('impuestosBanner');
@@ -3816,12 +3818,12 @@ function renderSection(id){
   if(id==='sec1'){
     h='<div style="margin-bottom:14px;font-size:12px;color:#5f7d8a">Empleados semanales promedio: <b style="color:#1a2e3a">'+(D.sem_prom||0).toLocaleString()+'</b> \xB7 Catorcenales promedio: <b style="color:#1a2e3a">'+(D.cat_prom||0).toLocaleString()+'</b></div>';
     h+='<div class="tbl-w"><table><thead><tr><th style="text-align:left">Concepto</th><th>Importe</th></tr></thead><tbody>';
-    h+='<tr><td>Percepciones</td><td style="color:'+tl+'"><b>$'+fmt(D.percepciones)+'</b></td></tr>';
-    h+='<tr><td>Deducciones</td><td style="color:'+rd+'"><b>$'+fmt(D.deducciones)+'</b></td></tr>';
-    h+='<tr class="tot"><td>TOTAL (Neto)</td><td><b>$'+fmt(D.total_neto)+'</b></td></tr></tbody></table></div>';
-    h+='<div class="g2" style="margin-top:16px"><div class="callout"><b>N\xF3mina vs CFDIs</b><div style="margin-top:10px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>N\xF3mina</span><span style="font-family:monospace">$'+fmt(D.total_neto)+'</span></div><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>CFDI</span><span style="font-family:monospace">$'+fmt(D.cfdi_total)+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;border-top:2px solid #d4e5eb;margin-top:6px"><span>Diferencia</span><span style="color:'+tl+'">$'+fmt(D.cfdi_dif)+'</span></div></div></div>';
-    h+='<div class="callout"><b>N\xF3mina vs Dispersiones</b><div style="margin-top:10px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>N\xF3mina</span><span style="font-family:monospace">$'+fmt(D.total_neto)+'</span></div><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>Dispersiones</span><span style="font-family:monospace">$'+fmt(D.disp_total)+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;border-top:2px solid #d4e5eb;margin-top:6px"><span>Diferencia</span><span style="color:'+tl+'">$'+fmt(D.disp_dif)+'</span></div></div></div></div>';
-    if(D.warnings){
+    h+='<tr><td>Percepciones</td><td style="color:'+tl+'"><b>'+mx(D.percepciones)+'</b></td></tr>';
+    h+='<tr><td>Deducciones</td><td style="color:'+rd+'"><b>'+mx(D.deducciones)+'</b></td></tr>';
+    h+='<tr class="tot"><td>TOTAL (Neto)</td><td><b>'+mx(D.total_neto)+'</b></td></tr></tbody></table></div>';
+    h+='<div class="g2" style="margin-top:16px"><div class="callout"><b>N\xF3mina vs CFDIs</b><div style="margin-top:10px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>N\xF3mina</span><span style="font-family:monospace">'+mx(D.total_neto)+'</span></div><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>CFDI</span><span style="font-family:monospace">'+mx(D.cfdi_total)+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;border-top:2px solid #d4e5eb;margin-top:6px"><span>Diferencia</span><span style="color:'+tl+'">'+mx(D.cfdi_dif)+'</span></div></div></div>';
+    h+='<div class="callout"><b>N\xF3mina vs Dispersiones</b><div style="margin-top:10px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>N\xF3mina</span><span style="font-family:monospace">'+mx(D.total_neto)+'</span></div><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>Dispersiones</span><span style="font-family:monospace">'+mx(D.disp_total)+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;border-top:2px solid #d4e5eb;margin-top:6px"><span>Diferencia</span><span style="color:'+tl+'">'+mx(D.disp_dif)+'</span></div></div></div></div>';
+    if(D.warnings&&U.rol==='admin'){
       var W=D.warnings;
       var wList=function(title,items,fmtItem){
         if(!items||!items.length)return '';
@@ -3836,8 +3838,8 @@ function renderSection(id){
         }else{b+='</ul>'}
         b+='</div>';return b;
       };
-      h+=wList('Conceptos nuevos detectados (revisar antes de publicar)',W.conceptos_nuevos,function(it){return '<b>'+it.col+'</b> &mdash; Total: $'+fmt(it.total)+' <span style="color:#888">('+(it.tipo||'?')+')</span>'});
-      h+=wList('Puestos nuevos detectados (revisar antes de publicar)',W.puestos_nuevos,function(it){return '<b>'+it.puesto+'</b> <span style="color:#888">['+it.tipo+']</span> &mdash; Monto: $'+fmt(it.monto)});
+      h+=wList('Conceptos nuevos detectados (revisar antes de publicar)',W.conceptos_nuevos,function(it){return '<b>'+it.col+'</b> &mdash; Total: '+mx(it.total)+' <span style="color:#888">('+(it.tipo||'?')+')</span>'});
+      h+=wList('Puestos nuevos detectados (revisar antes de publicar)',W.puestos_nuevos,function(it){return '<b>'+it.puesto+'</b> <span style="color:#888">['+it.tipo+']</span> &mdash; Monto: '+mx(it.monto)});
       if(W.columnas_no_detectadas&&W.columnas_no_detectadas.length){
         h+='<div style="margin-top:10px;padding:10px 14px;background:#fef5f5;border:1px solid #f5a3aa;border-left:4px solid #d94452;border-radius:8px;font-size:12px;color:#7a1f29"><b>&#9888; Columnas no detectadas en el Excel:</b> '+W.columnas_no_detectadas.join(', ')+'</div>';
       }
@@ -3857,83 +3859,83 @@ function renderSection(id){
   }
   if(id==='sec2'){
     var nomT=0,cfdiT=0,dispT=0;D.forEach(function(r){nomT+=r.nom;cfdiT+=r.cfdi;dispT+=r.disp});
-    h='<div class="g2" style="margin-bottom:16px"><div class="callout">Dif. N\xF3mina vs CFDI: <b style="color:'+tl+'">$'+fmt(nomT-cfdiT)+'</b></div><div class="callout">Dif. N\xF3mina vs Dispersiones: <b style="color:'+tl+'">$'+fmt(nomT-dispT)+'</b></div></div>';
+    h='<div class="g2" style="margin-bottom:16px"><div class="callout">Dif. N\xF3mina vs CFDI: <b style="color:'+tl+'">'+mx(nomT-cfdiT)+'</b></div><div class="callout">Dif. N\xF3mina vs Dispersiones: <b style="color:'+tl+'">'+mx(nomT-dispT)+'</b></div></div>';
     h+='<div class="tbl-w"><table><thead><tr><th>Periodo</th><th>N\xF3mina</th><th>CFDI</th><th>Dif</th><th>Dispersi\xF3n</th><th>Dif</th></tr></thead><tbody>';
-    D.forEach(function(r){var d1=(r.nom-r.cfdi);var d2=(r.nom-r.disp);h+='<tr><td>'+r.p+'</td><td>$'+fmt(r.nom)+'</td><td>$'+fmt(r.cfdi)+'</td><td style="color:'+(Math.abs(d1)<1?tl:rd)+'"><b>$'+fmt(d1)+'</b></td><td>$'+fmt(r.disp)+'</td><td style="color:'+(Math.abs(d2)<1?tl:rd)+'"><b>$'+fmt(d2)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td>$'+fmt(nomT)+'</td><td>$'+fmt(cfdiT)+'</td><td style="color:'+tl+'"><b>$'+fmt(nomT-cfdiT)+'</b></td><td>$'+fmt(dispT)+'</td><td style="color:'+tl+'"><b>$'+fmt(nomT-dispT)+'</b></td></tr></tbody></table></div>';
+    D.forEach(function(r){var d1=(r.nom-r.cfdi);var d2=(r.nom-r.disp);h+='<tr><td>'+r.p+'</td><td>'+mx(r.nom)+'</td><td>'+mx(r.cfdi)+'</td><td style="color:'+(Math.abs(d1)<1?tl:rd)+'"><b>'+mx(d1)+'</b></td><td>'+mx(r.disp)+'</td><td style="color:'+(Math.abs(d2)<1?tl:rd)+'"><b>'+mx(d2)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td>'+mx(nomT)+'</td><td>'+mx(cfdiT)+'</td><td style="color:'+tl+'"><b>'+mx(nomT-cfdiT)+'</b></td><td>'+mx(dispT)+'</td><td style="color:'+tl+'"><b>'+mx(nomT-dispT)+'</b></td></tr></tbody></table></div>';
     el.innerHTML=h;
   }
   if(id==='sec4'){
     h='<div class="chart-c"><h4>Neto por periodo</h4><canvas id="c4" height="220"></canvas></div>';
     h+='<div class="tbl-w" style="margin-top:16px"><table><thead><tr><th colspan="2" style="text-align:center;color:'+tl+'">PERCEPCIONES</th></tr><tr><th>Concepto</th><th>Total</th></tr></thead><tbody>';
-    D.percepciones.forEach(function(c){h+='<tr><td>'+c.c+'</td><td style="color:'+tl+'">$'+fmt(c.t)+'</td></tr>'});
-    h+='<tr class="tot"><td>TOTAL PERCEPCIONES</td><td style="color:'+tl+'"><b>$'+fmt(D.total_perc)+'</b></td></tr>';
+    D.percepciones.forEach(function(c){h+='<tr><td>'+c.c+'</td><td style="color:'+tl+'">'+mx(c.t)+'</td></tr>'});
+    h+='<tr class="tot"><td>TOTAL PERCEPCIONES</td><td style="color:'+tl+'"><b>'+mx(D.total_perc)+'</b></td></tr>';
     h+='<tr><td colspan="2" style="text-align:center;color:'+rd+';font-weight:700;background:#fef5f5;padding:8px">DEDUCCIONES</td></tr>';
-    D.deducciones.forEach(function(c){var tip=c.group&&c.group.length>1?' <span style="font-size:10px;color:#888" title="'+c.group.join(" + ")+'">(agrupado: '+c.group.length+')</span>':'';h+='<tr><td>'+c.c+tip+'</td><td style="color:'+rd+'">$'+fmt(c.t)+'</td></tr>'});
-    h+='<tr class="tot"><td>TOTAL DEDUCCIONES</td><td style="color:'+rd+'"><b>$'+fmt(D.total_ded)+'</b></td></tr>';
-    h+='<tr class="tot"><td><b>NETO</b></td><td><b>$'+fmt(D.total_neto)+'</b></td></tr>';
-    if(D.despensa){h+='<tr><td colspan="2" style="text-align:center;color:'+bl+';font-weight:700;background:#f4f9fc;padding:8px">DESPENSA (informativo, s\xED cuenta vs CFDIs)</td></tr><tr><td>'+D.despensa.c+'</td><td style="color:'+bl+'">$'+fmt(D.despensa.t)+'</td></tr>'}
+    D.deducciones.forEach(function(c){var tip=U.rol==='admin'&&c.group&&c.group.length>1?' <span style="font-size:10px;color:#888" title="'+c.group.join(" + ")+'">(agrupado: '+c.group.length+')</span>':'';h+='<tr><td>'+c.c+tip+'</td><td style="color:'+rd+'">'+mx(c.t)+'</td></tr>'});
+    h+='<tr class="tot"><td>TOTAL DEDUCCIONES</td><td style="color:'+rd+'"><b>'+mx(D.total_ded)+'</b></td></tr>';
+    h+='<tr class="tot"><td><b>NETO</b></td><td><b>'+mx(D.total_neto)+'</b></td></tr>';
+    if(D.despensa){h+='<tr><td colspan="2" style="text-align:center;color:'+bl+';font-weight:700;background:#f4f9fc;padding:8px">DESPENSA (informativo, s\xED cuenta vs CFDIs)</td></tr><tr><td>'+D.despensa.c+'</td><td style="color:'+bl+'">'+mx(D.despensa.t)+'</td></tr>'}
     h+='</tbody></table></div>';
     h+='<div class="tbl-w" style="margin-top:16px"><table><thead><tr><th>Periodo</th><th>Percepciones</th><th>Deducciones</th><th>Neto</th></tr></thead><tbody>';
-    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td style="color:'+tl+'">$'+fmt(r.perc)+'</td><td style="color:'+rd+'">$'+fmt(r.ded)+'</td><td><b>$'+fmt(r.neto)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+tl+'"><b>$'+fmt(D.total_perc)+'</b></td><td style="color:'+rd+'"><b>$'+fmt(D.total_ded)+'</b></td><td><b>$'+fmt(D.total_neto)+'</b></td></tr></tbody></table></div>';
+    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td style="color:'+tl+'">'+mx(r.perc)+'</td><td style="color:'+rd+'">'+mx(r.ded)+'</td><td><b>'+mx(r.neto)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+tl+'"><b>'+mx(D.total_perc)+'</b></td><td style="color:'+rd+'"><b>'+mx(D.total_ded)+'</b></td><td><b>'+mx(D.total_neto)+'</b></td></tr></tbody></table></div>';
     el.innerHTML=h;
     new Chart(document.getElementById('c4'),{type:'bar',data:{labels:D.periodos.map(function(r){return r.p}),datasets:[{data:D.periodos.map(function(r){return r.neto}),backgroundColor:bl+'44',borderColor:bl,borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:function(v){return '$'+(v/1e6).toFixed(0)+'M'}}}}}});
   }
   if(id==='sec5'){
     h='<h4 style="font-size:13px;color:'+tl+';margin-bottom:10px">N\xF3mina Semanal (Neto + Despensa)</h4><div class="tbl-w"><table><thead><tr><th>Puesto</th><th>Importe</th></tr></thead><tbody>';
-    D.semanal.forEach(function(r){h+='<tr><td>'+r.n+'</td><td style="color:'+tl+'"><b>$'+fmt(r.v)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL SEMANAL</td><td style="color:'+tl+'"><b>$'+fmt(D.total_sem)+'</b></td></tr></tbody></table></div>';
+    D.semanal.forEach(function(r){h+='<tr><td>'+r.n+'</td><td style="color:'+tl+'"><b>'+mx(r.v)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL SEMANAL</td><td style="color:'+tl+'"><b>'+mx(D.total_sem)+'</b></td></tr></tbody></table></div>';
     h+='<h4 style="font-size:13px;color:'+bl+';margin:20px 0 10px">N\xF3mina Catorcenal (Neto + Despensa)</h4><div class="tbl-w"><table><thead><tr><th>Puesto</th><th>Importe</th></tr></thead><tbody>';
-    D.catorcenal.forEach(function(r){h+='<tr><td>'+r.n+'</td><td style="color:'+bl+'"><b>$'+fmt(r.v)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL CATORCENAL</td><td style="color:'+bl+'"><b>$'+fmt(D.total_cat)+'</b></td></tr></tbody></table></div>';
+    D.catorcenal.forEach(function(r){h+='<tr><td>'+r.n+'</td><td style="color:'+bl+'"><b>'+mx(r.v)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL CATORCENAL</td><td style="color:'+bl+'"><b>'+mx(D.total_cat)+'</b></td></tr></tbody></table></div>';
     var nuevos=(D.nuevos_semanal||[]).concat(D.nuevos_catorcenal||[]);
-    if(nuevos.length){h+='<div class="callout" style="margin-top:16px;border-left:4px solid '+am+';background:#fffbf0"><b>\u26A0 Puestos nuevos detectados (revisar antes de publicar)</b><div style="margin-top:8px;font-size:12px">';nuevos.forEach(function(n){h+='<div>\xB7 '+n.n+' \u2014 $'+fmt(n.v)+'</div>'});h+='</div></div>'}
+    if(nuevos.length&&U.rol==='admin'){h+='<div class="callout" style="margin-top:16px;border-left:4px solid '+am+';background:#fffbf0"><b>\u26A0 Puestos nuevos detectados (revisar antes de publicar)</b><div style="margin-top:8px;font-size:12px">';nuevos.forEach(function(n){h+='<div>\xB7 '+n.n+' \u2014 '+mx(n.v)+'</div>'});h+='</div></div>'}
     el.innerHTML=h;
   }
   if(id==='sec6'){
     h='<div class="chart-c"><h4>Neto por estado</h4><canvas id="c6" height="350"></canvas></div>';
     h+='<div class="tbl-w" style="margin-top:16px"><table><thead><tr><th>Estado</th><th>Total n\xF3mina</th><th>%</th></tr></thead><tbody>';
     var tv6=D.reduce(function(s,r){return s+r.v},0);
-    D.forEach(function(r){h+='<tr><td>'+r.e+'</td><td style="color:'+bl+'"><b>$'+fmt(r.v)+'</b></td><td>'+(tv6>0?(r.v/tv6*100).toFixed(2):'0')+'%</td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+bl+'"><b>$'+fmt(tv6)+'</b></td><td>100%</td></tr></tbody></table></div>';
+    D.forEach(function(r){h+='<tr><td>'+r.e+'</td><td style="color:'+bl+'"><b>'+mx(r.v)+'</b></td><td>'+(tv6>0?(r.v/tv6*100).toFixed(2):'0')+'%</td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+bl+'"><b>'+mx(tv6)+'</b></td><td>100%</td></tr></tbody></table></div>';
     el.innerHTML=h;
     new Chart(document.getElementById('c6'),{type:'bar',data:{labels:D.slice(0,15).map(function(r){return r.e}),datasets:[{data:D.slice(0,15).map(function(r){return r.v}),backgroundColor:tl+'44',borderColor:tl,borderWidth:1}]},options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:function(v){return '$'+(v/1e6).toFixed(0)+'M'}}}}}});
   }
   if(id==='sec7'){
     h='<div class="tbl-w"><table><thead><tr><th>Periodo</th><th>ISR</th><th>IMSS</th><th>Infonavit</th><th>FONACOT</th><th>TRABAJADOR</th></tr></thead><tbody>';
-    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td>$'+fmt(r.isr)+'</td><td>$'+fmt(r.imss)+'</td><td>$'+fmt(r.info)+'</td><td>$'+fmt(r.fon)+'</td><td><b>$'+fmt(r.total)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td><b>$'+fmt(D.total_isr)+'</b></td><td><b>$'+fmt(D.total_imss)+'</b></td><td><b>$'+fmt(D.total_info)+'</b></td><td><b>$'+fmt(D.total_fon)+'</b></td><td><b>$'+fmt(D.total_trabajador)+'</b></td></tr>';
+    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td>'+mx(r.isr)+'</td><td>'+mx(r.imss)+'</td><td>'+mx(r.info)+'</td><td>'+mx(r.fon)+'</td><td><b>'+mx(r.total)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td><b>'+mx(D.total_isr)+'</b></td><td><b>'+mx(D.total_imss)+'</b></td><td><b>'+mx(D.total_info)+'</b></td><td><b>'+mx(D.total_fon)+'</b></td><td><b>'+mx(D.total_trabajador)+'</b></td></tr>';
     h+='</tbody></table></div>';
-    h+='<div class="callout" style="margin-top:16px;border-left:4px solid '+am+'"><b>Visor de n\xF3minas SAT</b><div style="margin-top:8px;font-size:12px"><div style="display:flex;gap:24px;flex-wrap:wrap"><div>Total n\xF3mina SAT: <b>$'+fmt(D.total_nomina_sat)+'</b></div><div>N\xF3mina exenta: <b>$'+fmt(D.nomina_exenta_sat)+'</b></div><div>Trabajadores: <b>'+D.num_empleados_sat+'</b></div></div>';
-    h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid #d4e5eb"><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0"><span>ISR n\xF3mina</span><span style="font-family:monospace">$'+fmt(D.isr_nomina)+'</span></div><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0"><span>ISR SAT</span><span style="font-family:monospace">$'+fmt(D.isr_sat)+'</span></div><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0;font-weight:700;color:'+rd+'"><span>Diferencia</span><span>$'+fmt(D.isr_dif)+'</span></div></div></div></div>';
+    h+='<div class="callout" style="margin-top:16px;border-left:4px solid '+am+'"><b>Visor de n\xF3minas SAT</b><div style="margin-top:8px;font-size:12px"><div style="display:flex;gap:24px;flex-wrap:wrap"><div>Total n\xF3mina SAT: <b>'+mx(D.total_nomina_sat)+'</b></div><div>N\xF3mina exenta: <b>'+mx(D.nomina_exenta_sat)+'</b></div><div>Trabajadores: <b>'+D.num_empleados_sat+'</b></div></div>';
+    h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid #d4e5eb"><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0"><span>ISR n\xF3mina</span><span style="font-family:monospace">'+mx(D.isr_nomina)+'</span></div><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0"><span>ISR SAT</span><span style="font-family:monospace">'+mx(D.isr_sat)+'</span></div><div style="display:flex;justify-content:space-between;max-width:400px;padding:3px 0;font-weight:700;color:'+rd+'"><span>Diferencia</span><span>'+mx(D.isr_dif)+'</span></div></div></div></div>';
     el.innerHTML=h;
   }
   if(id==='sec8'){
     h='<div class="tbl-w"><table><thead><tr><th>Periodo</th><th>IMSS</th><th>RCV</th><th>Infonavit</th><th>Imp. estatal</th><th>PATR\xD3N</th></tr></thead><tbody>';
-    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td>$'+fmt(r.imss)+'</td><td>$'+fmt(r.rcv)+'</td><td>$'+fmt(r.info)+'</td><td style="color:'+am+'">$'+fmt(r.isn)+'</td><td><b>$'+fmt(r.total)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td><b>$'+fmt(D.total_imss)+'</b></td><td><b>$'+fmt(D.total_rcv)+'</b></td><td><b>$'+fmt(D.total_info)+'</b></td><td style="color:'+am+'"><b>$'+fmt(D.isn_total)+'</b></td><td><b>$'+fmt(D.total_patron)+'</b></td></tr></tbody></table></div>';
+    D.periodos.forEach(function(r){h+='<tr><td>'+r.p+'</td><td>'+mx(r.imss)+'</td><td>'+mx(r.rcv)+'</td><td>'+mx(r.info)+'</td><td style="color:'+am+'">'+mx(r.isn)+'</td><td><b>'+mx(r.total)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td><b>'+mx(D.total_imss)+'</b></td><td><b>'+mx(D.total_rcv)+'</b></td><td><b>'+mx(D.total_info)+'</b></td><td style="color:'+am+'"><b>'+mx(D.isn_total)+'</b></td><td><b>'+mx(D.total_patron)+'</b></td></tr></tbody></table></div>';
     el.innerHTML=h;
   }
   if(id==='sec9'){
     h='<div class="tbl-w"><table><thead><tr><th>Registro Patronal</th><th>Estado</th><th>Colaboradores</th><th>Total IMSS</th></tr></thead><tbody>';
-    var t9=0,te9=0;D.forEach(function(r){t9+=r.t;te9+=r.emp;h+='<tr><td style="font-family:monospace;font-weight:600">'+r.rp+'</td><td>'+r.e+'</td><td>'+r.emp+'</td><td style="color:'+tl+'"><b>$'+fmt(r.t)+'</b></td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td>30 registros</td><td><b>'+te9.toLocaleString()+'</b></td><td style="color:'+tl+'"><b>$'+fmt(t9)+'</b></td></tr></tbody></table></div>';
+    var t9=0,te9=0;D.forEach(function(r){t9+=r.t;te9+=r.emp;h+='<tr><td style="font-family:monospace;font-weight:600">'+r.rp+'</td><td>'+r.e+'</td><td>'+r.emp+'</td><td style="color:'+tl+'"><b>'+mx(r.t)+'</b></td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td>30 registros</td><td><b>'+te9.toLocaleString()+'</b></td><td style="color:'+tl+'"><b>'+mx(t9)+'</b></td></tr></tbody></table></div>';
     el.innerHTML=h;
   }
   if(id==='sec10'){
     h='<div class="tbl-w"><table><thead><tr><th>Estado</th><th>Emp.</th><th>Base gravable</th><th>Tasa</th><th>Impuesto</th><th>Mes anterior</th><th>Diferencia</th></tr></thead><tbody>';
-    var ti=0,ta2=0;D.forEach(function(r){ti+=r.imp;ta2+=r.ant;h+='<tr><td>'+r.e+'</td><td>'+r.emp+'</td><td>$'+fmt(r.base)+'</td><td>'+r.tasa.toFixed(2)+'%</td><td style="color:'+am+'"><b>$'+fmt(r.imp)+'</b></td><td>$'+fmt(r.ant)+'</td><td style="color:'+(r.dif<0?gn:rd)+'">$'+fmt(r.dif)+'</td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td style="color:'+am+'"><b>$'+fmt(ti)+'</b></td><td><b>$'+fmt(ta2)+'</b></td><td style="color:'+gn+'"><b>$'+fmt(ti-ta2)+'</b></td></tr></tbody></table></div>';
+    var ti=0,ta2=0;D.forEach(function(r){ti+=r.imp;ta2+=r.ant;h+='<tr><td>'+r.e+'</td><td>'+r.emp+'</td><td>'+mx(r.base)+'</td><td>'+r.tasa.toFixed(2)+'%</td><td style="color:'+am+'"><b>'+mx(r.imp)+'</b></td><td>'+mx(r.ant)+'</td><td style="color:'+(r.dif<0?gn:rd)+'">'+mx(r.dif)+'</td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td style="color:'+am+'"><b>'+mx(ti)+'</b></td><td><b>'+mx(ta2)+'</b></td><td style="color:'+gn+'"><b>'+mx(ti-ta2)+'</b></td></tr></tbody></table></div>';
     el.innerHTML=h;
   }
   if(id==='sec11'){
     h='<div class="tbl-w"><table><thead><tr><th style="text-align:left">Concepto</th><th>Importe</th></tr></thead><tbody>';
-    h+='<tr><td>Provisi\xF3n global (contabilidad)</td><td><b>$'+fmt(D.provision_global)+'</b></td></tr>';
-    h+='<tr><td>N\xF3mina ajustada (- despensa + pensi\xF3n)</td><td><b>$'+fmt(D.nomina_ajustada)+'</b></td></tr>';
-    h+='<tr class="tot"><td>Diferencia</td><td style="color:'+rd+'"><b>$'+fmt(D.diferencia)+'</b></td></tr></tbody></table></div>';
+    h+='<tr><td>Provisi\xF3n global (contabilidad)</td><td><b>'+mx(D.provision_global)+'</b></td></tr>';
+    h+='<tr><td>N\xF3mina ajustada (- despensa + pensi\xF3n)</td><td><b>'+mx(D.nomina_ajustada)+'</b></td></tr>';
+    h+='<tr class="tot"><td>Diferencia</td><td style="color:'+rd+'"><b>'+mx(D.diferencia)+'</b></td></tr></tbody></table></div>';
     h+='<div class="tbl-w" style="margin-top:16px"><table><thead><tr><th>Periodo / Concepto</th><th>Provisi\xF3n</th><th>N\xF3mina</th><th>Variaci\xF3n</th></tr></thead><tbody>';
-    D.periodos.forEach(function(r){var vc=r.var===0?tl:(r.var>0?gn:rd);h+='<tr><td>'+r.p+'</td><td>$'+fmt(r.prov)+'</td><td>$'+fmt(r.nom)+'</td><td style="color:'+vc+'"><b>$'+fmt(r.var)+'</b></td></tr>'});
+    D.periodos.forEach(function(r){var vc=r.var===0?tl:(r.var>0?gn:rd);h+='<tr><td>'+r.p+'</td><td>'+mx(r.prov)+'</td><td>'+mx(r.nom)+'</td><td style="color:'+vc+'"><b>'+mx(r.var)+'</b></td></tr>'});
     h+='</tbody></table></div>';
     if(D.notas&&D.notas.length){h+='<div class="callout" style="margin-top:16px"><b>Notas</b>';D.notas.forEach(function(n){h+='<div style="margin-top:4px;font-size:12px;color:#5f7d8a">\xB7 '+n+'</div>'});h+='</div>'}
     el.innerHTML=h;
@@ -3962,8 +3964,8 @@ function renderSection(id){
     h='<h4 style="font-size:13px;color:'+tl+';margin-bottom:8px">Comisiones por estado</h4>';
     h+='<div class="chart-c"><canvas id="c14e" height="340"></canvas></div>';
     h+='<div class="tbl-w" style="margin-top:10px"><table><thead><tr><th style="text-align:left">Estado</th><th>Importe</th><th>%</th></tr></thead><tbody>';
-    ce.forEach(function(r){h+='<tr><td>'+r.e+'</td><td style="color:'+tl+'"><b>$'+fmt(r.v)+'</b></td><td>'+(r.pct!=null?r.pct.toFixed(2):(cet>0?(r.v/cet*100).toFixed(2):'0'))+'%</td></tr>'});
-    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+tl+'"><b>$'+fmt(cet)+'</b></td><td>100%</td></tr></tbody></table></div>';
+    ce.forEach(function(r){h+='<tr><td>'+r.e+'</td><td style="color:'+tl+'"><b>'+mx(r.v)+'</b></td><td>'+(r.pct!=null?r.pct.toFixed(2):(cet>0?(r.v/cet*100).toFixed(2):'0'))+'%</td></tr>'});
+    h+='<tr class="tot"><td>TOTAL</td><td style="color:'+tl+'"><b>'+mx(cet)+'</b></td><td>100%</td></tr></tbody></table></div>';
     h+='<h4 style="font-size:13px;color:'+am+';margin:22px 0 8px">Comisiones por periodo</h4>';
     h+='<div class="chart-c"><canvas id="c14p" height="200"></canvas></div>';
     h+='<h4 style="font-size:13px;color:'+bl+';margin:22px 0 8px">Seguro Social Patronal semanal (IMSS + RCV)</h4>';
