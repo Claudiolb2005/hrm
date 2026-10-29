@@ -3,6 +3,21 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.2 — 2026-10-29
+
+Sin cambio de reglas de cálculo. Cruce nómina ↔ CFDI con los pagos fuera de la nómina ordinaria.
+
+- **Renglones sin calendario al cruce.** Los renglones de corridas que no están en el calendario (BONOS SEM, BONOS CAT,
+  FINIQUITOS, PTU, COMISIONES, GRATIFICACION…) siguen sin cálculo del kernel (no hay periodicidad ni fecha de pago), pero sus
+  percepciones, ISR (ordinario + separación) y neto ya entran al cruce con el CFDI. Antes se descartaban: en agosto 2026 de
+  PrimeWireless se quedaron fuera 272 renglones. La reconciliación kernel ↔ nómina no los toma.
+- **Emparejamiento por importe** (`emparejarExtras` en `ingesta/cruce.js`, regla de 4 pasos: RFC + importe). PRIME timbra los
+  bonos como nómina ordinaria con las fechas de la semana (el bono de agosto cae en la SEM 32 y se sumaba al recibo semanal) y
+  los finiquitos como extraordinaria con fecha de pago propia (sin corrida). Antes de cruzar por corrida, cada renglón extra
+  busca su CFDI por colaborador y neto: uno exacto; si no, hasta 4 que sumen el neto exacto; si no, uno a ≤ 50 ¢. Sólo se mueve
+  un CFDI sin corrida, o de una semana con más de un CFDI del colaborador, o de una semana sin renglón suyo en la prenómina.
+  El reporte del cruce dice cuántos CFDI se emparejaron y de qué corrida salieron (`pagos_extra`).
+
 ## 0.11.1 — 2026-10-27
 
 Sin cambio de reglas ni de importes: la huella cambia porque la ingesta suma la detección del mes.

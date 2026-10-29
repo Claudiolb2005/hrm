@@ -7,7 +7,7 @@ import { cfdiXml, U, CAL, archivosPrueba } from './fixtures-cfdi.mjs';
 import { crearIngesta, avanzar, estadoIngesta } from '../../ingesta/trabajos.js';
 import { crearIngestaCfdi, avanzarCfdi, estadoIngestaCfdi, reintentarCfdi } from '../../ingesta/cfdi.js';
 import { leerCfdi, asignarCorrida, leerMetadataSat } from '../../ingesta/cfdi-xml.js';
-import { cruzarNominaCfdi } from '../../ingesta/cruce.js';
+import { cruzarNominaCfdi, emparejarExtras } from '../../ingesta/cruce.js';
 import { rutasDictamen } from '../../api/dictamen.js';
 import { rutasCfdi } from '../../api/cfdi.js';
 import { rutasKernel } from '../../api/kernel.js';
@@ -163,4 +163,32 @@ test('XML de punta a punta: lee, asigna corrida, descarta cancelados y repetidos
   const cont = JSON.parse(db.raw.prepare('SELECT contenido_json FROM dictamen').get().contenido_json);
   assert.equal(cont.s1_alcance.cfdi.validos, 4);
   assert.ok(cont.s6_cedulas.some(c => c.modulo === '4.2' && c.material));
+});
+
+test('pagos extra: el bono timbrado como ordinaria de la semana se cruza contra su renglón, no contra el recibo semanal', () => {
+  const ORD = new Set(['SEM31', 'SEM32', 'SEM33', 'SEM34']);
+  // Caso real 1067222 (agosto 2026): recibo SEM 32 de $881.47 y bono de $32,028.29, ambos con FechaFinalPago 09-ago.
+  const nom = [
+    { colaborador_llave: '1067222', corrida_id: 'SEM32', rubro: 'neto', valor_c: 88147, movimiento_id: 'm1' },
+    { colaborador_llave: '1067222', corrida_id: 'BONOS_SEM', rubro: 'neto', valor_c: 3202829, movimiento_id: 'm2' },
+    // Finiquito pagado en dos CFDI (ordinario sin renglón semanal + extraordinario sin corrida).
+    { colaborador_llave: '555001', corrida_id: 'FINIQUITOS', rubro: 'neto', valor_c: 1500000, movimiento_id: 'm3' },
+    // Bono sin CFDI propio: el único recibo semanal del colaborador nunca se mueve aunque el importe coincida.
+    { colaborador_llave: '777', corrida_id: 'SEM33', rubro: 'neto', valor_c: 50000, movimiento_id: 'm4' },
+    { colaborador_llave: '777', corrida_id: 'BONOS_SEM', rubro: 'neto', valor_c: 50000, movimiento_id: 'm5' },
+  ];
+  const cf = [
+    { uuid: '3B81', colaborador_llave: '1067222', corrida_id: 'SEM32', total_c: 88147, total_percepciones_c: 560000, isr_retenido_c: 0 },
+    { uuid: 'DB3A', colaborador_llave: '1067222', corrida_id: 'SEM32', total_c: 3202829, total_percepciones_c: 4460979, isr_retenido_c: 0 },
+    { uuid: 'F1', colaborador_llave: '555001', corrida_id: 'SEM34', total_c: 400000, total_percepciones_c: 0, isr_retenido_c: 0 },
+    { uuid: 'F2', colaborador_llave: '555001', corrida_id: null, total_c: 1100000, total_percepciones_c: 0, isr_retenido_c: 0 },
+    { uuid: 'S7', colaborador_llave: '777', corrida_id: 'SEM33', total_c: 50000, total_percepciones_c: 0, isr_retenido_c: 0 },
+  ];
+  const e = emparejarExtras(nom, cf, ORD);
+  const a = Object.fromEntries(e.cfdis.map(c => [c.uuid, c.corrida_id]));
+  assert.deepEqual(a, { '3B81': 'SEM32', DB3A: 'BONOS_SEM', F1: 'FINIQUITOS', F2: 'FINIQUITOS', S7: 'SEM33' });
+  assert.equal(e.reasignados.length, 3);
+  const r = cruzarNominaCfdi(nom, e.cfdis.filter(c => c.corrida_id), { rubros: ['neto'] });
+  assert.equal(r.coincidencias, 4, 'SEM32, bono, finiquito y SEM33');
+  assert.deepEqual(r.cruces.map(c => [c.tipo, c.colaborador_llave, c.corrida_id]), [['sin_cfdi', '777', 'BONOS_SEM']]);
 });

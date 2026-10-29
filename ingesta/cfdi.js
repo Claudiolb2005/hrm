@@ -9,7 +9,7 @@
 // Idempotente: repetir un lote o un cruce no duplica; un cruce nuevo conserva la clasificación de lo que vuelve a encontrar.
 import { abrirZip, fuenteR2 } from './xlsx.js';
 import { leerCfdi, asignarCorrida, leerMetadataSat } from './cfdi-xml.js';
-import { cruzarNominaCfdi, llaveBase, RUBROS_CRUCE } from './cruce.js';
+import { cruzarNominaCfdi, emparejarExtras, llaveBase, RUBROS_CRUCE } from './cruce.js';
 import { sha256Hex, nuevoId } from '../kernel/src/sello.js';
 import { insertarMultiple } from '../kernel/src/d1.js';
 
@@ -173,26 +173,42 @@ async function faseCruzando(env, ing) {
 
   const vistos = new Map(), duplicados = [], sinCorrida = {}, invalidos = [], conErrores = [];
   let cancelados = 0, sinEstado = 0, sustituciones = 0;
-  const validos = [];
+  const vigentes = [];
   for (const c of comps) {
-    if (!c.corrida_id) {
+    const contarSinCorrida = () => {
       const m = (c.motivo_sin_corrida || 'sin corrida').replace(/\d{4}-\d{2}-\d{2}/g, 'AAAA-MM-DD');
       sinCorrida[m] = (sinCorrida[m] || 0) + 1;
-      if (/^comprobante inválido/.test(c.motivo_sin_corrida || '')) invalidos.push(c.archivo);
-      continue;
-    }
+    };
+    if (!c.corrida_id && /^comprobante inválido/.test(c.motivo_sin_corrida || '')) { contarSinCorrida(); invalidos.push(c.archivo); continue; }
     if (vistos.has(c.uuid)) { duplicados.push({ uuid: c.uuid, archivos: [vistos.get(c.uuid), c.archivo] }); continue; }
     vistos.set(c.uuid, c.archivo);
     const e = estado.get(c.uuid);
     if (e === 'cancelado') { cancelados += 1; continue; }
-    if (!e) sinEstado += 1;
-    if (c.tipo_relacion === '04') sustituciones += 1;
-    if (c.n_errores) conErrores.push({ archivo: c.archivo, uuid: c.uuid, errores: JSON.parse(c.errores || '[]').slice(0, 3) });
-    validos.push(c);
+    vigentes.push(c);
   }
   const nomina = movs.map(m => ({ colaborador_llave: ing.llave === 'rfc' ? (m.rfc || '') : llaveBase(m.colaborador_id), corrida_id: m.corrida_id, rubro: m.rubro, valor_c: m.valor_c, movimiento_id: m.id }))
     .filter(m => m.colaborador_llave);
   const sinRfc = ing.llave === 'rfc' ? movs.filter(m => !m.rfc).length : 0;
+  // Bonos, finiquitos y demás pagos fuera de la nómina ordinaria: su CFDI se busca por colaborador e importe.
+  const { results: cal } = await db.prepare('SELECT corrida_id FROM calendario_nomina WHERE encargo_id = ?1 AND ordinaria = 1').bind(ing.encargo_id).all();
+  const emp = emparejarExtras(nomina, vigentes, new Set(cal.map(x => x.corrida_id)));
+  const validos = [];
+  for (const c of emp.cfdis) {
+    if (c.corrida_id) {
+      if (!estado.get(c.uuid)) sinEstado += 1;
+      if (c.tipo_relacion === '04') sustituciones += 1;
+      if (c.n_errores) conErrores.push({ archivo: c.archivo, uuid: c.uuid, errores: JSON.parse(c.errores || '[]').slice(0, 3) });
+      validos.push(c); continue;
+    }
+    const m = (c.motivo_sin_corrida || 'sin corrida').replace(/\d{4}-\d{2}-\d{2}/g, 'AAAA-MM-DD');
+    sinCorrida[m] = (sinCorrida[m] || 0) + 1;
+  }
+  const pagosExtra = {};
+  for (const x of emp.reasignados) {
+    const g = pagosExtra[x.a] || (pagosExtra[x.a] = { cfdi: 0, desde_corrida: {}, sin_corrida: 0 });
+    g.cfdi += 1;
+    if (x.de) g.desde_corrida[x.de] = (g.desde_corrida[x.de] || 0) + 1; else g.sin_corrida += 1;
+  }
   const r = cruzarNominaCfdi(nomina, validos);
   // Por corrida: deja ver de un vistazo si al paquete le falta una semana completa.
   const porCorrida = {};
@@ -225,6 +241,7 @@ async function faseCruzando(env, ing) {
   const reporte = { ...(JSON.parse(ing.reporte_json || '{}')), prenomina_ingesta_id: pre.id, ejecucion_id: pre.ejecucion_id, corte, llave: ing.llave,
     comprobantes: comps.length, validos: validos.length, invalidos: invalidos.length, muestra_invalidos: invalidos.slice(0, 20), sin_corrida: sinCorrida,
     duplicados: duplicados.length, muestra_duplicados: duplicados.slice(0, 20), cancelados, sin_estado_sat: sinEstado, sustituciones,
+    pagos_extra: { cfdi_emparejados: emp.reasignados.length, por_corrida: pagosExtra, muestra: emp.reasignados.slice(0, 20) },
     con_errores_internos: conErrores.length, muestra_errores: conErrores.slice(0, 20),
     cruce: { coincidencias: r.coincidencias, con_diferencia: r.con_diferencia, por_tipo: r.por_tipo, multiples_cfdi: r.multiples_cfdi, llaves_nomina: r.llaves_nomina, llaves_cfdi: r.llaves_cfdi,
       rubros_sin_dato_en_nomina: r.rubros_sin_dato_en_nomina, por_corrida: porCorrida },
