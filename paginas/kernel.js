@@ -8,7 +8,10 @@
 import { FUNCIONES_MES } from '../ingesta/mes.js';
 
 // Detección del mes (ingesta/mes.js): las mismas funciones que prueba el servidor, embebidas por toString.
-const JS_MES = FUNCIONES_MES.map(f => f.toString()).join('\n');
+// Al desplegar, wrangler empaqueta con keepNames y mete llamadas a __name(...) dentro de las funciones;
+// en el navegador ese ayudante no existe («__name is not defined»), así que se define aquí, inofensivo.
+const SHIM_NAME = 'var __name = __name || function (f) { return f; };';
+const JS_MES = SHIM_NAME + '\n' + FUNCIONES_MES.map(f => f.toString()).join('\n');
 
 export function paginaKernel({ CSS, LOGO, AUTH_ADMIN, LOGOUT_FN }) {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">

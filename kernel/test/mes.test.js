@@ -78,3 +78,18 @@ test('las funciones se pueden embeber en el navegador sin importaciones', () => 
   assert.equal(ctx.decidirMes(s, HOY).mes, '2026-08');
   assert.ok(!/\bimport\b|\bexport\b|`/.test(src), 'sin import/export ni backticks');
 });
+
+test('la detección embebida en /kernel funciona aunque wrangler meta __name (keepNames)', async () => {
+  const vm = await import('node:vm');
+  const { paginaKernel } = await import('../../paginas/kernel.js');
+  const html = paginaKernel({ CSS: '', LOGO: '', AUTH_ADMIN: '', LOGOUT_FN: '' });
+  const a = html.indexOf('var __name'); const b = html.indexOf('function limitesMes');
+  assert.ok(a >= 0 && a < html.indexOf('function mesesEnTexto'), 'el ayudante __name va antes de las funciones');
+  // Simula el empaquetado: una llamada a __name dentro del cuerpo, como la deja esbuild con keepNames.
+  const bloque = html.slice(a, html.indexOf('\n}', b) + 2)
+    .replace('function mesesEnTexto(', 'function mesesEnTexto(').replace(/(function mesesEnTexto\([^)]*\)\s*\{)/, '$1 const _p = __name(() => 0, "p");');
+  const ctx = vm.createContext({});
+  vm.runInContext(bloque, ctx);
+  const r = vm.runInContext('JSON.stringify(mesesEnTexto("ACUMULADO AGOSTO 2026 fab.xlsx").map(m => m.mes))', ctx);
+  assert.equal(r, '["2026-08"]');
+});
