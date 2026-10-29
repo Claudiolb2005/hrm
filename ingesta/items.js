@@ -106,7 +106,19 @@ export async function itemsDeRenglon(r, ctx, archivo_sha256, ingesta_id) {
   const cal = ctx.calendario.get(r.corrida_id);
   const items = [];
   const movimientos = [];
-  if (!cal) return { items, movimientos, excluido: 'calendario_faltante' };
+  if (!cal) {
+    // Sin calendario el kernel no calcula el renglón (no hay periodicidad ni fecha de pago), pero el
+    // pago existió: sus importes entran al cruce con el CFDI (bonos, finiquitos, PTU, comisiones).
+    // El CFDI retiene en un solo ISR el de la parte ordinaria y el de la separación (LISR 95).
+    const valores = { percepciones: r.movimientos.percepciones, neto: r.movimientos.neto,
+      isr: r.movimientos.isr === undefined && r.movimientos.isr_separacion === undefined ? undefined : (r.movimientos.isr || 0) + (r.movimientos.isr_separacion || 0) };
+    for (const rubro of ['percepciones', 'isr', 'neto']) {
+      if (valores[rubro] === undefined) continue;
+      movimientos.push({ id: await idMovimiento(ingesta_id, r.corrida_id, r.colaborador_id, rubro), encargo_id: ctx.encargo_id, ingesta_id,
+        corrida_id: r.corrida_id, colaborador_id: r.colaborador_id, rubro, valor_c: valores[rubro], archivo_sha256, renglon_origen: 'fila ' + r.fila, rfc: r.rfc || null });
+    }
+    return { items, movimientos, excluido: 'calendario_faltante' };
+  }
   const origen = { archivo_sha256, fila: r.fila, corrida_raw: r.corrida_raw };
   const exe = entradaExe(r, cal, ctx.perfil);
   items.push({ regla_id: 'CALC-EXE-001', colaborador_id: r.colaborador_id, corrida_id: r.corrida_id, entrada: exe, origen });

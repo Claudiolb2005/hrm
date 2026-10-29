@@ -261,7 +261,9 @@ async function faseCerrando(env, ing) {
     .bind(ejecucion.id, ...RUBROS_CONCILIADOS).all();
   const { results: movs } = await db.prepare('SELECT id, colaborador_id, rubro, corrida_id, valor_c FROM movimiento_nomina WHERE ingesta_id = ?1 AND rubro IN (' + ph + ')')
     .bind(ing.id, ...RUBROS_CONCILIADOS).all();
-  const rec = reconciliar(calcs.map(c => ({ ...c, limitado: c.limitado === 1 })), movs.map(m => ({ ...m, movimiento_ref: m.id })));
+  // Los renglones sin calendario sólo van al cruce con el CFDI: el kernel no los calculó.
+  const sinCalendario = new Set(Object.keys(reporte.sin_calendario || {}));
+  const rec = reconciliar(calcs.map(c => ({ ...c, limitado: c.limitado === 1 })), movs.filter(m => !sinCalendario.has(m.corrida_id)).map(m => ({ ...m, movimiento_ref: m.id })));
   // T4: tolerancia por rubro y corrida con la configuración del encargo; nunca sobre rubros de entero.
   const enc = await db.prepare('SELECT tolerancia_individual_c, tolerancia_agregada_min_c FROM encargo WHERE id = ?1').bind(ing.encargo_id).first();
   const tol = toleranciaPorGrupo(rec.diferencias, calcs, { individual_c: enc.tolerancia_individual_c, agregado_min_c: enc.tolerancia_agregada_min_c,
