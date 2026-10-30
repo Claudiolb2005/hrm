@@ -163,8 +163,19 @@ async function faseCruzando(env, ing) {
   const db = env.DB;
   const pre = await db.prepare("SELECT id, ejecucion_id FROM ingesta WHERE encargo_id = ?1 AND tipo = 'prenomina' AND estado = 'terminado' ORDER BY actualizado_en DESC LIMIT 1").bind(ing.encargo_id).first();
   if (!pre) throw new Error('Para cruzar hace falta la prenómina del periodo terminada en este encargo. Súbela y vuelve a cruzar.');
-  const { results: comps } = await db.prepare('SELECT archivo, uuid, colaborador_llave, corrida_id, motivo_sin_corrida, tipo_nomina, total_percepciones_c, isr_retenido_c, total_c, n_errores, ' +
+  const { results: comps } = await db.prepare('SELECT archivo, uuid, colaborador_llave, corrida_id, motivo_sin_corrida, tipo_nomina, periodicidad_pago, fecha_pago, fecha_final_pago, total_percepciones_c, isr_retenido_c, total_c, n_errores, ' +
     "json_extract(datos_json, '$.tipo_relacion') AS tipo_relacion, json_extract(datos_json, '$.errores') AS errores FROM comprobante WHERE ingesta_id = ?1 ORDER BY archivo").bind(ing.id).all();
+  // La corrida se vuelve a asignar con el calendario vigente: si se corrigió el calendario, «Volver a cruzar» lo toma.
+  // El comprobante leído no cambia (es inmutable); la asignación vigente vive en el cruce.
+  const { results: calVig } = await db.prepare('SELECT corrida_id, periodicidad, desde, hasta, fecha_pago, ordinaria FROM calendario_nomina WHERE encargo_id = ?1').bind(ing.encargo_id).all();
+  let reasig = 0;
+  for (const c of comps) {
+    if (/^comprobante inválido/.test(c.motivo_sin_corrida || '')) continue;
+    const a = asignarCorrida(c, calVig);
+    if ((a.corrida_id || null) === (c.corrida_id || null)) continue;
+    c.corrida_id = a.corrida_id || null; c.motivo_sin_corrida = a.motivo || null;
+    reasig += 1;
+  }
   const { results: est } = await db.prepare('SELECT uuid, estatus FROM cfdi_estado_sat WHERE encargo_id = ?1').bind(ing.encargo_id).all();
   const estado = new Map(est.map(e => [e.uuid, e.estatus]));
   const ph = RUBROS_CRUCE.map((_, i) => '?' + (i + 2)).join(',');
@@ -241,6 +252,7 @@ async function faseCruzando(env, ing) {
   const reporte = { ...(JSON.parse(ing.reporte_json || '{}')), prenomina_ingesta_id: pre.id, ejecucion_id: pre.ejecucion_id, corte, llave: ing.llave,
     comprobantes: comps.length, validos: validos.length, invalidos: invalidos.length, muestra_invalidos: invalidos.slice(0, 20), sin_corrida: sinCorrida,
     duplicados: duplicados.length, muestra_duplicados: duplicados.slice(0, 20), cancelados, sin_estado_sat: sinEstado, sustituciones,
+    corridas_reasignadas_por_calendario: reasig,
     pagos_extra: { cfdi_emparejados: emp.reasignados.length, por_corrida: pagosExtra, muestra: emp.reasignados.slice(0, 20) },
     con_errores_internos: conErrores.length, muestra_errores: conErrores.slice(0, 20),
     cruce: { coincidencias: r.coincidencias, con_diferencia: r.con_diferencia, por_tipo: r.por_tipo, multiples_cfdi: r.multiples_cfdi, llaves_nomina: r.llaves_nomina, llaves_cfdi: r.llaves_cfdi,
