@@ -3,6 +3,16 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.3 — 2026-10-30
+
+Sin cambio de reglas.
+
+- **«Volver a cruzar» toma el calendario vigente.** La corrida de cada CFDI se vuelve a asignar al cruzar (D5, `asignarCorrida`)
+  con el calendario actual del encargo, no con el que había al leer los XML. Corregir una corrida del calendario ya no exige
+  volver a subir el ZIP. El comprobante leído no cambia (es inmutable); el reporte dice cuántos cambiaron de corrida
+  (`corridas_reasignadas_por_calendario`). Caso: catorcenas 16 y 17 de agosto 2026 de PRIME, capturadas con fechas que no
+  coincidían con los timbres (219 CFDI sin corrida).
+
 ## 0.11.2 — 2026-10-29
 
 Sin cambio de reglas de cálculo. Cruce nómina ↔ CFDI con los pagos fuera de la nómina ordinaria.

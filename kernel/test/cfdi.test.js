@@ -149,6 +149,19 @@ test('XML de punta a punta: lee, asigna corrida, descarta cancelados y repetidos
   await hasta((id) => avanzarCfdi(env, { ingesta_id: id }), temprano, ['terminado', 'error']);
   assert.equal((await llamar('GET', '/api/kernel/cruces/grupos?ingesta_cfdi_id=' + temprano)).json.aceptacion.sin_clasificar, 0);
 
+  // Calendario corregido después de leer los XML: «Volver a cruzar» reasigna la corrida con el calendario vigente.
+  const sem31 = db.raw.prepare("SELECT hasta FROM calendario_nomina WHERE encargo_id = 'enc_c' AND corrida_id = 'SEM31'").get();
+  const enSem31 = db.raw.prepare("SELECT count(*) AS n FROM comprobante WHERE ingesta_id = ? AND corrida_id = 'SEM31'").get(temprano).n;
+  db.raw.prepare("UPDATE calendario_nomina SET hasta = '2026-08-01' WHERE encargo_id = 'enc_c' AND corrida_id = 'SEM31'").run();
+  assert.equal(await reintentarCfdi(db, temprano, { recruzar: true }), 'cruzando');
+  await hasta((id) => avanzarCfdi(env, { ingesta_id: id }), temprano, ['terminado', 'error']);
+  assert.equal((await estadoIngestaCfdi(db, temprano)).reporte.corridas_reasignadas_por_calendario, enSem31, 'con el calendario mal, la SEM 31 se queda sin timbres');
+  db.raw.prepare("UPDATE calendario_nomina SET hasta = ? WHERE encargo_id = 'enc_c' AND corrida_id = 'SEM31'").run(sem31.hasta);
+  assert.equal(await reintentarCfdi(db, temprano, { recruzar: true }), 'cruzando');
+  await hasta((id) => avanzarCfdi(env, { ingesta_id: id }), temprano, ['terminado', 'error']);
+  assert.equal((await estadoIngestaCfdi(db, temprano)).reporte.corridas_reasignadas_por_calendario, 0);
+  assert.equal((await llamar('GET', '/api/kernel/cruces/grupos?ingesta_cfdi_id=' + temprano)).json.aceptacion.sin_clasificar, 0, 'corregido el calendario, vuelve la clasificación');
+
   await llamar('POST', '/api/kernel/encargo/config', { encargo_id: 'enc_c', carga_patronal_c: 2775600000, carga_patronal_fuente: 'prueba' });
   const ej = (await estadoIngesta(db, pre)).ejecucion_id;
   const pr = await llamar('GET', '/api/kernel/dictamen/propuesta?encargo_id=enc_c&ejecucion_id=' + ej);
