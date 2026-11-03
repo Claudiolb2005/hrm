@@ -206,7 +206,9 @@ async function faseCruzando(env, ing) {
   const fechas = calVig.flatMap(x => [x.desde, x.hasta, x.fecha_pago]).filter(Boolean).sort();
   const periodo = fechas.length ? { desde: fechas[0], hasta: fechas[fechas.length - 1] } : null;
   const emp = emparejarExtras(nomina, vigentes, new Set(cal.map(x => x.corrida_id)), { periodo });
+  const enc = await db.prepare('SELECT tolerancia_individual_c, periodo_desde, periodo_hasta FROM encargo WHERE id = ?1').bind(ing.encargo_id).first();
   const validos = [];
+  const pagadosSinNomina = []; // CFDI pagados dentro del periodo del encargo que no tienen renglón en la prenómina
   for (const c of emp.cfdis) {
     if (c.corrida_id) {
       if (!estado.get(c.uuid)) sinEstado += 1;
@@ -214,6 +216,8 @@ async function faseCruzando(env, ing) {
       if (c.n_errores) conErrores.push({ archivo: c.archivo, uuid: c.uuid, errores: JSON.parse(c.errores || '[]').slice(0, 3) });
       validos.push(c); continue;
     }
+    const fp = c.fecha_pago || c.fecha_final_pago || '';
+    if (enc && enc.periodo_desde && enc.periodo_hasta && fp >= enc.periodo_desde && fp <= enc.periodo_hasta) { pagadosSinNomina.push(c); continue; }
     const m = (c.motivo_sin_corrida || 'sin corrida').replace(/\d{4}-\d{2}-\d{2}/g, 'AAAA-MM-DD');
     sinCorrida[m] = (sinCorrida[m] || 0) + 1;
   }
@@ -223,7 +227,15 @@ async function faseCruzando(env, ing) {
     g.cfdi += 1;
     if (x.de) g.desde_corrida[x.de] = (g.desde_corrida[x.de] || 0) + 1; else g.sin_corrida += 1;
   }
-  const r = cruzarNominaCfdi(nomina, validos);
+  const r = cruzarNominaCfdi(nomina, validos, { tolerancia_c: enc && Number.isInteger(enc.tolerancia_individual_c) ? enc.tolerancia_individual_c : 0 });
+  // Un CFDI pagado en el periodo que no se empareja con ningún renglón (ni ordinario ni extra) es un pago timbrado que
+  // la prenómina no trae: va a la lista por clasificar como «CFDI sin nómina», no sólo al contador de «sin corrida».
+  for (const c of pagadosSinNomina) {
+    if (!estado.get(c.uuid)) sinEstado += 1;
+    r.cruces.push({ tipo: 'sin_nomina', colaborador_llave: c.colaborador_llave || '', corrida_id: 'PAGO ' + (c.fecha_pago || c.fecha_final_pago),
+      rubro: 'neto', movimiento_id: null, uuids: c.uuid, nomina_c: null, cfdi_c: c.total_c || 0 });
+    r.por_tipo.sin_nomina = (r.por_tipo.sin_nomina || 0) + 1;
+  }
   // Por corrida: deja ver de un vistazo si al paquete le falta una semana completa.
   const porCorrida = {};
   const cuenta = (cid, k) => { const x = porCorrida[cid] || (porCorrida[cid] = { nomina: 0, cfdi: 0, sin_cfdi: 0, sin_nomina: 0, diferencias: 0 }); x[k] += 1; };
@@ -258,8 +270,9 @@ async function faseCruzando(env, ing) {
     corridas_reasignadas_por_calendario: reasig,
     pagos_extra: { cfdi_emparejados: emp.reasignados.length, por_corrida: pagosExtra, muestra: emp.reasignados.slice(0, 20) },
     con_errores_internos: conErrores.length, muestra_errores: conErrores.slice(0, 20),
-    cruce: { coincidencias: r.coincidencias, con_diferencia: r.con_diferencia, por_tipo: r.por_tipo, multiples_cfdi: r.multiples_cfdi, llaves_nomina: r.llaves_nomina, llaves_cfdi: r.llaves_cfdi,
+    cruce: { coincidencias: r.coincidencias, con_diferencia: r.con_diferencia, dentro_de_tolerancia: r.dentro_de_tolerancia, dentro_de_tolerancia_c: r.dentro_de_tolerancia_c, tolerancia_c: r.tolerancia_c, por_tipo: r.por_tipo, multiples_cfdi: r.multiples_cfdi, llaves_nomina: r.llaves_nomina, llaves_cfdi: r.llaves_cfdi,
       rubros_sin_dato_en_nomina: r.rubros_sin_dato_en_nomina, por_corrida: porCorrida },
+    cfdi_pagados_sin_nomina: pagadosSinNomina.length,
     modulo_4_2: { estado: motivos.length ? 'universo_parcial' : 'completo', motivos, esperado: r.llaves_nomina, efectivo: r.coincidencias + r.con_diferencia } };
   await lotesDb(db, [...st, db.prepare("UPDATE ingesta_cfdi SET estado = 'terminado', prenomina_ingesta_id = ?2, ejecucion_id = ?3, corte_actual = ?4, reporte_json = ?5, actualizado_en = datetime('now') WHERE id = ?1")
     .bind(ing.id, pre.id, pre.ejecucion_id, corte, JSON.stringify(reporte))]);

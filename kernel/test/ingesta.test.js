@@ -279,4 +279,9 @@ test('0.11.5 · el bono catorcenal entra al ajuste mensual (PRIME 123 CAT 17 = $
   assert.equal(JSON.parse(porEmp['777'].traza_json).nominas_en_mes, 2, 'la comisión no entra');
   const { results: difs } = await db.prepare("SELECT colaborador_id, corrida_id FROM v_diferencia WHERE encargo_id = 'enc_ago' AND colaborador_id = '123'").all();
   assert.deepEqual(difs, [], 'sin diferencia en la catorcena 17');
+  // ISN: los pagos sin calendario (bono y comisión) son erogaciones del mes y entran a la base del registro.
+  const isn = await db.prepare("SELECT traza_json FROM calculo_kernel WHERE regla_id = 'CALC-ISN-001'").first();
+  const tz = JSON.parse(isn.traza_json);
+  assert.equal(tz.base_c, (13006 + 13006 + 17675 + 3000 + 3000 + 5000) * 100);
+  assert.equal(st.reporte.mensual.isn_extras, 2);
 });

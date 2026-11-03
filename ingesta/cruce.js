@@ -21,7 +21,9 @@ export const llaveBase = (colaborador_id) => String(colaborador_id).split('#')[0
  * @param nomina [{ colaborador_llave, corrida_id, rubro, valor_c, movimiento_id }]
  * @param cfdis  [{ uuid, colaborador_llave, corrida_id, total_percepciones_c, isr_retenido_c, total_c }]
  */
-export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) {
+// tolerancia_c (T4): una diferencia de redondeo hasta la tolerancia individual del encargo (p. ej. 1–2 ¢ entre el
+// NETO de la prenómina y el Total del CFDI) se cuenta aparte y no se vuelve renglón por clasificar.
+export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE, tolerancia_c = 0 } = {}) {
   const k = (x) => x.colaborador_llave + '|' + x.corrida_id;
   const N = new Map(), F = new Map();
   for (const m of nomina) {
@@ -38,7 +40,7 @@ export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) 
     F.set(k(c), g);
   }
   const cruces = [];
-  let coincidencias = 0, con_diferencia = 0, multiples_cfdi = 0;
+  let coincidencias = 0, con_diferencia = 0, multiples_cfdi = 0, dentro_de_tolerancia = 0, dentro_de_tolerancia_c = 0;
   const sinRubro = new Set();
   for (const [key, n] of [...N.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const f = F.get(key);
@@ -54,6 +56,8 @@ export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) 
     for (const r of rubros) {
       if (n.valores[r] === undefined) { sinRubro.add(r); continue; }
       if (n.valores[r] === f.valores[r]) continue;
+      const d = f.valores[r] - n.valores[r];
+      if (Math.abs(d) <= tolerancia_c) { dentro_de_tolerancia += 1; dentro_de_tolerancia_c += d; continue; }
       igual = false;
       cruces.push({ tipo: 'diferencia', colaborador_llave: n.colaborador_llave, corrida_id: n.corrida_id, rubro: r, movimiento_id: n.movs[r] || null,
         uuids: f.uuids.join(','), nomina_c: n.valores[r], cfdi_c: f.valores[r] });
@@ -67,7 +71,7 @@ export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) 
   }
   const tipos = {};
   for (const c of cruces) tipos[c.tipo] = (tipos[c.tipo] || 0) + 1;
-  return { coincidencias, con_diferencia, multiples_cfdi, cruces, por_tipo: tipos, llaves_nomina: N.size, llaves_cfdi: F.size,
+  return { coincidencias, con_diferencia, multiples_cfdi, dentro_de_tolerancia, dentro_de_tolerancia_c, tolerancia_c, cruces, por_tipo: tipos, llaves_nomina: N.size, llaves_cfdi: F.size,
     rubros_sin_dato_en_nomina: [...sinRubro].sort() };
 }
 

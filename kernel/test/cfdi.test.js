@@ -251,3 +251,41 @@ test('cruce: las percepciones del CFDI suman los otros pagos, como el TOTAL PERC
   assert.equal(r.coincidencias, 1);
   assert.deepEqual(r.cruces, []);
 });
+
+test('0.11.5 · cruce con tolerancia: 1–2 ¢ de redondeo se cuentan aparte; arriba de la tolerancia sigue siendo diferencia', async () => {
+  const { cruzarNominaCfdi } = await import('../../ingesta/cruce.js');
+  const nomina = [
+    { colaborador_llave: '1', corrida_id: 'SEM31', rubro: 'neto', valor_c: 243697, movimiento_id: 'm1' },
+    { colaborador_llave: '2', corrida_id: 'SEM31', rubro: 'neto', valor_c: 100000, movimiento_id: 'm2' },
+  ];
+  const cfdis = [
+    { uuid: 'a', colaborador_llave: '1', corrida_id: 'SEM31', total_percepciones_c: 0, isr_retenido_c: 0, total_c: 243696 },
+    { uuid: 'b', colaborador_llave: '2', corrida_id: 'SEM31', total_percepciones_c: 0, isr_retenido_c: 0, total_c: 100051 },
+  ];
+  const sin = cruzarNominaCfdi(nomina, cfdis, { rubros: ['neto'] });
+  assert.equal(sin.cruces.length, 2, 'sin tolerancia: las dos son diferencia');
+  const con = cruzarNominaCfdi(nomina, cfdis, { rubros: ['neto'], tolerancia_c: 50 });
+  assert.equal(con.dentro_de_tolerancia, 1);
+  assert.equal(con.dentro_de_tolerancia_c, -1);
+  assert.equal(con.coincidencias, 1);
+  assert.deepEqual(con.cruces.map(c => c.colaborador_llave), ['2'], '51 ¢ rebasa la tolerancia de 50 ¢');
+});
+
+test('0.11.5 · CFDI pagado en el periodo sin renglón en la prenómina se lista «CFDI sin nómina» para clasificar', async () => {
+  const { db, env } = await preparar();
+  const { zipArchivos } = await import('./util.js');
+  const { PAQUETE } = await import('./fixtures-cfdi.mjs');
+  await env.DOCS.put('x2.zip', zipArchivos({ ...PAQUETE,
+    // Finiquito timbrado (E, 99) el 20-ago que la prenómina no trae.
+    'agosto/z.xml': cfdiXml({ uuid: U(9), emp: '777777', ffp: '2026-08-20', fip: '2026-08-20', fpago: '2026-08-20', tipo: 'E', per: '99', percep: 5000000, isr: 900000 }) }));
+  const pre = await crearIngesta(env, { encargo_id: 'enc_c', r2_key: 'p.xlsx' });
+  assert.equal((await hasta((id) => avanzar(env, { ingesta_id: id }), pre, ['terminado', 'error'])).estado, 'terminado');
+  const id = await crearIngestaCfdi(env, { encargo_id: 'enc_c', tipo: 'xml_nomina', r2_key: 'x2.zip' });
+  assert.equal((await hasta((x) => avanzarCfdi(env, { ingesta_id: x }), id, ['terminado', 'error'])).estado, 'terminado');
+  const rep = (await estadoIngestaCfdi(db, id)).reporte;
+  assert.equal(rep.cfdi_pagados_sin_nomina, 1);
+  const z = db.raw.prepare("SELECT tipo, corrida_id, cfdi_c FROM cruce_cfdi WHERE ingesta_cfdi_id = ? AND colaborador_llave = '777777'").get(id);
+  assert.deepEqual({ ...z }, { tipo: 'sin_nomina', corrida_id: 'PAGO 2026-08-20', cfdi_c: 4100000 });
+  // El CFDI del 30-jul (fuera del periodo del encargo) sigue sólo en el contador de «sin corrida».
+  assert.equal(db.raw.prepare("SELECT count(*) AS n FROM cruce_cfdi WHERE ingesta_cfdi_id = ? AND corrida_id LIKE 'PAGO 2026-07%'").get(id).n, 0);
+});

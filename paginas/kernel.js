@@ -935,7 +935,7 @@ function pintarCfdi(){
   }
   if(rep.cruce){
     var c=rep.cruce,m=rep.modulo_4_2||{};
-    h+='<div class="kpis">'+[['Comprobantes',rep.comprobantes],['Válidos',rep.validos],['Cancelados (fuera)',rep.cancelados],['Repetidos',rep.duplicados],['Sin estado SAT',rep.sin_estado_sat],['Coinciden',c.coincidencias],['Con diferencia',c.con_diferencia],['Pago sin CFDI',(c.por_tipo||{}).sin_cfdi],['CFDI sin nómina',(c.por_tipo||{}).sin_nomina]]
+    h+='<div class="kpis">'+[['Comprobantes',rep.comprobantes],['Válidos',rep.validos],['Cancelados (fuera)',rep.cancelados],['Repetidos',rep.duplicados],['Sin estado SAT',rep.sin_estado_sat],['Coinciden',c.coincidencias],['Redondeo (≤ tolerancia)',c.dentro_de_tolerancia],['Con diferencia',c.con_diferencia],['Pago sin CFDI',(c.por_tipo||{}).sin_cfdi],['CFDI sin nómina',(c.por_tipo||{}).sin_nomina]]
       .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
     h+='<div class="'+(m.estado==='completo'?'aviso ok':'aviso')+'">Módulo 4.2: '+(m.estado==='completo'?'universo completo':'universo parcial — '+esc((m.motivos||[]).join('; ')))+'</div>';
     var sc=Object.keys(rep.sin_corrida||{});

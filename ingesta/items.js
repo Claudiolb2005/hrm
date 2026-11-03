@@ -227,12 +227,21 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
   }
 
   // ── ISN: por registro patronal y mes de pago, concepto por concepto
+  // Los pagos sin calendario (bonos, finiquitos, PTU, comisiones, gratificaciones) también son erogaciones del
+  // mes: entran al ISN del mes del encargo cuando el encargo es de un solo mes (prenómina mensual). Antes se
+  // descartaban de los dos lados (kernel y cliente) y su ISN no se auditaba.
+  const d = ctx.encargo && ctx.encargo.periodo_desde ? String(ctx.encargo.periodo_desde).slice(0, 7) : null;
+  const h = ctx.encargo && ctx.encargo.periodo_hasta ? String(ctx.encargo.periodo_hasta).slice(0, 7) : null;
+  const mesEncargoIsn = d && d === h ? d : null;
   const porRegistro = new Map();
   for (const r of renglones) {
     const cal = ctx.calendario.get(r.corrida_id);
-    if (!cal || !r.registro) continue;
-    const k = r.registro + '|' + cal.fecha_pago.slice(0, 7);
-    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes: cal.fecha_pago.slice(0, 7), conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0 });
+    if (!r.registro) continue;
+    const mes = cal ? cal.fecha_pago.slice(0, 7) : mesEncargoIsn;
+    if (!mes) { reporte.isn_sin_mes = (reporte.isn_sin_mes || 0) + 1; continue; }
+    if (!cal) reporte.isn_extras = (reporte.isn_extras || 0) + 1;
+    const k = r.registro + '|' + mes;
+    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes, conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0 });
     const a = porRegistro.get(k);
     for (const p of r.percepciones) {
       if (p.tipo === 'opaco') a.opacos += 1;
