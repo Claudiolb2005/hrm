@@ -3,6 +3,21 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.4 — 2026-11-03
+
+Sin cambio de reglas de cálculo. Tres ajustes al cruce nómina ↔ CFDI encontrados con la prueba del encargado de PRIME
+(agosto 2026).
+
+- **Percepciones del CFDI = TotalPercepciones + TotalOtrosPagos.** El TOTAL PERCEPCIONES de la prenómina de PRIME suma los
+  otros pagos; el cruce los comparaba sólo contra TotalPercepciones. 16 colaboradores con otros pagos salían con diferencia en
+  percepciones aunque el neto cuadraba (ej. 1071770 SEM 33: $10,693.31 vs $4,993.31 + $5,700 de otros pagos).
+- **Un renglón ordinario en $0 no retiene el CFDI.** PRIME timbra la comisión como O con las fechas de la semana y la
+  prenómina trae esa semana en ceros y la comisión en su renglón. Como era el único CFDI de la semana, `emparejarExtras` no lo
+  movía: 10 comisiones salían «sin CFDI» y la semana con diferencia (ej. 1078254, $2,097.61).
+- **Entre CFDI del mismo importe se prefiere el pagado dentro del periodo.** El paquete trae CFDI de meses anteriores; la
+  gratificación de $30,000 de 1069635 se emparejó con el CFDI de julio y el de agosto quedaba «sin nómina». El periodo sale del
+  calendario (primer día de corrida a último día o pago); sin periodo se conserva el orden por UUID.
+
 ## 0.11.3 — 2026-10-30
 
 Sin cambio de reglas.
