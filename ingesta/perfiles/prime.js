@@ -103,5 +103,12 @@ export default {
   perfil_fiscal: {
     fondo_ahorro_cumple_requisitos: false,   // P2 resuelto: no cumple (hallazgo 5)
     aplica_ajuste_mensual: true,             // semana 34 y catorcena 17 ajustan con tarifa mensual
+    // Pagos fuera del calendario que PRIME suma a las bases del ajuste mensual (y resta su ISR retenido).
+    // Verificado contra agosto 2026: el bono catorcenal entra (ej. 123 CAT 17 = $2,778.84 al centavo);
+    // comisiones, gratificación, PTU y finiquitos no entran (incluirlos rompe casos que hoy cuadran).
+    extras_en_ajuste: [
+      { patron: '^BONOS_SEM$', periodicidad: 'semanal' },
+      { patron: '^BONOS_CAT$', periodicidad: 'catorcenal' },
+    ],
   },
 };

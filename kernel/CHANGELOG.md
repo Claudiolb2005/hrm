@@ -3,6 +3,24 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.5 — 2026-11-03
+
+Ajuste mensual de ISR con los bonos de PRIME. Lo reportó el encargado de PRIME con agosto 2026: «todas las diferencias son
+en ISR»; caso 123 CAT 17, kernel $1,759.37 vs nómina y CFDI $2,778.84 (diferencia $1,019.47).
+
+- **Causa.** El ajuste mensual (CALC-ISR-AJM-001) sólo sumaba las nóminas ordinarias del calendario. PRIME paga el bono en
+  su propio renglón (BONOS SEM / BONOS CAT, sin calendario) pero lo acumula al mes: el ISR del mes se calcula sobre
+  sueldo + bono y se le restan el ISR de la primera catorcena y el del bono. 123: tarifa mensual sobre
+  $13,006 + $13,006 + $17,675 = $7,623.00 − $1,908.45 − $2,935.71 = **$2,778.84** (= nómina = CFDI).
+- **Arreglo.** El perfil declara qué pagos extra entran al ajuste (`perfil_fiscal.extras_en_ajuste`); en PRIME, BONOS SEM y
+  BONOS CAT, con la periodicidad de su nombre. Entran al grupo del colaborador en el mes del ajuste; su base sale de la misma
+  regla de exenciones y su ISR retenido se resta. La traza dice qué extras entraron (`origen.extras`).
+- **Verificado contra los 3,167 ajustes de agosto 2026:** con los bonos coinciden 40 más; incluir comisiones, gratificación,
+  PTU o finiquitos rompe casos que hoy cuadran, por eso no entran (C5 sigue por confirmar para el resto).
+- **Lo que queda en ISR no es error del kernel** (diferencias de PRIME, ya conocidas): ajuste negativo no reintegrado
+  (≈409, nómina en $0), subsidio con 15.59% sobre UMA 2026 = $555.97 en vez de $535.65 (1,008 semanales y 30 ajustes;
+  $4.68 por semana, $20.32 al mes) y fondo de ahorro tratado como exento (20 ajustes, ≈70 semanales).
+
 ## 0.11.4 — 2026-11-03
 
 Sin cambio de reglas de cálculo. Tres ajustes al cruce nómina ↔ CFDI encontrados con la prueba del encargado de PRIME
