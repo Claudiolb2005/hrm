@@ -6,7 +6,13 @@
 // Sólo se devuelve lo que no coincide; la coincidencia se cuenta.
 
 export const RUBROS_CRUCE = ['percepciones', 'isr', 'neto'];
-const DE_CFDI = { percepciones: 'total_percepciones_c', isr: 'isr_retenido_c', neto: 'total_c' };
+// «percepciones» es el TOTAL PERCEPCIONES de la prenómina, que suma los otros pagos (subsidio entregado,
+// reintegros…): del CFDI se toma TotalPercepciones + TotalOtrosPagos, que es el mismo universo (= SubTotal).
+const DE_CFDI = {
+  percepciones: (c) => (c.total_percepciones_c || 0) + (c.total_otros_pagos_c || 0),
+  isr: (c) => c.isr_retenido_c || 0,
+  neto: (c) => c.total_c || 0,
+};
 
 /** «1073134#Y6079749104» (renglón separado por registro) → «1073134». */
 export const llaveBase = (colaborador_id) => String(colaborador_id).split('#')[0];
@@ -28,7 +34,7 @@ export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) 
   for (const c of cfdis) {
     const g = F.get(k(c)) || { colaborador_llave: c.colaborador_llave, corrida_id: c.corrida_id, uuids: [], valores: Object.fromEntries(rubros.map(r => [r, 0])) };
     g.uuids.push(c.uuid);
-    for (const r of rubros) g.valores[r] += c[DE_CFDI[r]] || 0;
+    for (const r of rubros) g.valores[r] += DE_CFDI[r](c);
     F.set(k(c), g);
   }
   const cruces = [];
@@ -76,21 +82,25 @@ export function cruzarNominaCfdi(nomina, cfdis, { rubros = RUBROS_CRUCE } = {}) 
  * RFC + importe), y ese CFDI se cruza contra el renglón extra.
  *
  * Sólo puede tomarse un CFDI que no cuadra solo: sin corrida, o en una corrida ordinaria donde el
- * colaborador tiene más de un CFDI, o donde la prenómina no tiene renglón suyo. Un recibo que es el
- * único del colaborador en una semana con renglón en la prenómina nunca se mueve.
+ * colaborador tiene más de un CFDI, o donde la prenómina no tiene renglón suyo con importe. Un recibo
+ * que es el único del colaborador en una semana con renglón con importe en la prenómina nunca se mueve.
+ * Un renglón semanal en ceros no es un recibo: PRIME timbra la comisión en la semana (O, fechas de la
+ * SEM 33) y la prenómina trae la SEM 33 en $0 y la comisión en su propio renglón.
  * Primero un CFDI con el neto exacto; si no, hasta 4 CFDI que sumen el neto exacto; si no, un CFDI
- * a no más de 50 ¢. Determinista: renglones de mayor a menor neto, CFDI por UUID.
+ * a no más de 50 ¢. Determinista: renglones de mayor a menor neto; CFDI primero los pagados dentro del
+ * periodo (el paquete trae CFDI de meses anteriores con el mismo importe) y después por UUID.
  *
  * @param nomina [{ colaborador_llave, corrida_id, rubro, valor_c }]
- * @param cfdis  [{ uuid, colaborador_llave, corrida_id, total_c }] (corrida_id puede ser null)
+ * @param cfdis  [{ uuid, colaborador_llave, corrida_id, total_c, fecha_pago? }] (corrida_id puede ser null)
  * @param ordinarias Set de corridas ordinarias del calendario
+ * @param periodo { desde, hasta } fechas AAAA-MM-DD del calendario; sin periodo no se ordena por fecha
  * @returns { cfdis: copia con corrida_id reasignada, reasignados: [{ uuid, de, a }] }
  */
-export function emparejarExtras(nomina, cfdis, ordinarias, { tolerancia_c = 50, max_combinados = 4 } = {}) {
+export function emparejarExtras(nomina, cfdis, ordinarias, { tolerancia_c = 50, max_combinados = 4, periodo = null } = {}) {
   const extras = new Map(); // colab → [{ corrida_id, neto }]
   const conRenglon = new Set();
   for (const m of nomina) {
-    conRenglon.add(m.colaborador_llave + '|' + m.corrida_id);
+    if (m.valor_c) conRenglon.add(m.colaborador_llave + '|' + m.corrida_id);
     if (m.rubro !== 'neto' || ordinarias.has(m.corrida_id)) continue;
     const xs = extras.get(m.colaborador_llave) || [];
     const x = xs.find(e => e.corrida_id === m.corrida_id);
@@ -109,13 +119,14 @@ export function emparejarExtras(nomina, cfdis, ordinarias, { tolerancia_c = 50, 
     const xs = porColab.get(c.colaborador_llave) || [];
     xs.push(c); porColab.set(c.colaborador_llave, xs);
   }
+  const fuera = (c) => (periodo && c.fecha_pago && (c.fecha_pago < periodo.desde || c.fecha_pago > periodo.hasta)) ? 1 : 0;
   const mover = (c, a) => {
     if (c.corrida_id) porLlave.set(c.colaborador_llave + '|' + c.corrida_id, porLlave.get(c.colaborador_llave + '|' + c.corrida_id) - 1);
     reasignados.push({ uuid: c.uuid, colaborador_llave: c.colaborador_llave, de: c.corrida_id || null, a });
     c.corrida_id = a; c.emparejado_por_importe = true;
   };
   for (const [colab, xs] of [...extras.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const cands = (porColab.get(colab) || []).sort((a, b) => String(a.uuid).localeCompare(String(b.uuid)));
+    const cands = (porColab.get(colab) || []).sort((a, b) => fuera(a) - fuera(b) || String(a.uuid).localeCompare(String(b.uuid)));
     for (const e of xs.sort((a, b) => b.neto - a.neto || a.corrida_id.localeCompare(b.corrida_id))) {
       if (e.neto === 0) continue;
       const disp = cands.filter(c => !c.emparejado_por_importe && libre(c));

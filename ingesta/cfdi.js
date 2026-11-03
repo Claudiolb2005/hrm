@@ -164,7 +164,7 @@ async function faseCruzando(env, ing) {
   const pre = await db.prepare("SELECT id, ejecucion_id FROM ingesta WHERE encargo_id = ?1 AND tipo = 'prenomina' AND estado = 'terminado' ORDER BY actualizado_en DESC LIMIT 1").bind(ing.encargo_id).first();
   if (!pre) throw new Error('Para cruzar hace falta la prenómina del periodo terminada en este encargo. Súbela y vuelve a cruzar.');
   const { results: comps } = await db.prepare('SELECT archivo, uuid, colaborador_llave, corrida_id, motivo_sin_corrida, tipo_nomina, periodicidad_pago, fecha_pago, fecha_final_pago, total_percepciones_c, isr_retenido_c, total_c, n_errores, ' +
-    "json_extract(datos_json, '$.tipo_relacion') AS tipo_relacion, json_extract(datos_json, '$.errores') AS errores FROM comprobante WHERE ingesta_id = ?1 ORDER BY archivo").bind(ing.id).all();
+    "coalesce(json_extract(datos_json, '$.total_otros_pagos_c'), 0) AS total_otros_pagos_c, json_extract(datos_json, '$.tipo_relacion') AS tipo_relacion, json_extract(datos_json, '$.errores') AS errores FROM comprobante WHERE ingesta_id = ?1 ORDER BY archivo").bind(ing.id).all();
   // La corrida se vuelve a asignar con el calendario vigente: si se corrigió el calendario, «Volver a cruzar» lo toma.
   // El comprobante leído no cambia (es inmutable); la asignación vigente vive en el cruce.
   const { results: calVig } = await db.prepare('SELECT corrida_id, periodicidad, desde, hasta, fecha_pago, ordinaria FROM calendario_nomina WHERE encargo_id = ?1').bind(ing.encargo_id).all();
@@ -202,7 +202,10 @@ async function faseCruzando(env, ing) {
   const sinRfc = ing.llave === 'rfc' ? movs.filter(m => !m.rfc).length : 0;
   // Bonos, finiquitos y demás pagos fuera de la nómina ordinaria: su CFDI se busca por colaborador e importe.
   const { results: cal } = await db.prepare('SELECT corrida_id FROM calendario_nomina WHERE encargo_id = ?1 AND ordinaria = 1').bind(ing.encargo_id).all();
-  const emp = emparejarExtras(nomina, vigentes, new Set(cal.map(x => x.corrida_id)));
+  // Periodo del calendario: del primer día de corrida al último día o pago. Entre CFDI del mismo importe se prefiere el del periodo.
+  const fechas = calVig.flatMap(x => [x.desde, x.hasta, x.fecha_pago]).filter(Boolean).sort();
+  const periodo = fechas.length ? { desde: fechas[0], hasta: fechas[fechas.length - 1] } : null;
+  const emp = emparejarExtras(nomina, vigentes, new Set(cal.map(x => x.corrida_id)), { periodo });
   const validos = [];
   for (const c of emp.cfdis) {
     if (c.corrida_id) {

@@ -205,3 +205,49 @@ test('pagos extra: el bono timbrado como ordinaria de la semana se cruza contra 
   assert.equal(r.coincidencias, 4, 'SEM32, bono, finiquito y SEM33');
   assert.deepEqual(r.cruces.map(c => [c.tipo, c.colaborador_llave, c.corrida_id]), [['sin_cfdi', '777', 'BONOS_SEM']]);
 });
+
+test('pagos extra: la comisión timbrada en una semana que la prenómina trae en $0 se cruza contra su renglón', () => {
+  const ORD = new Set(['SEM33', 'SEM34']);
+  // Caso real 1078254 (agosto 2026): SEM 33 en ceros en la prenómina; la comisión de $2,097.61 se timbró como O de la SEM 33.
+  const nom = [
+    { colaborador_llave: '1078254', corrida_id: 'SEM33', rubro: 'percepciones', valor_c: 0, movimiento_id: 'a1' },
+    { colaborador_llave: '1078254', corrida_id: 'SEM33', rubro: 'neto', valor_c: 0, movimiento_id: 'a2' },
+    { colaborador_llave: '1078254', corrida_id: 'COMISIONES', rubro: 'percepciones', valor_c: 226096, movimiento_id: 'a3' },
+    { colaborador_llave: '1078254', corrida_id: 'COMISIONES', rubro: 'neto', valor_c: 209761, movimiento_id: 'a4' },
+  ];
+  const cf = [{ uuid: 'C1', colaborador_llave: '1078254', corrida_id: 'SEM33', total_c: 209761, total_percepciones_c: 226096, isr_retenido_c: 16335 }];
+  const e = emparejarExtras(nom, cf, ORD);
+  assert.equal(e.cfdis[0].corrida_id, 'COMISIONES');
+  const r = cruzarNominaCfdi(nom, e.cfdis, { rubros: ['percepciones', 'neto'] });
+  assert.equal(r.coincidencias, 1);
+  assert.deepEqual(r.cruces, [], 'la SEM 33 en ceros no exige comprobante');
+});
+
+test('pagos extra: con dos CFDI del mismo importe se toma el pagado dentro del periodo', () => {
+  const ORD = new Set(['SEM31']);
+  // Caso real 1069635: gratificación de $30,000; el paquete trae un CFDI de julio y el de agosto (O, SEM 31) por lo mismo.
+  const nom = [{ colaborador_llave: '1069635', corrida_id: 'GRATIFICACION', rubro: 'neto', valor_c: 3000000, movimiento_id: 'g1' }];
+  const cf = [
+    { uuid: '52A6', colaborador_llave: '1069635', corrida_id: null, fecha_pago: '2026-07-03', total_c: 3000000 },
+    { uuid: '9DF1', colaborador_llave: '1069635', corrida_id: 'SEM31', fecha_pago: '2026-08-07', total_c: 3000000 },
+  ];
+  const periodo = { desde: '2026-07-27', hasta: '2026-08-28' };
+  const e = emparejarExtras(nom, cf, ORD, { periodo });
+  const a = Object.fromEntries(e.cfdis.map(c => [c.uuid, c.corrida_id]));
+  assert.deepEqual(a, { '52A6': null, '9DF1': 'GRATIFICACION' });
+  // Sin periodo se conserva el orden por UUID (comportamiento anterior).
+  assert.equal(emparejarExtras(nom, cf, ORD).cfdis.find(c => c.uuid === '52A6').corrida_id, 'GRATIFICACION');
+});
+
+test('cruce: las percepciones del CFDI suman los otros pagos, como el TOTAL PERCEPCIONES de la prenómina', () => {
+  // Caso real 1071770 SEM 33: sueldo $4,993.31 + otros pagos $5,700 = $10,693.31 en la prenómina; neto $3,258.47 en ambos.
+  const nom = [
+    { colaborador_llave: '1071770', corrida_id: 'SEM33', rubro: 'percepciones', valor_c: 1069331, movimiento_id: 'p1' },
+    { colaborador_llave: '1071770', corrida_id: 'SEM33', rubro: 'isr', valor_c: 63176, movimiento_id: 'p2' },
+    { colaborador_llave: '1071770', corrida_id: 'SEM33', rubro: 'neto', valor_c: 325847, movimiento_id: 'p3' },
+  ];
+  const cf = [{ uuid: '6147', colaborador_llave: '1071770', corrida_id: 'SEM33', total_percepciones_c: 499331, total_otros_pagos_c: 570000, isr_retenido_c: 63176, total_c: 325847 }];
+  const r = cruzarNominaCfdi(nom, cf);
+  assert.equal(r.coincidencias, 1);
+  assert.deepEqual(r.cruces, []);
+});
