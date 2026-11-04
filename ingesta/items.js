@@ -171,13 +171,45 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
       if (!grupos.has(k)) grupos.set(k, []);
       grupos.get(k).push({ r, cal });
     }
-    for (const g of grupos.values()) {
+    // Pagos extra que el perfil declara parte del ajuste (p. ej. bonos de PRIME): no tienen calendario,
+    // entran al grupo del colaborador con su periodicidad (del nombre de la corrida) en el mes del ajuste.
+    const extras = new Map(); // clave del grupo → renglones extra
+    const reglasExtra = ((ctx.perfil && ctx.perfil.perfil_fiscal && ctx.perfil.perfil_fiscal.extras_en_ajuste) || [])
+      .map(x => ({ re: new RegExp(x.patron), periodicidad: x.periodicidad }));
+    if (reglasExtra.length) {
+      const mesesDe = new Map(); // colaborador|periodicidad → meses con nómina ordinaria
+      for (const k of grupos.keys()) {
+        const [c, p, mes] = k.split('|');
+        const kk = c + '|' + p;
+        if (!mesesDe.has(kk)) mesesDe.set(kk, []);
+        mesesDe.get(kk).push(mes);
+      }
+      const mesEncargo = ctx.encargo && ctx.encargo.periodo_desde ? String(ctx.encargo.periodo_desde).slice(0, 7) : null;
+      for (const r of renglones) {
+        if (ctx.calendario.get(r.corrida_id)) continue;
+        const regla = reglasExtra.find(x => x.re.test(r.corrida_id || ''));
+        if (!regla) continue;
+        const meses = mesesDe.get(r.colaborador_id + '|' + regla.periodicidad) || [];
+        const mes = meses.length === 1 ? meses[0] : (mesEncargo && meses.includes(mesEncargo) ? mesEncargo : null);
+        if (!mes) { reporte.ajm_extras_sin_grupo = (reporte.ajm_extras_sin_grupo || 0) + 1; continue; }
+        const k = [r.colaborador_id, regla.periodicidad, mes].join('|');
+        if (!extras.has(k)) extras.set(k, []);
+        extras.get(k).push({ r, periodicidad: regla.periodicidad });
+      }
+    }
+    for (const [k, g] of grupos) {
       const ult = g.find(x => ctx.ultimaDelMes.has(x.r.corrida_id));
       if (!ult) continue;
       const lim = [];
       const bases = [], topes = [];
       let previo = 0;
-      for (const { r, cal } of g.sort((a, b) => a.cal.fecha_pago.localeCompare(b.cal.fecha_pago))) {
+      const enGrupo = [...g].sort((a, b) => a.cal.fecha_pago.localeCompare(b.cal.fecha_pago));
+      for (const x of (extras.get(k) || []).sort((a, b) => a.r.fila - b.r.fila)) {
+        // Sin calendario propio: se mide con la fecha de pago de la última nómina del mes y la periodicidad del bono.
+        enGrupo.push({ r: x.r, cal: { periodicidad: x.periodicidad, fecha_pago: ult.cal.fecha_pago, ordinaria: false }, extra: true });
+      }
+      if (enGrupo.length > g.length) reporte.ajm_con_extras = (reporte.ajm_con_extras || 0) + 1;
+      for (const { r, cal } of enGrupo) {
         const b = baseDe(r, cal, ctx.perfil, ctx.catalogo);
         bases.push(b.base_c); topes.push(b.base_tope_c);
         for (const l of [...limitacionesIsr(r), ...b.limitaciones]) lim.push({ motivo: l.motivo === 'dato_faltante' ? 'base_limitada' : l.motivo, detalle: r.corrida_id + ': ' + l.detalle });
@@ -186,20 +218,30 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
       items.push({ regla_id: 'CALC-ISR-AJM-001', colaborador_id: ult.r.colaborador_id, corrida_id: ult.r.corrida_id,
         entrada: { bases_mes_c: bases, bases_tope_mes_c: topes, isr_retenido_previo_mes_c: previo, fecha_pago: ult.cal.fecha_pago, aplica_ajuste_mensual: true },
         limitaciones: lim,
-        origen: { archivo_sha256, filas: g.map(x => x.r.fila), isr_previo: 'retenido según prenómina',
-          nota: 'C5 por confirmar: los pagos extra no entran a las bases del ajuste' } });
+        origen: { archivo_sha256, filas: enGrupo.map(x => x.r.fila), isr_previo: 'retenido según prenómina',
+          extras: enGrupo.filter(x => x.extra).map(x => x.r.corrida_id + ' fila ' + x.r.fila),
+          nota: 'C5 por confirmar: entran al ajuste sólo los pagos extra que declara el perfil (extras_en_ajuste); el resto no' } });
       reporte.ajm += 1;
       if (lim.length) reporte.ajm_limitados += 1;
     }
   }
 
   // ── ISN: por registro patronal y mes de pago, concepto por concepto
+  // Los pagos sin calendario (bonos, finiquitos, PTU, comisiones, gratificaciones) también son erogaciones del
+  // mes: entran al ISN del mes del encargo cuando el encargo es de un solo mes (prenómina mensual). Antes se
+  // descartaban de los dos lados (kernel y cliente) y su ISN no se auditaba.
+  const d = ctx.encargo && ctx.encargo.periodo_desde ? String(ctx.encargo.periodo_desde).slice(0, 7) : null;
+  const h = ctx.encargo && ctx.encargo.periodo_hasta ? String(ctx.encargo.periodo_hasta).slice(0, 7) : null;
+  const mesEncargoIsn = d && d === h ? d : null;
   const porRegistro = new Map();
   for (const r of renglones) {
     const cal = ctx.calendario.get(r.corrida_id);
-    if (!cal || !r.registro) continue;
-    const k = r.registro + '|' + cal.fecha_pago.slice(0, 7);
-    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes: cal.fecha_pago.slice(0, 7), conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0 });
+    if (!r.registro) continue;
+    const mes = cal ? cal.fecha_pago.slice(0, 7) : mesEncargoIsn;
+    if (!mes) { reporte.isn_sin_mes = (reporte.isn_sin_mes || 0) + 1; continue; }
+    if (!cal) reporte.isn_extras = (reporte.isn_extras || 0) + 1;
+    const k = r.registro + '|' + mes;
+    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes, conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0 });
     const a = porRegistro.get(k);
     for (const p of r.percepciones) {
       if (p.tipo === 'opaco') a.opacos += 1;

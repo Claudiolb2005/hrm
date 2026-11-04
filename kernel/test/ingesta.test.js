@@ -240,3 +240,48 @@ test('0.9.0 · finiquito y PTU generan ítems de LISR 95 y RLISR 174 con su rubr
   assert.ok(it.limitaciones.some(l => l.motivo === 'ptu_mezclada'));
   assert.ok(mix.items.some(i => i.regla_id === 'CALC-ISR-EXT-001'));
 });
+
+test('0.11.5 · el bono catorcenal entra al ajuste mensual (PRIME 123 CAT 17 = $2,778.84 al centavo); comisiones no', async () => {
+  const db = baseDatos();
+  const DOCS = r2Local();
+  const env = { DB: db, DOCS };
+  db.raw.exec("INSERT INTO empresas (id, nombre, slug) VALUES (1, 'PRIMEWIRELESS', 'prime')");
+  db.raw.exec("INSERT INTO encargo (id, empresa_id, nivel, periodo_desde, periodo_hasta, ejercicio, origen_nomina, aplica_ajuste_mensual) VALUES ('enc_ago', 1, 'B5+', '2026-08-01', '2026-08-31', 2026, 'cliente', 1)");
+  // Calendario catorcenal corregido con los timbres (30-oct).
+  const cal = [['CAT16', 'catorcenal', '2026-07-23', '2026-08-05', '2026-08-05', 1], ['CAT17', 'catorcenal', '2026-08-06', '2026-08-19', '2026-08-19', 1],
+    ['SEM33', 'semanal', '2026-08-10', '2026-08-16', '2026-08-20', 1], ['SEM34', 'semanal', '2026-08-17', '2026-08-23', '2026-08-27', 1]];
+  for (const c of cal) db.raw.prepare("INSERT INTO calendario_nomina (encargo_id, corrida_id, periodicidad, desde, hasta, fecha_pago, ordinaria, fuente) VALUES ('enc_ago',?,?,?,?,?,?,'prueba')").run(...c);
+  db.raw.exec("INSERT INTO registro_patronal (empresa_id, registro, entidad, fuente) VALUES (1, 'Y6079749104', 'CDMX', 'prueba')");
+  const filas = [
+    ['PRIMEWIRELESS HOLDINGS S DE RL DE CV'], ['ACUMULADO DE NÓMINA AGOSTO 2026'], [], ENC,
+    // Caso real del encargado de PRIME (fila 12537): CAT 16 y CAT 17 de $13,006 y bono catorcenal de $17,675.
+    fila({ corrida: 'CAT 16', emp: 123, perc: { Sueldo: 13006 }, isr: 1908.45 }),
+    fila({ corrida: 'CAT 17', emp: 123, perc: { Sueldo: 13006 }, isr: 2778.84 }),
+    fila({ corrida: 'BONOS CAT', emp: 123, perc: { Bono: 17675 }, isr: 2935.71 }),
+    // La comisión de PRIME no entra a su ajuste: la semana 34 queda igual que sin ella.
+    fila({ corrida: 'SEM 33', emp: 777, perc: { Sueldo: 3000 }, isr: 0 }),
+    fila({ corrida: 'SEM 34', emp: 777, perc: { Sueldo: 3000 }, isr: 0 }),
+    fila({ corrida: 'COMISIONES', emp: 777, perc: { Comisiones: 5000 }, isr: 600 }),
+  ];
+  await DOCS.put('empresa-1/agosto/acumulado.xlsx', xlsx([{ nombre: 'Hoja1', filas }]));
+  const id = await crearIngesta(env, { encargo_id: 'enc_ago', r2_key: 'empresa-1/agosto/acumulado.xlsx' });
+  let r;
+  for (let i = 0; i < 10; i++) { r = await avanzar(env, { ingesta_id: id }); if (['terminado', 'error'].includes(r.estado)) break; }
+  const st = await estadoIngesta(db, id);
+  assert.equal(r.estado, 'terminado', st.error || '');
+  assert.equal(st.reporte.mensual.ajm_con_extras, 1);
+  const ajm = await db.prepare("SELECT colaborador_id, valor_calculado_c, traza_json FROM calculo_kernel WHERE regla_id = 'CALC-ISR-AJM-001' ORDER BY colaborador_id").all();
+  const porEmp = Object.fromEntries(ajm.results.map(x => [x.colaborador_id, x]));
+  assert.equal(porEmp['123'].valor_calculado_c, 277884, 'ISR mes sobre 13,006 + 13,006 + 17,675 menos 1,908.45 y 2,935.71 retenidos');
+  const t = JSON.parse(porEmp['123'].traza_json);
+  assert.equal(t.nominas_en_mes, 3);
+  assert.equal(t.isr_retenido_previo_mes_c, 190845 + 293571);
+  assert.equal(JSON.parse(porEmp['777'].traza_json).nominas_en_mes, 2, 'la comisión no entra');
+  const { results: difs } = await db.prepare("SELECT colaborador_id, corrida_id FROM v_diferencia WHERE encargo_id = 'enc_ago' AND colaborador_id = '123'").all();
+  assert.deepEqual(difs, [], 'sin diferencia en la catorcena 17');
+  // ISN: los pagos sin calendario (bono y comisión) son erogaciones del mes y entran a la base del registro.
+  const isn = await db.prepare("SELECT traza_json FROM calculo_kernel WHERE regla_id = 'CALC-ISN-001'").first();
+  const tz = JSON.parse(isn.traza_json);
+  assert.equal(tz.base_c, (13006 + 13006 + 17675 + 3000 + 3000 + 5000) * 100);
+  assert.equal(st.reporte.mensual.isn_extras, 2);
+});
