@@ -8,7 +8,7 @@
 // Fases:  pendiente → calculando (lotes) → mensual (AJM, ISN) → cerrando (sello + reconciliación) → terminado
 // Cada paso es idempotente: ids deterministas, INSERT OR IGNORE, y un candado con vencimiento.
 import { abrirLibro, fuenteBuffer } from './xlsx.js';
-import { detectarEncabezado, construirMapa, renglonCanonico } from './canonico.js';
+import { detectarEncabezado, construirMapa, renglonCanonico, clasificarCorrida } from './canonico.js';
 import { itemsDeRenglon, itemsMensuales, ultimasDelMes } from './items.js';
 import { abrirEjecucion, calcularLote, cerrarEjecucion } from '../kernel/src/ejecutar.js';
 import { reconciliar } from '../kernel/src/reconciliacion.js';
@@ -29,6 +29,27 @@ const RUBROS_CONCILIADOS = ['isr', 'isn'];
 export const RUBROS_ENTERO = ['isr_enterado', 'cuotas_pagadas', 'isn_declarado'];
 
 const ahoraISO = () => new Date().toISOString();
+
+const SIN_ENCABEZADO = (perfil) => 'No se encontró el renglón de encabezado del perfil ' + perfil.id + ': este Excel no es la prenómina o el acumulado ' +
+  '(no trae sus columnas: ' + perfil.columnas.corrida[0] + ', ' + perfil.columnas.colaborador[0] + ', ' + perfil.columnas.total_percepciones[0] + '…). ' +
+  'Los CFDI se suben en un .zip con los XML, no en Excel.';
+
+/**
+ * ¿El archivo es de otro mes? El encargo ya tiene calendario y ninguna corrida del archivo está en él, aunque el
+ * archivo sí trae nóminas ordinarias (SEM 35… en el encargo de agosto). Devuelve el mensaje o null.
+ * Pasó el 7-nov-2026: el acumulado de septiembre se soltó en el encargo de agosto y se calculó como si fuera suyo.
+ */
+export function archivoDeOtroMes(corridas, calendario, perfil, encargo) {
+  const delCalendario = [...calendario.entries()].filter(([, c]) => c.ordinaria).map(([id]) => id);
+  if (!delCalendario.length) return null;
+  const ids = Object.keys(corridas || {});
+  if (ids.some(id => calendario.has(id))) return null;
+  const ordinarias = ids.filter(id => clasificarCorrida(id, perfil).ordinaria);
+  if (!ordinarias.length) return null;
+  const lista = (l) => l.sort().slice(0, 8).join(', ') + (l.length > 8 ? '…' : '');
+  return 'Este archivo no es de este mes: trae ' + lista(ordinarias) + ' y el encargo' + (encargo && encargo.periodo_desde ? ' de ' + String(encargo.periodo_desde).slice(0, 7) : '') +
+    ' tiene ' + lista(delCalendario) + '. Súbelo en «Sube los documentos del mes» para que llegue a su encargo. No se calculó nada.';
+}
 
 async function ejecutarLotes(db, sentencias) {
   for (let i = 0; i < sentencias.length; i += 50) await db.batch(sentencias.slice(i, i + 50));
@@ -109,7 +130,7 @@ async function fasePendiente(env, ing) {
       primeros.push(fila);
       if (primeros.length < perfil.encabezado.buscar_en_primeros) return;
       const i = detectarEncabezado(primeros, perfil);
-      if (i === null) throw new Error('No se encontró el renglón de encabezado del perfil ' + perfil.id);
+      if (i === null) throw new Error(SIN_ENCABEZADO(perfil));
       filaEnc = i + 1;
       mapa = construirMapa(primeros[i], perfil);
       if (mapa.faltantes.length) throw new Error('Columnas requeridas faltantes: ' + mapa.faltantes.join(', '));
@@ -120,7 +141,7 @@ async function fasePendiente(env, ing) {
   });
   if (!mapa) { // archivo con menos renglones que la ventana de búsqueda
     const i = detectarEncabezado(primeros, perfil);
-    if (i === null) throw new Error('No se encontró el renglón de encabezado del perfil ' + perfil.id);
+    if (i === null) throw new Error(SIN_ENCABEZADO(perfil));
     filaEnc = i + 1; mapa = construirMapa(primeros[i], perfil);
     if (mapa.faltantes.length) throw new Error('Columnas requeridas faltantes: ' + mapa.faltantes.join(', '));
     for (let k = i + 1; k < primeros.length; k++) await procesar(primeros[k], k + 1);
@@ -143,6 +164,8 @@ async function fasePendiente(env, ing) {
   await cerrarLote();
   await Promise.all(pendientesEscritura);
   if (!renglones) throw new Error('El archivo no tiene renglones de datos');
+  const otroMes = archivoDeOtroMes(corridas, ctx.calendario, perfil, ctx.encargo);
+  if (otroMes) throw new Error(otroMes);
 
   const excluidosCal = Object.values(sinCalendario).reduce((s, n) => s + n, 0);
   const fuentes = {
@@ -246,6 +269,12 @@ async function faseMensual(env, ing) {
 async function faseCerrando(env, ing) {
   const db = env.DB;
   const reporte = JSON.parse(ing.reporte_json);
+  {
+    // Ingestas anteriores a esta guarda: si el archivo era de otro mes no se reconcilia (ni vuelve a «terminado»).
+    const ctx0 = await contexto(db, ing, null);
+    const otroMes = archivoDeOtroMes(reporte.corridas, ctx0.calendario, ctx0.perfil, ctx0.encargo);
+    if (otroMes) throw new Error(otroMes);
+  }
   const ejecucion = await ejecucionAbierta(db, ing.ejecucion_id);
   if (ejecucion.estado === 'abierta') {
     const lotes = await leerLotes(db, ejecucion.id);
@@ -326,6 +355,18 @@ export async function estadoIngesta(db, id) {
   if (!i) return null;
   return { ...i, reporte: i.reporte_json ? JSON.parse(i.reporte_json) : null, reporte_json: undefined,
     avance: i.lotes_total ? Math.round(100 * i.lotes_hechos / i.lotes_total) : 0 };
+}
+
+/**
+ * Volver a calcular: otra ingesta del mismo archivo (el que ya está en R2) con el kernel y el calendario de hoy.
+ * La ejecución anterior queda sellada como estaba; la nueva es otra ejecución. Sirve cuando cambió el kernel
+ * o el calendario y no hace falta volver a subir el archivo.
+ */
+export async function recalcular(env, id, usuario_id) {
+  const i = await env.DB.prepare('SELECT encargo_id, tipo, perfil, r2_key, archivo_nombre, estado FROM ingesta WHERE id = ?1').bind(id).first();
+  if (!i) throw new Error('Ingesta no existe');
+  if (!['terminado', 'error'].includes(i.estado)) throw new Error('La lectura sigue en proceso: espera a que termine');
+  return crearIngesta(env, { encargo_id: i.encargo_id, tipo: i.tipo, perfil: i.perfil, r2_key: i.r2_key, archivo_nombre: i.archivo_nombre, usuario_id });
 }
 
 /** Reintentar una ingesta en error desde la fase en que quedó (los pasos son idempotentes). */

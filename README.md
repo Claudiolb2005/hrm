@@ -89,6 +89,9 @@ Página en `paginas/kernel.js`; todo lo que viene de archivos del cliente se esc
 | `GET/POST /api/kernel/calendario` | Calendario de nómina del encargo (fecha de pago y periodicidad por corrida) |
 | `GET/POST /api/kernel/registros` | Entidad y prima de riesgo por registro patronal |
 | `GET /api/kernel/diferencias/grupos?encargo_id=&ejecucion_id=` | Diferencias agrupadas por regla, rubro e importe |
+| `GET /api/kernel/diferencias/causas?encargo_id=&ejecucion_id=` | Lo validado por regla (revisados, coinciden, con diferencia) y cada diferencia con su causa (`ingesta/diagnostico.js`). Se calcula al leer |
+| `GET /api/kernel/diferencias/explicar?encargo_id=&diferencia_id=` | Pasos del cálculo de una diferencia (conceptos, base, tarifa, subsidio, nómina, causa) |
+| `POST /api/kernel/ingesta/recalcular` | Otra ingesta del mismo archivo (ya en R2) con el kernel y el calendario de hoy |
 | `POST /api/kernel/clasificar-grupo` | Clasifica en bloque las diferencias sin clasificar de un filtro |
 
 Ver `kernel/README.md`.

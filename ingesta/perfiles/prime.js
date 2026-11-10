@@ -18,7 +18,7 @@
 
 export default {
   id: 'prime',
-  version: '2026-10-19',
+  version: '2026-11-10',
   empresa: 'PRIMEWIRELESS HOLDINGS (PHO190128QD8)',
 
   // Hoja: la que más renglones × columnas tenga (el acumulado trae hojas auxiliares).
@@ -54,6 +54,8 @@ export default {
     { encabezado: 'Aguinaldo',                     tipo: 'percepcion', concepto: 'aguinaldo' },
     { encabezado: 'Gratificación',                 tipo: 'percepcion', concepto: 'gratificacion' },
     { encabezado: 'Indemnización',                 tipo: 'separacion', concepto: 'indemnizacion' },
+    // El acumulado de PRIME trae el encabezado recortado («Indemnizacio»): es la misma columna.
+    { encabezado: 'Indemnizacio',                  tipo: 'separacion', concepto: 'indemnizacion' },
     { encabezado: 'Prima de antigüedad',           tipo: 'separacion', concepto: 'prima_antiguedad' },
     { encabezado: 'Liquidacion',                   tipo: 'separacion', concepto: 'liquidacion' },
     { encabezado: 'PTU',                           tipo: 'ptu',        concepto: 'ptu' },
@@ -106,9 +108,34 @@ export default {
     // Pagos fuera del calendario que PRIME suma a las bases del ajuste mensual (y resta su ISR retenido).
     // Verificado contra agosto 2026: el bono catorcenal entra (ej. 123 CAT 17 = $2,778.84 al centavo);
     // comisiones, gratificación, PTU y finiquitos no entran (incluirlos rompe casos que hoy cuadran).
+    // Septiembre 2026: PRIME nombró las corridas «BONOS CAT SEPTIEMBRE» y «BONO» y el ajuste dejó de sumarlas
+    // (24 ajustes con diferencia; con el bono, 23 coinciden al centavo y uno queda en negativo no reintegrado).
+    // El nombre puede traer sufijo (mes); «BONO» a secas toma la periodicidad de la nómina del colaborador.
+    // Un bono con nombre propio (p. ej. «BONO ESPELETA») no entra: PRIME no lo suma (175 CAT 20 cuadra sin él)
+    // y el reporte mensual lo declara (`ajm_bonos_fuera`).
     extras_en_ajuste: [
-      { patron: '^BONOS_SEM$', periodicidad: 'semanal' },
-      { patron: '^BONOS_CAT$', periodicidad: 'catorcenal' },
+      { patron: '^BONOS?_SEM(_.*)?$', periodicidad: 'semanal' },
+      { patron: '^BONOS?_CAT(_.*)?$', periodicidad: 'catorcenal' },
+      { patron: '^BONOS?$' },
+    ],
+    // Corridas con nombre de bono: las que no caen en extras_en_ajuste se reportan.
+    patron_bono: '^BONOS?(_|$)',
+    // ISN del lado de la nómina: «Impuesto estatal» de un renglón no puede pasar de este porcentaje de sus
+    // percepciones (la tasa más alta del país con adicionales no llega a 5 %). En los renglones de bonos de PRIME
+    // la columna trae ≈35 % del bono (agosto y septiembre 2026): no es ISN, no se suma y se reporta aparte.
+    isn_renglon_maximo_pct: 10,
+    // Causas conocidas de diferencia de esta nómina: el diagnóstico recalcula con cada una y, si el resultado
+    // es lo que retuvo la nómina, la diferencia queda explicada (ingesta/diagnostico.js). No cambian el cálculo.
+    hipotesis: [
+      { id: 'subsidio_1559', tipo: 'subsidio_monto', monto_mensual: '555.97', de: 'nomina',
+        titulo: 'Subsidio para el empleo con 15.59 %',
+        explicacion: 'La nómina aplica el subsidio con 15.59 % de la UMA mensual ($555.97). Desde febrero de 2026 el decreto fija 15.02 % ($535.65): la nómina retiene $4.68 de menos por semana, $9.36 por catorcena o $20.32 al mes.' },
+      { id: 'fondo_ahorro_exento', tipo: 'concepto_exento', concepto: 'fondo_ahorro_empresa', de: 'criterio',
+        titulo: 'Fondo de ahorro tratado como exento',
+        explicacion: 'La nómina no grava la aportación de la empresa al fondo de ahorro. En la revisión el fondo no acredita los requisitos de la LISR (art. 27 fr. XI y 93 fr. XI), por eso el sistema lo grava. Sin el fondo en la base, el ISR es el que retuvo la nómina.' },
+      { id: 'prima_dominical_un_domingo', tipo: 'exento_hasta_uma', concepto: 'prima_dominical', veces: 1, de: 'alcance',
+        titulo: 'Prima dominical: falta el número de domingos',
+        explicacion: 'El archivo no dice cuántos domingos se trabajaron y no se pudo deducir de la prima. Con un domingo exento (1 UMA) el ISR es el que retuvo la nómina.' },
     ],
   },
 };

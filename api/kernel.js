@@ -5,7 +5,8 @@
 // canónicas; la ingesta con cola (archivo en R2 → lotes idempotentes) se monta encima.
 import { ejecutar, reconciliar, aceptacion, listaPBC, verificarSello, KERNEL_VERSION, KERNEL_HUELLA, versionCatalogoReglas, Catalogo, CUBETAS } from '../kernel/src/index.js';
 import { cargarCatalogo, persistirEjecucion, leerEjecucion, verificarArranque, compararMatriz, insertarMultiple } from '../kernel/src/d1.js';
-import { crearIngesta, avanzar, estadoIngesta, reintentar, PERFILES, RUBROS_ENTERO } from '../ingesta/trabajos.js';
+import { crearIngesta, avanzar, estadoIngesta, reintentar, recalcular, PERFILES, RUBROS_ENTERO } from '../ingesta/trabajos.js';
+import { diagnosticoEjecucion, explicarDiferencia } from '../ingesta/diagnostico.js';
 import { toleranciaPorGrupo } from '../kernel/src/dictamen.js';
 import semilla from '../kernel/data/parametros-2026.js';
 import { metadatosFuente } from '../servicio/expediente.js';
@@ -18,6 +19,12 @@ export const ENTIDADES = ['AGS', 'BC', 'BCS', 'CAMP', 'CHIS', 'CHIH', 'CDMX', 'C
   'MOR', 'NAY', 'NL', 'OAX', 'PUE', 'QRO', 'QROO', 'SLP', 'SIN', 'SON', 'TAB', 'TAMS', 'TLAX', 'VER', 'YUC', 'ZAC'];
 const PERIODICIDADES = ['semanal', 'decenal', 'catorcenal', 'quincenal', 'mensual'];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Perfil del cliente con el que se leyó el archivo de una ejecución (para las causas de diferencia que declara). */
+async function perfilDeEjecucion(db, ejecucion_id) {
+  const i = await db.prepare('SELECT perfil FROM ingesta WHERE ejecucion_id = ?1 ORDER BY creado_en DESC LIMIT 1').bind(ejecucion_id).first();
+  return PERFILES[(i && i.perfil) || 'prime'] || PERFILES.prime;
+}
 
 async function cuerpo(request) {
   try { return await request.json(); } catch { return null; }
@@ -146,7 +153,10 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   if (p === '/api/kernel/ejecuciones' && m === 'GET') {
     const enc = url.searchParams.get('encargo_id');
     if (!enc) return J({ error: 'encargo_id requerido' }, 400, C);
-    const { results } = await db.prepare('SELECT id, kernel_version, version_parametros, calculado_en, n_calculos, sello FROM ejecucion WHERE encargo_id = ?1 ORDER BY calculado_en DESC').bind(enc).all();
+    // Con el archivo de prenómina del que salió cada una: las del SUA y las que no terminaron no se reconcilian contra la nómina.
+    const { results } = await db.prepare('SELECT e.id, e.kernel_version, e.version_parametros, e.calculado_en, e.n_calculos, e.sello, ' +
+      "(SELECT i.archivo_nombre FROM ingesta i WHERE i.ejecucion_id = e.id AND i.estado = 'terminado' ORDER BY i.creado_en DESC LIMIT 1) AS archivo_nombre " +
+      'FROM ejecucion e WHERE e.encargo_id = ?1 ORDER BY e.calculado_en DESC').bind(enc).all();
     return J({ ejecuciones: results }, 200, C);
   }
 
@@ -223,6 +233,26 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     return J({ grupos: results, total: tot.n || 0, aceptacion: { aceptado: (tot.pendientes || 0) === 0, sin_clasificar: tot.pendientes || 0 } }, 200, C);
   }
 
+  // Diferencias con su causa y resumen de lo validado (ingesta/diagnostico.js). Se calcula al leer; no guarda nada.
+  if (p === '/api/kernel/diferencias/causas' && m === 'GET') {
+    const enc = url.searchParams.get('encargo_id'), ej = url.searchParams.get('ejecucion_id');
+    if (!enc || !ej) return J({ error: 'encargo_id y ejecucion_id requeridos' }, 400, C);
+    const e = await db.prepare('SELECT id, kernel_version, kernel_huella FROM ejecucion WHERE id = ?1 AND encargo_id = ?2').bind(ej, enc).first();
+    if (!e) return J({ error: 'Ejecución no existe en este encargo' }, 404, C);
+    const r = await diagnosticoEjecucion(db, { encargo_id: enc, ejecucion_id: ej, perfil: await perfilDeEjecucion(db, ej), catalogo: await cargarCatalogo(db) });
+    // Si la ejecución es de una versión anterior del kernel, la pantalla ofrece volver a calcular el mismo archivo.
+    return J({ ...r, kernel: { version: e.kernel_version, actual: KERNEL_VERSION, anterior: e.kernel_huella !== KERNEL_HUELLA },
+      aceptacion: { aceptado: r.sin_clasificar === 0, sin_clasificar: r.sin_clasificar } }, 200, C);
+  }
+  if (p === '/api/kernel/diferencias/explicar' && m === 'GET') {
+    const enc = url.searchParams.get('encargo_id'), id = url.searchParams.get('diferencia_id');
+    if (!enc || !id) return J({ error: 'encargo_id y diferencia_id requeridos' }, 400, C);
+    const ej = await db.prepare('SELECT c.ejecucion_id FROM diferencia d JOIN calculo_kernel c ON c.id = d.calculo_kernel_id WHERE d.id = ?1 AND c.encargo_id = ?2').bind(id, enc).first();
+    if (!ej) return J({ error: 'Diferencia no existe en este encargo' }, 404, C);
+    const r = await explicarDiferencia(db, { encargo_id: enc, diferencia_id: id, perfil: await perfilDeEjecucion(db, ej.ejecucion_id), catalogo: await cargarCatalogo(db) });
+    return J({ explicacion: r }, 200, C);
+  }
+
   if (p === '/api/kernel/clasificar' && m === 'POST') {
     const d = await cuerpo(request);
     if (!d || !d.diferencia_id || !CUBETAS.includes(d.cubeta) || !d.motivo) return J({ error: 'Se espera { diferencia_id, cubeta, motivo, criterio_id? }' }, 400, C);
@@ -234,7 +264,22 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
   // Clasificación en bloque: todas las diferencias sin clasificar que cumplen el filtro (p. ej. las 1,029 del hallazgo 1).
   if (p === '/api/kernel/clasificar-grupo' && m === 'POST') {
     const d = await cuerpo(request);
-    if (!d || !d.encargo_id || !CUBETAS.includes(d.cubeta) || !d.motivo) return J({ error: 'Se espera { encargo_id, cubeta, motivo, regla_id?, rubro?, corrida_id?, diferencia_c?, criterio_id? }' }, 400, C);
+    if (!d || !d.encargo_id || !CUBETAS.includes(d.cubeta) || !d.motivo) return J({ error: 'Se espera { encargo_id, cubeta, motivo, regla_id?, rubro?, corrida_id?, diferencia_c?, causa?, criterio_id? }' }, 400, C);
+    // Por causa: las diferencias sin clasificar de la ejecución que el diagnóstico atribuye a esa causa (y regla).
+    if (d.causa) {
+      if (!d.ejecucion_id) return J({ error: 'Con causa se necesita ejecucion_id' }, 400, C);
+      const dx = await diagnosticoEjecucion(db, { encargo_id: d.encargo_id, ejecucion_id: d.ejecucion_id, perfil: await perfilDeEjecucion(db, d.ejecucion_id), catalogo: await cargarCatalogo(db) });
+      const ids = dx.casos.filter(c => c.causa === d.causa && !c.cubeta && (!d.regla_id || c.regla_id === d.regla_id)).map(c => c.id);
+      const en = new Date().toISOString();
+      const st = [];
+      for (let i = 0; i < ids.length; i += 80) {
+        const g = ids.slice(i, i + 80);
+        st.push(db.prepare('UPDATE diferencia SET cubeta = ?1, motivo = ?2, quien = ?3, clasificado_por_usuario_id = ?4, criterio_id = ?5, clasificado_en = ?6 WHERE cubeta IS NULL AND id IN (' +
+          g.map((_, k) => '?' + (k + 7)).join(',') + ')').bind(d.cubeta, d.motivo, u.nombre || u.email, u.id, d.criterio_id || null, en, ...g));
+      }
+      for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
+      return J({ ok: true, clasificadas: ids.length }, 200, C);
+    }
     const filtros = ['encargo_id = ?1', 'cubeta IS NULL'];
     const args = [d.encargo_id];
     for (const k of ['regla_id', 'rubro', 'corrida_id', 'diferencia_c']) if (d[k] !== undefined && d[k] !== null && d[k] !== '') { args.push(d[k]); filtros.push(k + ' = ?' + args.length); }
@@ -291,6 +336,15 @@ export async function rutasKernel(request, env, u, C, J, ctx) {
     if (!d || !d.id) return J({ error: 'id requerido' }, 400, C);
     const r = await avanzar(env, { ingesta_id: d.id, presupuesto_ms: 20000 });
     return J({ ...r, ingesta: await estadoIngesta(db, d.id) }, 200, C);
+  }
+  // Volver a calcular el mismo archivo (ya está en R2) con el kernel y el calendario de hoy: otra ingesta, otra ejecución.
+  if (p === '/api/kernel/ingesta/recalcular' && m === 'POST') {
+    const d = await cuerpo(request);
+    if (!d || !d.id) return J({ error: 'id requerido' }, 400, C);
+    let id;
+    try { id = await recalcular(env, d.id, u.id); } catch (e) { return J({ error: e.message }, 400, C); }
+    if (ctx && ctx.waitUntil) ctx.waitUntil(avanzar(env, { ingesta_id: id, presupuesto_ms: 25000 }));
+    return J({ ok: true, id }, 201, C);
   }
   if (p === '/api/kernel/ingesta/reintentar' && m === 'POST') {
     const d = await cuerpo(request);

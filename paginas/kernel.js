@@ -228,12 +228,38 @@ html body .k-row>label input{width:auto;margin:0}
 
   <section id="t-diferencias" class="oculto">
     <div class="k-card">
-      <h2>Diferencias kernel vs nómina</h2>
+      <h2>Lo que se validó</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">El sistema vuelve a calcular con la ley el ISR de cada renglón de tu nómina y el impuesto sobre nóminas de cada registro patronal, y lo compara con lo que trae tu archivo. Lo que coincide no aparece como diferencia: aquí está la cuenta.</div>
+      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Archivo</label><select id="selEj" class="k-sel" onchange="cargarCausas()"></select><button class="k-btn sec peq" id="btnRecalc" onclick="recalcularEj()">Volver a calcular</button></div>
+      <div id="avisoEj"></div>
       <div id="acept"></div>
-      <div class="k-row" style="margin:6px 0 10px"><label style="font-size:12px;color:#5a7a8a">Ejecución</label><select id="selEj" class="k-sel" onchange="cargarGrupos()"></select></div>
+      <div class="scroll"><table class="k-tbl"><thead><tr><th>Qué se revisó</th><th class="num">Revisados</th><th class="num">Coinciden</th><th class="num">Con diferencia</th><th style="width:28%">Coincide</th></tr></thead><tbody id="tbVal"></tbody></table></div>
+      <div id="sinCalc"></div>
+    </div>
+    <div class="k-card">
+      <h2>Diferencias por causa</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Cada diferencia se volvió a calcular con las causas ya conocidas de esta nómina. Si con una de ellas el resultado es exactamente lo que retuvo la nómina, esa es su causa. Elige un renglón para ver los casos y cómo se calculó cada uno.</div>
+      <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Causa</th><th>De quién es</th><th>Dónde</th><th class="num">Casos</th><th class="num">Importe</th><th></th></tr></thead><tbody id="tbCau"></tbody></table></div>
+    </div>
+    <div class="k-card oculto" id="casosCausa">
+      <h2 id="casosT">Casos</h2>
+      <div id="casosExp" class="aviso"></div>
+      <div class="frm solo-admin">
+        <div><label>Cubeta</label><select id="kCub" class="k-sel" onchange="document.getElementById('kCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
+          <option value="proceso_mal">Proceso actual mal (hallazgo)</option><option value="kernel_mal">Kernel mal (se corrige)</option><option value="criterio_sin_resolver">Criterio sin resolver</option></select></div>
+        <div id="kCritW" class="oculto"><label>Criterio de la bitácora</label><select id="kCrit" class="k-sel"></select></div>
+        <div style="grid-column:span 2"><label>Motivo</label><input id="kMot" class="k-in"></div>
+        <div><button class="k-btn" onclick="clasificarCausa()">Clasificar esta causa</button></div>
+      </div>
+      <div class="scroll alto" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Colaborador</th><th>Corrida</th><th class="num">Sistema</th><th class="num">Nómina</th><th class="num">Diferencia</th><th>Origen</th><th></th></tr></thead><tbody id="tbCasosC"></tbody></table></div>
+      <div id="explica"></div>
+    </div>
+    <div class="k-card solo-admin">
+      <h2>Diferencias por importe (clasificación)</h2>
+      <div id="aceptG"></div>
       <div class="scroll alto"><table class="k-tbl"><thead><tr><th>Regla</th><th>Rubro</th><th class="num">Diferencia</th><th class="num">Casos</th><th class="num">Pendientes</th><th>Cubeta</th><th></th></tr></thead><tbody id="tbGr"></tbody></table></div>
     </div>
-    <div class="k-card oculto" id="clasif">
+    <div class="k-card oculto solo-admin" id="clasif">
       <h2 id="clasifT">Clasificar</h2>
       <div class="frm solo-admin">
         <div><label>Cubeta</label><select id="cCub" class="k-sel" onchange="document.getElementById('cCritW').classList.toggle('oculto', this.value!=='criterio_sin_resolver')">
@@ -552,7 +578,9 @@ function pintarSua(){
   api('GET','/api/kernel/sua/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&periodo='+encodeURIComponent(per)).then(function(r){
     var a=r.aceptacion;window.SUAG=r.grupos;
     document.getElementById('aceptS').innerHTML=r.total===0?'<div class="aviso ok">Kernel, emisión y pago coinciden en todo.</div>':(a.aceptado?'<div class="aviso ok">Todo el cruce está clasificado.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar+'</b> de '+r.total+' por clasificar.</div>');
-    document.getElementById('tbSuaG').innerHTML=r.grupos.map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(CAUSAS[g.causa]||g.causa)+'</td><td>'+esc(RAMASN[g.rama]||g.rama)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.registros+'</td><td class="num">'+pesos(g.pagado_menos_kernel_c)+'</td><td class="num">'+pesos(g.pagado_menos_emitido_c)+'</td><td class="num">'+g.pendientes+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBS[g.cubeta])+'</span>':'')+'</td></tr>'}).join('');
+    var okS=r.grupos.filter(function(g){return g.pagado_menos_kernel_c===0}).reduce(function(t,g){return t+g.n},0);
+    if(okS)document.getElementById('aceptS').innerHTML+='<div class="aviso ok">En <b>'+okS.toLocaleString('es-MX')+'</b> de '+r.total.toLocaleString('es-MX')+' casos el pago es correcto: lo pagado en el SUA es igual al cálculo de ley. Aparecen porque la emisión del IMSS trae otro importe (por ejemplo, no descuenta las incapacidades).</div>';
+    document.getElementById('tbSuaG').innerHTML=r.grupos.map(function(g,i){return '<tr class="click" data-i="'+i+'"><td>'+esc(CAUSAS[g.causa]||g.causa)+(g.pagado_menos_kernel_c===0?' <span class="b b-ok">Pago correcto</span>':'')+'</td><td>'+esc(RAMASN[g.rama]||g.rama)+'</td><td class="num">'+g.n+'</td><td class="num">'+g.registros+'</td><td class="num">'+pesos(g.pagado_menos_kernel_c)+'</td><td class="num">'+pesos(g.pagado_menos_emitido_c)+'</td><td class="num">'+g.pendientes+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBS[g.cubeta])+'</span>':'')+'</td></tr>'}).join('');
     document.querySelectorAll('#tbSuaG tr.click').forEach(function(tr){tr.addEventListener('click',function(){verGrupoSua(window.SUAG[Number(tr.dataset.i)],tr)})});
   }).catch(function(e){document.getElementById('aceptS').innerHTML='<div class="aviso err">'+esc(e.message)+'</div>'});
 }
@@ -612,7 +640,8 @@ function pintarIngesta(){
   d.classList.remove('oculto');
   h+='<div class="k-row" style="justify-content:space-between"><h2 style="margin:0">'+esc(i.archivo_nombre)+'</h2><div class="k-row">'+badgeEstado(i.estado)+
     (['pendiente','calculando','mensual','cerrando'].indexOf(i.estado)>=0?'<button class="k-btn peq" onclick="avanzar()">Avanzar ahora</button>':'')+
-    (i.estado==='error'?'<button class="k-btn peq" onclick="reintentar()">Reintentar</button>':'')+'</div></div>';
+    (i.estado==='error'?'<button class="k-btn peq" onclick="reintentar()">Reintentar</button>':'')+
+    (i.estado==='terminado'?'<button class="k-btn peq sec" onclick="recalcularEj(ING.id)">Volver a calcular</button>':'')+'</div></div>';
   h+='<div class="sub mono" style="color:#8ba5b2;margin:4px 0 12px;word-break:break-all">SHA-256 '+esc(i.archivo_sha256||'—')+(i.ejecucion_id?' · ejecución '+esc(i.ejecucion_id):'')+'</div>';
   if(i.error)h+='<div class="aviso err">'+esc(String(i.error).split('\\n')[0])+'</div>';
   if(i.lotes_total)h+='<div class="k-row" style="margin-bottom:12px"><div class="bar" style="flex:1"><i style="width:'+i.avance+'%"></i></div><span class="num" style="font-size:12px;color:#5a7a8a">'+i.lotes_hechos+' / '+i.lotes_total+' lotes</span></div>';
@@ -634,7 +663,7 @@ function pintarIngesta(){
     var rc=rep.reconciliacion;
     h+='<h3>Reconciliación contra la nómina</h3><div class="kpis">'+[['Coinciden',rc.coincidencias],['Coinciden (limitados)',rc.coincidencias_limitadas],['Diferencias',rc.diferencias],['Limitados',rc.limitados],['Sin par en nómina',rc.sin_par_cliente],['Sin par en kernel',rc.sin_par_kernel]]
       .map(function(x){return '<div class="kpi"><div class="l">'+x[0]+'</div><div class="v">'+Number(x[1]||0).toLocaleString('es-MX')+'</div></div>'}).join('')+'</div>';
-    h+='<button class="k-btn sec" onclick="irDiferencias()">'+(CARGA?'Ver diferencias →':'Clasificar diferencias →')+'</button>';
+    h+='<button class="k-btn sec" onclick="irDiferencias()">'+(CARGA?'Ver lo validado y las diferencias →':'Clasificar diferencias →')+'</button>';
   }
   d.innerHTML=h;
 }
@@ -644,32 +673,114 @@ function irDiferencias(){document.querySelector('.k-tab[data-t="diferencias"]').
 // Pendientes de la ejecución de la ingesta que se está viendo (la aceptación es por ejecución).
 function cargarPendientes(){
   if(!ENC||!ING||!ING.ejecucion_id){document.getElementById('nPend').textContent='0';return}
-  api('GET','/api/kernel/diferencias/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ING.ejecucion_id)).then(function(r){document.getElementById('nPend').textContent=r.aceptacion.sin_clasificar})
+  api('GET','/api/kernel/diferencias/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ING.ejecucion_id)).then(function(r){document.getElementById('nPend').textContent=CARGA?r.total:r.aceptacion.sin_clasificar})
 }
 function cargarEjecuciones(){
   if(!ENC)return;
   Promise.all([api('GET','/api/kernel/ejecuciones?encargo_id='+encodeURIComponent(ENC.id)),api('GET','/api/kernel/criterios')]).then(function(r){
     CRITS=r[1].criterios||[];
-    document.getElementById('cCrit').innerHTML=CRITS.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
-    var l=r[0].ejecuciones||[];var s=document.getElementById('selEj');
-    s.innerHTML=l.length?l.map(function(e){return '<option value="'+esc(e.id)+'">'+esc(fecha(e.calculado_en)+' · '+Number(e.n_calculos||0).toLocaleString('es-MX')+' cálculos · '+e.id)+'</option>'}).join(''):'<option value="">Sin ejecuciones selladas</option>';
+    var ops=CRITS.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.id+' · '+c.tema)+'</option>'}).join('');
+    document.getElementById('cCrit').innerHTML=ops;document.getElementById('kCrit').innerHTML=ops;
+    // Sólo las ejecuciones que salieron de una prenómina leída completa: las del SUA y las fallidas no se comparan aquí.
+    var todas=r[0].ejecuciones||[];var l=todas.filter(function(e){return e.archivo_nombre});if(!l.length)l=todas;
+    var s=document.getElementById('selEj');
+    s.innerHTML=l.length?l.map(function(e){return '<option value="'+esc(e.id)+'">'+esc((e.archivo_nombre||'Ejecución manual')+' · '+fecha(e.calculado_en)+' · '+Number(e.n_calculos||0).toLocaleString('es-MX')+' cálculos')+'</option>'}).join(''):'<option value="">Sin archivos calculados</option>';
     if(ING&&ING.ejecucion_id&&l.some(function(e){return e.id===ING.ejecucion_id}))s.value=ING.ejecucion_id;
-    cargarGrupos();
+    cargarCausas();
   });
+}
+var DX=null,GCAU=null;
+var DEB={nomina:'b-lim',criterio:'b-par',alcance:'b-neu',hrm:'b-run'};
+function pct(a,b){return b?Math.floor(1000*a/b)/10:0}
+function cargarCausas(){
+  var ej=document.getElementById('selEj').value;
+  document.getElementById('casosCausa').classList.add('oculto');document.getElementById('clasif').classList.add('oculto');GCAU=null;GRUPO=null;DX=null;
+  ['avisoEj','acept','sinCalc','explica'].forEach(function(i){document.getElementById(i).innerHTML=''});
+  document.getElementById('btnRecalc').classList.toggle('oculto',!ej);
+  if(!ej){document.getElementById('tbVal').innerHTML='<tr><td colspan="5" class="vacio">Todavía no hay un archivo calculado en este encargo.</td></tr>';document.getElementById('tbCau').innerHTML='';document.getElementById('tbGr').innerHTML='';return}
+  document.getElementById('tbVal').innerHTML='<tr><td colspan="5" class="vacio">Revisando…</td></tr>';document.getElementById('tbCau').innerHTML='';
+  api('GET','/api/kernel/diferencias/causas?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ej)).then(function(r){
+    DX=r;pintarCausas();
+  }).catch(function(e){document.getElementById('tbVal').innerHTML='<tr><td colspan="5" class="vacio">'+esc(e.message)+'</td></tr>'});
+  if(!CARGA)cargarGrupos();
+}
+function pintarCausas(){
+  var r=DX,T={n:0,ok:0,d:0};
+  document.getElementById('tbVal').innerHTML=(r.resumen||[]).map(function(x){T.n+=x.calculos;T.ok+=x.coinciden;T.d+=x.diferencias;var p=pct(x.coinciden,x.calculos);
+    return '<tr><td><b>'+esc(REGLAS[x.regla_id]||x.regla_id)+'</b></td><td class="num">'+x.calculos.toLocaleString('es-MX')+'</td><td class="num">'+x.coinciden.toLocaleString('es-MX')+'</td><td class="num">'+x.diferencias.toLocaleString('es-MX')+'</td><td><div class="k-row" style="flex-wrap:nowrap"><div class="bar" style="flex:1"><i style="width:'+p+'%"></i></div><span class="num" style="font-size:11px;color:#5a7a8a">'+p+'%</span></div></td></tr>'}).join('')+
+    (T.n?'<tr><td><b>Total</b></td><td class="num"><b>'+T.n.toLocaleString('es-MX')+'</b></td><td class="num"><b>'+T.ok.toLocaleString('es-MX')+'</b></td><td class="num"><b>'+T.d.toLocaleString('es-MX')+'</b></td><td class="num" style="font-size:11px;color:#5a7a8a">'+pct(T.ok,T.n)+'%</td></tr>':'<tr><td colspan="5" class="vacio">Sin cálculos comparables en este archivo.</td></tr>');
+  var a=r.aceptacion,h='';
+  if(T.n)h='<div class="aviso '+(T.d?'':'ok')+'">De <b>'+T.n.toLocaleString('es-MX')+'</b> importes revisados, <b>'+T.ok.toLocaleString('es-MX')+'</b> coinciden con tu nómina ('+pct(T.ok,T.n)+'%) y <b>'+T.d.toLocaleString('es-MX')+'</b> tienen diferencia. '+
+    (T.d?'Cada diferencia trae su causa en la tabla de abajo'+(CARGA?'; HRM las revisa y las clasifica.':'. Faltan <b>'+a.sin_clasificar.toLocaleString('es-MX')+'</b> por clasificar; pasa con cero sin clasificar.'):'')+'</div>';
+  document.getElementById('acept').innerHTML=h;
+  document.getElementById('avisoEj').innerHTML=r.kernel&&r.kernel.anterior?'<div class="aviso">Este archivo se calculó con una versión anterior del sistema ('+esc(r.kernel.version)+'). Pulsa <b>Volver a calcular</b> para aplicar las correcciones de la versión '+esc(r.kernel.actual)+'; no hace falta subirlo otra vez.</div>':'';
+  var sc=r.sin_calculo||{},ks=Object.keys(sc),av=r.avisos||{},x='';
+  if(ks.length)x+='<h3>Pagos fuera de las nóminas del calendario</h3><div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:6px">Finiquitos, bonos, PTU, gratificaciones y comisiones que vienen en renglón aparte. Su ISR no se recalcula aquí; el pago se valida contra su CFDI en la pestaña <b>Nómina ↔ CFDI</b> y sus importes sí entran al impuesto sobre nóminas del mes.</div><div class="chipl">'+ks.map(function(k){return '<span>'+esc(k.replace(/_/g,' '))+' · '+Number(sc[k]).toLocaleString('es-MX')+'</span>'}).join('')+'</div>';
+  if(av.ajm_bonos_fuera)x+='<div class="aviso">Bonos que no entraron al ajuste mensual de ISR (la nómina no los acumula): '+Object.keys(av.ajm_bonos_fuera).map(function(k){return '<b>'+esc(k.replace(/_/g,' '))+'</b> ('+av.ajm_bonos_fuera[k]+')'}).join(', ')+'. HRM lo revisa.</div>';
+  if(av.isn_fuera_de_rango)x+='<div class="aviso">'+av.isn_fuera_de_rango.renglones+' renglones traen en «Impuesto estatal» más de lo que puede ser un impuesto sobre nóminas ('+pesos(av.isn_fuera_de_rango.suma_c)+' en total): ese importe no se sumó al ISN de la nómina. HRM lo revisa.</div>';
+  document.getElementById('sinCalc').innerHTML=x;
+  var g=r.causas||[];
+  document.getElementById('tbCau').innerHTML=g.map(function(c,i){
+    var imp=c.min_c===c.max_c&&c.n>1?pesos(c.min_c)+' c/u':pesos(c.suma_c);
+    return '<tr class="click" data-i="'+i+'"><td><b>'+esc(c.titulo)+'</b><div style="font-size:11px;color:#5a7a8a;max-width:520px">'+esc(c.explicacion)+'</div></td><td><span class="b '+(DEB[c.de]||'b-neu')+'">'+esc((r.de||{})[c.de]||c.de)+'</span></td><td>'+esc(REGLAS[c.regla_id]||c.regla_id)+'</td><td class="num">'+c.n.toLocaleString('es-MX')+(!CARGA&&c.pendientes<c.n?' <span class="b b-ok">'+(c.n-c.pendientes)+' clasif.</span>':'')+'</td><td class="num">'+imp+'</td><td><button class="k-btn peq sec">Ver casos</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" class="vacio">Sin diferencias en este archivo.</td></tr>';
+  document.querySelectorAll('#tbCau tr.click').forEach(function(tr){tr.addEventListener('click',function(){abrirCausa(g[Number(tr.dataset.i)],tr)})});
+  document.getElementById('nPend').textContent=CARGA?r.total:a.sin_clasificar;
+}
+function abrirCausa(c,tr){
+  GCAU=c;document.querySelectorAll('#tbCau tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
+  document.getElementById('casosCausa').classList.remove('oculto');document.getElementById('explica').innerHTML='';
+  document.getElementById('casosT').textContent=c.titulo+' · '+(REGLAS[c.regla_id]||c.regla_id)+' · '+c.n.toLocaleString('es-MX')+' casos';
+  document.getElementById('casosExp').textContent=c.explicacion;
+  document.getElementById('kMot').value=c.titulo;
+  var l=(DX.casos||[]).filter(function(x){return x.causa===c.causa&&x.regla_id===c.regla_id}).sort(function(a,b){return Math.abs(b.diferencia_c)-Math.abs(a.diferencia_c)});
+  var mas=l.length>300;if(mas)l=l.slice(0,300);
+  document.getElementById('tbCasosC').innerHTML=l.map(function(x){
+    return '<tr><td class="mono">'+esc(x.colaborador_id)+'</td><td>'+esc(x.corrida_id)+'</td><td class="num">'+pesos(x.kernel_c)+'</td><td class="num">'+pesos(x.cliente_c)+'</td><td class="num">'+pesos(x.diferencia_c)+'</td><td>'+esc(x.renglon_origen||'')+(x.detalle?'<div style="font-size:11px;color:#5a7a8a">'+esc(x.detalle)+'</div>':'')+'</td><td><button class="k-btn peq sec" data-id="'+esc(x.id)+'">Cómo se calculó</button>'+(x.cubeta&&!CARGA?' <span class="b b-neu">'+esc(CUBETAS[x.cubeta]||x.cubeta)+'</span>':'')+'</td></tr>';
+  }).join('')+(mas?'<tr><td colspan="7" class="vacio">Se muestran los 300 casos de mayor importe.</td></tr>':'');
+  document.querySelectorAll('#tbCasosC button[data-id]').forEach(function(b){b.addEventListener('click',function(){verExplicacion(b.dataset.id,b.closest('tr'))})});
+  document.getElementById('casosCausa').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function verExplicacion(id,tr){
+  document.querySelectorAll('#tbCasosC tr').forEach(function(x){x.classList.toggle('sel',x===tr)});
+  var d=document.getElementById('explica');d.innerHTML='<div class="vacio">Armando el cálculo…</div>';
+  api('GET','/api/kernel/diferencias/explicar?encargo_id='+encodeURIComponent(ENC.id)+'&diferencia_id='+encodeURIComponent(id)).then(function(r){
+    var e=r.explicacion,fin='';
+    var filas=(e.pasos||[]).map(function(p){
+      if(p.causa){fin='<div class="aviso"><b>'+esc(p.t)+'</b><br>'+esc(p.v)+'</div>';return ''}
+      var f=p.fuerte?'font-weight:700':'';
+      return '<tr><td style="'+f+'">'+esc(p.t)+'</td><td style="color:#5a7a8a">'+esc(p.v)+'</td><td class="num" style="'+f+'">'+(p.c==null?'':pesos(p.c))+'</td></tr>';
+    }).join('');
+    d.innerHTML='<h3>Colaborador '+esc(e.colaborador_id)+' · '+esc(e.corrida_id)+' · '+esc(REGLAS[e.regla_id]||e.regla_id)+(e.renglon_origen?' · '+esc(e.renglon_origen)+' de tu archivo':'')+'</h3>'+
+      '<div class="scroll"><table class="k-tbl"><thead><tr><th>Paso</th><th>Cómo</th><th class="num">Importe</th></tr></thead><tbody>'+filas+'</tbody></table></div>'+fin;
+    d.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }).catch(function(x){d.innerHTML='<div class="aviso err">'+esc(x.message)+'</div>'});
+}
+function clasificarCausa(){
+  if(!GCAU)return;
+  var b={encargo_id:ENC.id,ejecucion_id:document.getElementById('selEj').value,causa:GCAU.causa,regla_id:GCAU.regla_id,cubeta:document.getElementById('kCub').value,motivo:document.getElementById('kMot').value.trim()};
+  if(b.cubeta==='criterio_sin_resolver')b.criterio_id=document.getElementById('kCrit').value;
+  if(!b.motivo){alert('Escribe el motivo');return}
+  api('POST','/api/kernel/clasificar-grupo',b).then(function(){cargarCausas()}).catch(function(e){alert(e.message)});
+}
+function recalcularEj(id){
+  id=id||(DX&&DX.ingesta_id);
+  if(!id){alert('Este cálculo no salió de un archivo subido: súbelo de nuevo.');return}
+  if(!confirm('Se vuelve a leer el mismo archivo con la versión actual del sistema y el calendario de hoy. Tarda unos minutos y no borra el cálculo anterior. ¿Continuar?'))return;
+  api('POST','/api/kernel/ingesta/recalcular',{id:id}).then(function(r){ING=null;document.querySelector('.k-tab[data-t="archivos"]').click();cargarIngestas(r.id)}).catch(function(e){alert(e.message)});
 }
 function cargarGrupos(){
   var ej=document.getElementById('selEj').value;
   document.getElementById('clasif').classList.add('oculto');GRUPO=null;
-  if(!ej){document.getElementById('tbGr').innerHTML='<tr><td colspan="7" class="vacio">Sin ejecuciones.</td></tr>';document.getElementById('acept').innerHTML='';return}
+  if(!ej){document.getElementById('tbGr').innerHTML='<tr><td colspan="7" class="vacio">Sin ejecuciones.</td></tr>';document.getElementById('aceptG').innerHTML='';return}
   api('GET','/api/kernel/diferencias/grupos?encargo_id='+encodeURIComponent(ENC.id)+'&ejecucion_id='+encodeURIComponent(ej)).then(function(r){
     var a=r.aceptacion;
-    document.getElementById('acept').innerHTML=r.total===0?'<div class="aviso ok">Sin diferencias en esta ejecución.</div>':
+    document.getElementById('aceptG').innerHTML=r.total===0?'<div class="aviso ok">Sin diferencias en esta ejecución.</div>':
       (a.aceptado?'<div class="aviso ok">Todas las diferencias están clasificadas: la ejecución pasa el criterio de aceptación.</div>':'<div class="aviso">Faltan <b>'+a.sin_clasificar.toLocaleString('es-MX')+'</b> de '+r.total.toLocaleString('es-MX')+' diferencias por clasificar. Pasa con cero sin clasificar.</div>');
     document.getElementById('tbGr').innerHTML=(r.grupos||[]).map(function(g,i){
       return '<tr class="click" data-i="'+i+'"><td>'+esc(REGLAS[g.regla_id]||g.regla_id)+'</td><td>'+esc(g.rubro)+'</td><td class="num">'+pesos(g.diferencia_c)+'</td><td class="num">'+g.n+(g.limitados?' <span class="b b-par">'+g.limitados+' lim.</span>':'')+'</td><td class="num">'+(g.pendientes||0)+'</td><td>'+(g.cubeta?'<span class="b b-neu">'+esc(CUBETAS[g.cubeta]||g.cubeta)+'</span>':'—')+'</td><td><button class="k-btn peq sec">Ver</button></td></tr>';
     }).join('')||'<tr><td colspan="7" class="vacio">Sin diferencias.</td></tr>';
     document.querySelectorAll('#tbGr tr.click').forEach(function(tr){tr.addEventListener('click',function(){abrirGrupo(r.grupos[Number(tr.dataset.i)],tr)})});
-    document.getElementById('nPend').textContent=a.sin_clasificar;
   });
 }
 function abrirGrupo(g,tr){
@@ -689,7 +800,7 @@ function clasificarGrupo(){
     cubeta:document.getElementById('cCub').value,motivo:document.getElementById('cMot').value.trim()};
   if(b.cubeta==='criterio_sin_resolver')b.criterio_id=document.getElementById('cCrit').value;
   if(!b.motivo){alert('Escribe el motivo');return}
-  api('POST','/api/kernel/clasificar-grupo',b).then(function(r){document.getElementById('cMot').value='';cargarGrupos()}).catch(function(e){alert(e.message)});
+  api('POST','/api/kernel/clasificar-grupo',b).then(function(r){document.getElementById('cMot').value='';cargarCausas()}).catch(function(e){alert(e.message)});
 }
 
 // ── Calendario

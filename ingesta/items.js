@@ -11,13 +11,31 @@ import { Contexto } from '../kernel/src/parametros.js';
 import { CALC_EXE_001 } from '../kernel/src/reglas/exenciones.js';
 import { sha256Hex } from '../kernel/src/sello.js';
 
-/** Domingos trabajados: columna explícita, o prima dominical = domingos × 25% × SD exacto al centavo. */
-export function domingosDe(r, prima_c) {
+/** Domingos que caen en un periodo (fechas YYYY-MM-DD, inclusive). null si el periodo no es válido. */
+export function domingosEnPeriodo(desde, hasta) {
+  const a = Date.parse(desde + 'T00:00:00Z'), b = Date.parse(hasta + 'T00:00:00Z');
+  if (!(a <= b) || b - a > 62 * 86400000) return null;
+  let n = 0;
+  for (let t = a; t <= b; t += 86400000) if (new Date(t).getUTCDay() === 0) n += 1;
+  return n;
+}
+
+/**
+ * Domingos trabajados: columna explícita; o prima dominical = domingos × 25% × SD exacto al centavo; o, si el
+ * periodo de la corrida sólo tiene un domingo (nómina semanal), ese domingo: una prima dominical pagada en una
+ * semana no puede corresponder a más de uno. Con dos o más domingos posibles no se supone.
+ */
+export function domingosDe(r, prima_c, cal) {
   if (Number.isInteger(r.domingos) && r.domingos > 0) return { domingos: r.domingos, origen: 'columna' };
-  if (!r.sd_c || !prima_c) return { domingos: null, origen: 'sin_dato' };
-  const porDomingo = Math.floor((r.sd_c * 25 + 50) / 100); // 25% del SD, a centavo, medio hacia arriba
-  if (porDomingo > 0 && prima_c % porDomingo === 0 && prima_c / porDomingo <= 5) return { domingos: prima_c / porDomingo, origen: 'derivado: prima ÷ (25% × SD)' };
-  return { domingos: null, origen: 'no_deducible' };
+  if (!prima_c) return { domingos: null, origen: 'sin_dato' };
+  if (r.sd_c) {
+    const porDomingo = Math.floor((r.sd_c * 25 + 50) / 100); // 25% del SD, a centavo, medio hacia arriba
+    if (porDomingo > 0 && prima_c % porDomingo === 0 && prima_c / porDomingo <= 5) return { domingos: prima_c / porDomingo, origen: 'derivado: prima ÷ (25% × SD)' };
+  }
+  if (prima_c > 0 && cal && cal.desde && cal.hasta && domingosEnPeriodo(cal.desde, cal.hasta) === 1) {
+    return { domingos: 1, origen: 'derivado: el periodo ' + cal.desde + ' a ' + cal.hasta + ' sólo tiene un domingo' };
+  }
+  return { domingos: null, origen: r.sd_c ? 'no_deducible' : 'sin_dato' };
 }
 
 /** Entrada de CALC-EXE-001 para un renglón. */
@@ -26,7 +44,7 @@ export function entradaExe(r, cal, perfil) {
   for (const p of r.percepciones) {
     if (p.tipo !== 'percepcion') continue;
     const x = { concepto: p.concepto, monto_c: p.monto_c };
-    if (p.concepto === 'prima_dominical') x.domingos = domingosDe(r, p.monto_c).domingos;
+    if (p.concepto === 'prima_dominical') x.domingos = domingosDe(r, p.monto_c, cal).domingos;
     percepciones.push(x);
   }
   return { fecha_pago: cal.fecha_pago, percepciones, semanas_periodo: cal.periodicidad === 'catorcenal' ? 2 : 1,
@@ -121,7 +139,9 @@ export async function itemsDeRenglon(r, ctx, archivo_sha256, ingesta_id) {
   }
   const origen = { archivo_sha256, fila: r.fila, corrida_raw: r.corrida_raw };
   const exe = entradaExe(r, cal, ctx.perfil);
-  items.push({ regla_id: 'CALC-EXE-001', colaborador_id: r.colaborador_id, corrida_id: r.corrida_id, entrada: exe, origen });
+  const pd = r.percepciones.find(p => p.tipo === 'percepcion' && p.concepto === 'prima_dominical');
+  items.push({ regla_id: 'CALC-EXE-001', colaborador_id: r.colaborador_id, corrida_id: r.corrida_id, entrada: exe,
+    origen: pd ? { ...origen, domingos: domingosDe(r, pd.monto_c, cal) } : origen });
 
   const fuera = limitacionesIsr(r);
   const b = baseDe(r, cal, ctx.perfil, ctx.catalogo);
@@ -174,8 +194,9 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
     // Pagos extra que el perfil declara parte del ajuste (p. ej. bonos de PRIME): no tienen calendario,
     // entran al grupo del colaborador con su periodicidad (del nombre de la corrida) en el mes del ajuste.
     const extras = new Map(); // clave del grupo → renglones extra
-    const reglasExtra = ((ctx.perfil && ctx.perfil.perfil_fiscal && ctx.perfil.perfil_fiscal.extras_en_ajuste) || [])
-      .map(x => ({ re: new RegExp(x.patron), periodicidad: x.periodicidad }));
+    const pf = (ctx.perfil && ctx.perfil.perfil_fiscal) || {};
+    const reglasExtra = (pf.extras_en_ajuste || []).map(x => ({ re: new RegExp(x.patron), periodicidad: x.periodicidad || null }));
+    const reBono = pf.patron_bono ? new RegExp(pf.patron_bono) : null;
     if (reglasExtra.length) {
       const mesesDe = new Map(); // colaborador|periodicidad → meses con nómina ordinaria
       for (const k of grupos.keys()) {
@@ -188,13 +209,23 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
       for (const r of renglones) {
         if (ctx.calendario.get(r.corrida_id)) continue;
         const regla = reglasExtra.find(x => x.re.test(r.corrida_id || ''));
-        if (!regla) continue;
-        const meses = mesesDe.get(r.colaborador_id + '|' + regla.periodicidad) || [];
+        if (!regla) {
+          // Corrida con nombre de bono que el perfil no manda al ajuste: se declara, no se adivina.
+          if (reBono && reBono.test(r.corrida_id || '')) { const f = reporte.ajm_bonos_fuera || (reporte.ajm_bonos_fuera = {}); f[r.corrida_id] = (f[r.corrida_id] || 0) + 1; }
+          continue;
+        }
+        // Sin periodicidad en el nombre («BONO»): la de la nómina ordinaria del colaborador, si es una sola.
+        let periodicidad = regla.periodicidad;
+        if (!periodicidad) {
+          const suyas = ['semanal', 'decenal', 'catorcenal', 'quincenal', 'mensual'].filter(p => mesesDe.has(r.colaborador_id + '|' + p));
+          periodicidad = suyas.length === 1 ? suyas[0] : null;
+        }
+        const meses = periodicidad ? (mesesDe.get(r.colaborador_id + '|' + periodicidad) || []) : [];
         const mes = meses.length === 1 ? meses[0] : (mesEncargo && meses.includes(mesEncargo) ? mesEncargo : null);
         if (!mes) { reporte.ajm_extras_sin_grupo = (reporte.ajm_extras_sin_grupo || 0) + 1; continue; }
-        const k = [r.colaborador_id, regla.periodicidad, mes].join('|');
+        const k = [r.colaborador_id, periodicidad, mes].join('|');
         if (!extras.has(k)) extras.set(k, []);
-        extras.get(k).push({ r, periodicidad: regla.periodicidad });
+        extras.get(k).push({ r, periodicidad });
       }
     }
     for (const [k, g] of grupos) {
@@ -234,6 +265,8 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
   const h = ctx.encargo && ctx.encargo.periodo_hasta ? String(ctx.encargo.periodo_hasta).slice(0, 7) : null;
   const mesEncargoIsn = d && d === h ? d : null;
   const porRegistro = new Map();
+  const pfIsn = (ctx.perfil && ctx.perfil.perfil_fiscal) || {};
+  const maxIsnPct = Number.isFinite(pfIsn.isn_renglon_maximo_pct) ? pfIsn.isn_renglon_maximo_pct : null;
   for (const r of renglones) {
     const cal = ctx.calendario.get(r.corrida_id);
     if (!r.registro) continue;
@@ -241,7 +274,7 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
     if (!mes) { reporte.isn_sin_mes = (reporte.isn_sin_mes || 0) + 1; continue; }
     if (!cal) reporte.isn_extras = (reporte.isn_extras || 0) + 1;
     const k = r.registro + '|' + mes;
-    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes, conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0 });
+    if (!porRegistro.has(k)) porRegistro.set(k, { registro: r.registro, mes, conceptos: new Map(), isn_cliente_c: 0, no_catalogados: 0, opacos: 0, isn_fuera_n: 0, isn_fuera_c: 0 });
     const a = porRegistro.get(k);
     for (const p of r.percepciones) {
       if (p.tipo === 'opaco') a.opacos += 1;
@@ -249,7 +282,14 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
       a.conceptos.set(p.concepto, (a.conceptos.get(p.concepto) || 0) + p.monto_c);
     }
     a.no_catalogados += r.no_catalogados.length;
-    a.isn_cliente_c += r.movimientos.isn || 0;
+    // «Impuesto estatal» mayor al máximo posible sobre las percepciones del renglón no es ISN (en los bonos de
+    // PRIME la columna trae ≈35 % del bono): no se suma al lado de la nómina y se declara con su importe.
+    const isnR = r.movimientos.isn || 0;
+    if (maxIsnPct !== null && isnR > 0 && isnR * 100 > Math.abs(r.total_percepciones_c || 0) * maxIsnPct) {
+      a.isn_fuera_n += 1; a.isn_fuera_c += isnR;
+      const f = reporte.isn_fuera_de_rango || (reporte.isn_fuera_de_rango = { renglones: 0, suma_c: 0, por_corrida: {} });
+      f.renglones += 1; f.suma_c += isnR; f.por_corrida[r.corrida_id] = (f.por_corrida[r.corrida_id] || 0) + 1;
+    } else a.isn_cliente_c += isnR;
   }
   for (const a of porRegistro.values()) {
     const entidad = ctx.entidades.get(a.registro) || null;
@@ -257,9 +297,11 @@ export async function itemsMensuales(renglones, ctx, archivo_sha256, ingesta_id)
     const lim = [];
     if (a.no_catalogados) lim.push({ motivo: 'concepto_no_catalogado', detalle: a.no_catalogados + ' importes en conceptos no catalogados' });
     if (a.opacos) lim.push({ motivo: 'concepto_opaco', detalle: a.opacos + ' importes en conceptos por confirmar (P2)' });
+    if (a.isn_fuera_n) lim.push({ motivo: 'isn_nomina_fuera_de_rango', detalle: a.isn_fuera_n + ' renglones con «Impuesto estatal» mayor al ' + maxIsnPct + ' % de sus percepciones ($' + (a.isn_fuera_c / 100).toFixed(2) + '): no se suman al ISN de la nómina' });
     items.push({ regla_id: 'CALC-ISN-001', colaborador_id: a.registro, corrida_id: 'MES' + a.mes,
       entrada: { registro: a.registro, entidad, municipio: (ctx.municipios && ctx.municipios.get(a.registro)) || undefined, mes: a.mes, conceptos: [...a.conceptos.entries()].sort().map(([concepto, monto_c]) => ({ concepto, monto_c })) },
-      limitaciones: lim, origen: { archivo_sha256, agregado: 'registro × mes' } });
+      limitaciones: lim, origen: { archivo_sha256, agregado: 'registro × mes', isn_nomina_c: a.isn_cliente_c,
+        ...(a.isn_fuera_n ? { isn_nomina_fuera_de_rango: { renglones: a.isn_fuera_n, suma_c: a.isn_fuera_c } } : {}) } });
     movimientos.push({ id: await idMovimiento(ingesta_id, 'MES' + a.mes, a.registro, 'isn'), encargo_id: ctx.encargo_id, ingesta_id,
       corrida_id: 'MES' + a.mes, colaborador_id: a.registro, rubro: 'isn', valor_c: a.isn_cliente_c, archivo_sha256, renglon_origen: 'suma por registro y mes' });
     reporte.isn_registros += 1;

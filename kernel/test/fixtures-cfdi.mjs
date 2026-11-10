@@ -45,10 +45,10 @@ function fila(o) {
   return f;
 }
 export const FILAS_CFDI = [['PRIMEWIRELESS'], ['ACUMULADO'], [], ENC_CFDI,
-  fila({ corrida: 'SEM 31', emp: 1067513, sd: 315.24, perc: { Sueldo: 2206.68, Comisiones: 5486, 'incentivos (MONTO)': 68, 'Prima dominical': 78.81 }, isr: 1222.87, isn: 1533.69 }), // ISN del mes por registro, igual al del kernel
-  fila({ corrida: 'SEM 31', emp: 1073134, perc: { Sueldo: 2206.68 }, isr: 29.42 }),
-  fila({ corrida: 'SEM 31', emp: 390062, sd: 543.16, perc: { Sueldo: 8465.05, 'Prima dominical': 135.79 }, isr: 1384.60 }),
-  fila({ corrida: 'BONO SEM 32', emp: 1071756, perc: { Bono: 19695.34 }, isr: 4466.24 }),
+  fila({ corrida: 'SEM 31', emp: 1067513, sd: 315.24, perc: { Sueldo: 2206.68, Comisiones: 5486, 'incentivos (MONTO)': 68, 'Prima dominical': 78.81 }, isr: 1222.87, isn: 313.58 }), // ISN por renglón (4 % CDMX); el del mes por registro suma 1,533.69, igual al del kernel
+  fila({ corrida: 'SEM 31', emp: 1073134, perc: { Sueldo: 2206.68 }, isr: 29.42, isn: 88.27 }),
+  fila({ corrida: 'SEM 31', emp: 390062, sd: 543.16, perc: { Sueldo: 8465.05, 'Prima dominical': 135.79 }, isr: 1384.60, isn: 344.03 }),
+  fila({ corrida: 'BONO SEM 32', emp: 1071756, perc: { Bono: 19695.34 }, isr: 4466.24, isn: 787.81 }),
 ];
 export const S31 = { ffp: '2026-08-02', fip: '2026-07-27', fpago: '2026-08-06' };
 export const PAQUETE = {
