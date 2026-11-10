@@ -3,6 +3,56 @@
 Cada cambio de regla entra con una línea que dice qué cambió y desde qué fecha aplica (T9).
 La versión viaja en cada `calculo_kernel` y en cada dictamen.
 
+## 0.11.6 — 2026-11-10
+
+Septiembre 2026 de PRIME, primera carga completa del encargado: «1,618 diferencias, todas en ISR e ISN; no tengo cómo
+validarlas, no identifico de dónde salen… si los pagos son correctos, ¿dónde se visualiza esa validación?». Sin cambio de
+versión de ninguna regla ni de parámetros; cambian la ingesta, el perfil de PRIME y la pantalla.
+
+**Lo que estaba mal en el sistema**
+
+- **Bonos con otro nombre fuera del ajuste mensual.** El perfil sólo reconocía `BONOS_SEM` y `BONOS_CAT`. En septiembre PRIME
+  nombró las corridas «BONOS CAT SEPTIEMBRE» (22) y «BONO» (3): no entraron al ajuste y salieron 24 ajustes con diferencia
+  (el mismo error de agosto, 123 CAT 20: kernel $2,707.95 vs nómina $3,959.62). Ahora el nombre admite sufijo y «BONO» a
+  secas toma la periodicidad de la nómina del colaborador. Verificado contra los 24: 23 coinciden al centavo con el bono y uno
+  (1071744) queda en saldo a favor no reintegrado. Un bono con nombre propio («BONO ESPELETA») no entra —PRIME no lo acumula:
+  175 CAT 20 cuadra sin él— y el reporte mensual lo declara (`ajm_bonos_fuera`).
+- **«Impuesto estatal» de los renglones de bono no es ISN.** Desde 0.11.5 los pagos fuera del calendario entran al ISN del
+  mes de los dos lados; en los renglones de bono de PRIME esa columna trae ≈35 % del bono (ZAC agosto: $11,261.07 sobre
+  $32,500; MOR septiembre: ≈$11.8 millones sobre el bono de $33.76 millones) y el ISN «de la nómina» del registro salía
+  inflado (Morelos: $11.94 millones contra $1.21 del kernel). Un renglón cuyo «Impuesto estatal» pasa del
+  `isn_renglon_maximo_pct` del perfil (10 %) no se suma al lado de la nómina, se declara con su importe
+  (`isn_fuera_de_rango` en el reporte, `isn_nomina_fuera_de_rango` en la traza) y limita el cálculo del registro.
+- **Prima dominical de una nómina semanal.** Cuando la prima no es 25 % exacto del salario diario no se deducían los domingos
+  y el renglón quedaba limitado con la prima gravada completa (51 semanales y 65 ajustes de septiembre; 142 en agosto), todos
+  con diferencia. Una semana de lunes a domingo sólo tiene un domingo: si el periodo de la corrida tiene uno solo, es ése
+  (`domingosDe`, origen en la traza de CALC-EXE-001). En la catorcena (dos domingos posibles) se sigue sin suponer.
+- **Archivo de otro mes en el encargo.** El 7-nov el acumulado de septiembre se soltó en el encargo de agosto: se leyó, se
+  selló una ejecución con todos los renglones «sin calendario» y quedó como la prenómina vigente de agosto (el cruce con CFDI
+  toma la última terminada). Si el encargo tiene calendario y ninguna corrida ordinaria del archivo está en él, la ingesta
+  termina en error con el motivo y no abre ejecución (`archivoDeOtroMes`); una ingesta anterior en ese caso no vuelve a «terminado».
+- **«Indemnizacio».** El acumulado trae el encabezado recortado y la columna quedaba «no catalogada»: es la indemnización.
+- Excel que no es prenómina (p. ej. un reporte de CFDI): el error dice qué es y cómo se suben los CFDI.
+
+**Lo que no se veía**
+
+- **Causa de cada diferencia** (`ingesta/diagnostico.js`, `GET /api/kernel/diferencias/causas`). Cada diferencia se vuelve
+  a calcular con las causas conocidas de la nómina (`perfil_fiscal.hipotesis`): subsidio con 15.59 %, fondo de ahorro tratado
+  como exento, prima dominical sin domingos; más las generales (ajuste a favor no reintegrado, ISN menor o mayor). Sólo se
+  asigna una causa si el recálculo da lo que retuvo la nómina (± 2 ¢); lo demás queda «dato faltante» o «por revisar». Se
+  calcula al leer con la traza sellada: no guarda nada, no clasifica y sirve para las ejecuciones ya hechas. Septiembre:
+  de las 1,185 diferencias de ISR por periodo, 1,074 son el subsidio, 57 el fondo de ahorro, 2 las dos cosas y 52 están
+  limitadas por un dato faltante (casi todas, prima dominical).
+- **Cómo se calculó cada caso** (`GET /api/kernel/diferencias/explicar`): conceptos y su parte exenta, base, renglón de la
+  tarifa, subsidio, lo que trae la nómina y la causa con el recálculo. Caso del encargado, 393310 SEM 35: $1,362.76 contra
+  $1,262.41; sin el fondo de ahorro ($444.84) la base es $7,945.82 y el ISR $1,262.41.
+- **Lo que sí coincide.** La pestaña Diferencias abre con «Lo que se validó»: revisados, coinciden y con diferencia por regla
+  (septiembre: 12,343 importes, 10,725 coinciden), y los pagos fuera del calendario que se validan en Nómina ↔ CFDI.
+- **Clasificar por causa** (HRM): `POST /api/kernel/clasificar-grupo` acepta `causa` + `ejecucion_id`.
+- **Volver a calcular** (`POST /api/kernel/ingesta/recalcular`): otra ingesta del archivo que ya está en R2 con el kernel y
+  el calendario de hoy; la ejecución anterior queda sellada. La pantalla lo ofrece cuando la ejecución es de una versión anterior.
+- SUA ↔ IMSS: los grupos con pagado = kernel dicen «Pago correcto».
+
 ## 0.11.5 — 2026-11-03
 
 Ajuste mensual de ISR con los bonos de PRIME. Lo reportó el encargado de PRIME con agosto 2026: «todas las diferencias son

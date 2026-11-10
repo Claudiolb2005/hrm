@@ -47,6 +47,7 @@ export const PERMISOS_CARGA = {
   'GET /api/kernel/ingesta': { id: 'ingesta_id' },
   'POST /api/kernel/ingesta/avanzar': { id: 'ingesta_id' },
   'POST /api/kernel/ingesta/reintentar': { id: 'ingesta_id' },
+  'POST /api/kernel/ingesta/recalcular': { id: 'ingesta_id' },
   'POST /api/kernel/ejecutar': { requiere: 'encargo_id' },
   'POST /api/kernel/movimientos': { requiere: 'encargo_id' },
   'POST /api/kernel/reconciliar': { requiere: 'ejecucion_id' },
@@ -54,6 +55,9 @@ export const PERMISOS_CARGA = {
   'GET /api/kernel/ejecucion': { id: 'ejecucion_id' },
   'GET /api/kernel/diferencias': { requiere: 'encargo_id' },
   'GET /api/kernel/diferencias/grupos': { requiere: 'encargo_id' },
+  // Causa de cada diferencia y resumen de lo validado (sólo lectura; el módulo comprueba que la ejecución y la diferencia son del encargo)
+  'GET /api/kernel/diferencias/causas': { requiere: 'encargo_id' },
+  'GET /api/kernel/diferencias/explicar': { requiere: 'encargo_id' },
   // Calendario (dato del cliente); registros patronales sólo lectura
   'GET /api/kernel/calendario': { requiere: 'encargo_id' },
   'POST /api/kernel/calendario': { requiere: 'encargo_id' },
