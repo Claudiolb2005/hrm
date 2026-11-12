@@ -138,10 +138,23 @@ test('paquetes en R2: escritura por partes, unión de varios ZIP y metadata en u
   const DOCS = r2Local();
   const w = escritorR2(DOCS, 'grande.bin', {}, { parte: 1000 });
   const dato = randomBytes(5300);
-  for (let i = 0; i < dato.length; i += 333) await w.escribir(new Uint8Array(dato.subarray(i, i + 333)));
+  // Trozos de tamaño irregular, como llegan de la red: R2 exige que todas las partes, salvo la última, midan lo mismo.
+  for (let i = 0, k = 0; i < dato.length; k++) { const n = [333, 1, 2048, 777, 64][k % 5]; await w.escribir(new Uint8Array(dato.subarray(i, i + n))); i += n; }
   assert.deepEqual(await w.cerrar(), { key: 'grande.bin', size: 5300 });
   assert.equal(DOCS.multipartes, 1, 'se subió por partes');
   assert.ok(Buffer.from(DOCS.mapa.get('grande.bin')).equals(dato));
+  const justo = escritorR2(DOCS, 'justo.bin', {}, { parte: 1000 });
+  await justo.escribir(new Uint8Array(dato.subarray(0, 3000)));
+  await justo.escribir(new Uint8Array(0));
+  assert.deepEqual(await justo.cerrar(), { key: 'justo.bin', size: 3000 }, 'múltiplo exacto: sin parte final vacía');
+  assert.ok(Buffer.from(DOCS.mapa.get('justo.bin')).equals(dato.subarray(0, 3000)));
+  // Tamaños al azar contra el R2 local estricto.
+  for (let v = 0; v < 30; v++) {
+    const d = randomBytes(1 + Math.floor(Math.random() * 9000)), x = escritorR2(DOCS, 'azar.bin', {}, { parte: 1 + Math.floor(Math.random() * 1500) });
+    for (let i = 0; i < d.length;) { const n = 1 + Math.floor(Math.random() * 2500); await x.escribir(new Uint8Array(d.subarray(i, i + n))); i += n; }
+    await x.cerrar();
+    assert.ok(Buffer.from(DOCS.mapa.get('azar.bin')).equals(d), 'vuelta ' + v);
+  }
 
   const nombres = Object.keys(PAQUETE);
   const A = Object.fromEntries(nombres.slice(0, 5).map(k => [k, PAQUETE[k]])), B = Object.fromEntries(nombres.slice(4).map(k => [k, PAQUETE[k]])); // uno repetido
@@ -361,7 +374,7 @@ test('el SAT falla o tarda: reintenta con espera, no gasta descargas y deja el m
   await c.correr();
   const sc = c.db.raw.prepare('SELECT estado, error FROM sat_solicitud WHERE id = ?').get(idc);
   assert.equal(sc.estado, 'error');
-  assert.match(sc.error, /ya se pidió 2 veces/);
+  assert.match(sc.error, /ya se pidió 2 veces.*Última falla: La descarga del paquete se cortó/, 'el motivo de fondo no se pierde');
   assert.ok(Object.values(c.sat.descargas).every(n => n <= 2));
   c.sat.cortar = null;
   assert.equal(await reintentarSat(c.env, idc), 'lista');

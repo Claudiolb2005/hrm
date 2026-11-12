@@ -22,27 +22,38 @@ function juntar(trozos, total) {
  * grande y de una vez cuando es chico. `escribir(u8)` y `cerrar()` → { key, size }; `abortar()` si algo falla.
  */
 export function escritorR2(bucket, key, opciones = {}, { parte = PARTE } = {}) {
-  let trozos = [], pendiente = 0, total = 0, subida = null;
+  // R2 exige que todas las partes de una subida, salvo la última, midan exactamente lo mismo: se llena un búfer
+  // del tamaño de la parte y se sube cada vez que se completa, sin importar cómo lleguen los trozos de la red.
+  const multi = typeof bucket.createMultipartUpload === 'function';
+  let buf = new Uint8Array(multi ? parte : 0), usado = 0, total = 0, subida = null, sueltos = [];
   const partes = [];
-  const subirParte = async () => {
+  const subirParte = async (u8) => {
     if (!subida) subida = await bucket.createMultipartUpload(key, opciones);
-    partes.push(await subida.uploadPart(partes.length + 1, juntar(trozos, pendiente)));
-    trozos = []; pendiente = 0;
+    partes.push(await subida.uploadPart(partes.length + 1, u8));
   };
   return {
     get bytes() { return total; },
     async escribir(u8) {
       if (!u8 || !u8.length) return;
-      trozos.push(u8); pendiente += u8.length; total += u8.length;
-      if (pendiente >= parte && typeof bucket.createMultipartUpload === 'function') await subirParte();
+      total += u8.length;
+      if (!multi) { sueltos.push(u8.slice()); return; }
+      let p = 0;
+      while (p < u8.length) {
+        // Una parte llena sólo se sube cuando ya se sabe que hay más datos: así la última nunca queda vacía.
+        if (usado === parte) { await subirParte(buf); buf = new Uint8Array(parte); usado = 0; }
+        const n = Math.min(parte - usado, u8.length - p);
+        buf.set(u8.subarray(p, p + n), usado);
+        usado += n; p += n;
+      }
     },
     async cerrar() {
-      if (subida) { if (pendiente) await subirParte(); await subida.complete(partes); }
-      else await bucket.put(key, juntar(trozos, pendiente), opciones);
-      trozos = [];
+      if (!multi) await bucket.put(key, juntar(sueltos, total), opciones);
+      else if (!subida) await bucket.put(key, buf.slice(0, usado), opciones); // cupo en una parte: subida simple
+      else { if (usado) await subirParte(buf.slice(0, usado)); await subida.complete(partes); }
+      sueltos = []; buf = new Uint8Array(0);
       return { key, size: total };
     },
-    async abortar() { trozos = []; if (subida) await subida.abort().catch(() => {}); },
+    async abortar() { sueltos = []; buf = new Uint8Array(0); if (subida) await subida.abort().catch(() => {}); },
   };
 }
 

@@ -210,7 +210,8 @@ async function pasoLista(env, s, firma, token) {
   const p = await db.prepare("SELECT * FROM sat_paquete WHERE solicitud_id = ?1 AND estado = 'pendiente' ORDER BY n LIMIT 1").bind(s.id).first();
   if (!p) { await fijar(db, s.id, { estado: 'descargada', proxima_accion: iso(ahora(env)), intentos: 0, error: null }); return 'descargada'; }
   if (p.descargas >= MAX_DESCARGAS) {
-    await fijar(db, s.id, { estado: 'error', error: 'El paquete ' + p.n + ' ya se pidió ' + p.descargas + ' veces al SAT sin completarse: hay que hacer otra solicitud' });
+    // Se conserva el motivo de la última falla: sin él no se sabe si falló el SAT, la red o el guardado.
+    await fijar(db, s.id, { estado: 'error', error: 'El paquete ' + p.n + ' ya se pidió ' + p.descargas + ' veces al SAT sin completarse' + (s.error ? '. Última falla: ' + String(s.error).slice(0, 600) : '') });
     return 'error';
   }
   // Dentro de la carpeta de comprobantes del encargo: así el expediente los lista y les aplica el plazo de retención.
