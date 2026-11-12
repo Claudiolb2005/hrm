@@ -169,6 +169,21 @@ test('paquetes en R2: escritura por partes, unión de varios ZIP y metadata en u
     const ini = e.local + 30 + (b[e.local + 26] | (b[e.local + 27] << 8)) + (b[e.local + 28] | (b[e.local + 29] << 8));
     assert.equal(inflateRawSync(b.subarray(ini, ini + e.comprimido)).toString(), PAQUETE[e.nombre], e.nombre);
   }
+  // Un mes real trae más de 20 mil XML: las lecturas de R2 no pueden crecer con el número de entradas
+  // (el Worker tiene un límite de subpeticiones por invocación).
+  const muchos = (pref, n) => zipArchivos(Object.fromEntries(Array.from({ length: n }, (_, i) => [pref + i + '.xml', '<x n="' + i + '"/>'])));
+  await DOCS.put('g1.zip', muchos('a', 3000)); await DOCS.put('g2.zip', muchos('b', 2500));
+  let lecturas = 0; const get0 = DOCS.get.bind(DOCS); DOCS.get = (k, o) => { lecturas += 1; return get0(k, o); };
+  const g = await unirZips(DOCS, ['g1.zip', 'g2.zip'], 'g.zip');
+  DOCS.get = get0;
+  assert.equal(g.entradas, 5500);
+  assert.ok(lecturas <= 12, 'lecturas de R2: ' + lecturas);
+  const zg = await abrirZip(fuenteBuffer(DOCS.mapa.get('g.zip')));
+  for (const nombre of ['a0.xml', 'a2999.xml', 'b0.xml', 'b2499.xml']) {
+    const e = zg.entradas.get(nombre), b = DOCS.mapa.get('g.zip');
+    const ini = e.local + 30 + (b[e.local + 26] | (b[e.local + 27] << 8)) + (b[e.local + 28] | (b[e.local + 29] << 8));
+    assert.equal(inflateRawSync(b.subarray(ini, ini + e.comprimido)).toString(), '<x n="' + nombre.replace(/\D/g, '') + '"/>', nombre);
+  }
   await DOCS.put('no.zip', new Uint8Array([1, 2, 3]));
   await assert.rejects(unirZips(DOCS, ['a.zip', 'no.zip'], 'x.zip'), /no es un ZIP válido/);
   assert.equal(DOCS.mapa.has('x.zip'), false);
