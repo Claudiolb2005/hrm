@@ -37,7 +37,9 @@ export function r2Local() {
     async list({ prefix = '' } = {}) { return { truncated: false, objects: [...m.keys()].filter(k => k.startsWith(prefix)).sort().map(k => ({ key: k, size: m.get(k).length, uploaded: new Date('2026-10-15T12:00:00Z'), customMetadata: this.meta.get(k) || {} })) }; },
     async createMultipartUpload(k, o) { const partes = []; const yo = this;
       return { async uploadPart(n, v) { const u8 = new Uint8Array(v); partes[n - 1] = u8.slice(); return { partNumber: n, etag: 'e' + n }; },
-        async complete() { const t = partes.reduce((s, p) => s + p.length, 0); const u = new Uint8Array(t); let q = 0; for (const p of partes) { u.set(p, q); q += p.length; } yo.multipartes = (yo.multipartes || 0) + 1; return yo.put(k, u, o); },
+        async complete() { // Como R2: todas las partes, salvo la última, miden lo mismo.
+          if (partes.slice(0, -1).some(p => p.length !== partes[0].length)) throw new Error('completeMultipartUpload: All non-trailing parts must have the same length. (10048)');
+          const t = partes.reduce((s, p) => s + p.length, 0); const u = new Uint8Array(t); let q = 0; for (const p of partes) { u.set(p, q); q += p.length; } yo.multipartes = (yo.multipartes || 0) + 1; return yo.put(k, u, o); },
         async abort() { yo.abortadas = (yo.abortadas || 0) + 1; } }; },
     async head(k) { return m.has(k) ? { key: k, size: m.get(k).length } : null; },
     async get(k, o) { if (!m.has(k)) return null; let u8 = m.get(k); if (o?.range) u8 = u8.subarray(o.range.offset, o.range.offset + o.range.length); return obj(u8); } };
