@@ -6,6 +6,9 @@
 //          además de lo del socio, en /kernel sube prenómina, XML/metadata del SAT, SUA, maestro y
 //          calendario, y ejecuta lecturas, cruces y reconciliaciones, SÓLO de los encargos de su empresa
 //          y sólo mientras el encargo está abierto.
+//          Descarga directa del SAT (decisión de Claudio, 12-nov-2026): carga, prueba, sustituye y borra la e.firma
+//          de SU empresa, pide las descargas de sus encargos abiertos y las avanza o reintenta. La bitácora del
+//          uso de la e.firma es de HRM: el perfil no la consulta.
 //
 // Lo que el perfil «carga» nunca hace (separación de funciones: lo que se audita no se califica a sí mismo):
 // clasificar diferencias o cruces, crear o configurar encargos a mano, cambiar registros patronales, procesar
@@ -29,6 +32,7 @@ const LLAVES = {
   ingesta_cfdi_id: 'SELECT e.empresa_id, e.estado FROM ingesta_cfdi x JOIN encargo e ON e.id = x.encargo_id WHERE x.id = ?1',
   ingesta_sua_id: 'SELECT e.empresa_id, e.estado FROM ingesta_sua x JOIN encargo e ON e.id = x.encargo_id WHERE x.id = ?1',
   carga_id: 'SELECT e.empresa_id, e.estado FROM maestro_carga x JOIN encargo e ON e.id = x.encargo_id WHERE x.id = ?1',
+  solicitud_sat_id: 'SELECT e.empresa_id, e.estado FROM sat_solicitud x JOIN encargo e ON e.id = x.encargo_id WHERE x.id = ?1',
   empresa_id: "SELECT id AS empresa_id, 'abierto' AS estado FROM empresas WHERE id = ?1",
 };
 
@@ -70,6 +74,16 @@ export const PERMISOS_CARGA = {
   'POST /api/kernel/cfdi/reintentar': { id: 'ingesta_cfdi_id' },
   'GET /api/kernel/cruces/grupos': { requiere: 'ingesta_cfdi_id' },
   'GET /api/kernel/cruces': { requiere: 'ingesta_cfdi_id' },
+  // Descarga directa del SAT: la e.firma de su empresa y las solicitudes de sus encargos. La bitácora no está aquí.
+  // En la carga de la e.firma (formulario) la empresa la verifica el módulo (api/sat.js).
+  'GET /api/kernel/sat/credencial': { requiere: 'empresa_id' },
+  'POST /api/kernel/sat/credencial': { multipart: true },
+  'POST /api/kernel/sat/credencial/borrar': { requiere: 'empresa_id' },
+  'POST /api/kernel/sat/probar': { requiere: 'empresa_id' },
+  'GET /api/kernel/sat/solicitudes': { requiere: 'encargo_id' },
+  'POST /api/kernel/sat/solicitudes': { requiere: 'encargo_id' },
+  'POST /api/kernel/sat/avanzar': { id: 'solicitud_sat_id' },
+  'POST /api/kernel/sat/reintentar': { id: 'solicitud_sat_id' },
   // SUA ↔ emisión del IMSS ↔ pago
   'POST /api/kernel/sua': { multipart: true },
   'GET /api/kernel/sua': { requiere: 'encargo_id' },
