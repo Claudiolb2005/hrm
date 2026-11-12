@@ -156,6 +156,30 @@ html body .k-row>label input{width:auto;margin:0}
       <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num">Entradas</th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detCfdi"></div>
+    <div class="k-card solo-admin" id="cardSat">
+      <h2>Descarga directa del SAT</h2>
+      <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">El portal pide al SAT los CFDI de nómina emitidos por la empresa y su metadata (vigentes y cancelados) con la e.firma, y los deja en la lista de arriba, listos para el cruce. El SAT puede tardar de minutos a horas en armar los paquetes: no hace falta dejar esta página abierta.</div>
+      <div id="satCred"></div>
+      <div id="frmSat" class="oculto">
+        <div class="frm">
+          <div><label>Certificado (.cer)</label><input type="file" id="satCer" accept=".cer" class="k-in"></div>
+          <div><label>Llave privada (.key)</label><input type="file" id="satKey" accept=".key" class="k-in"></div>
+          <div><label>Contraseña de la llave</label><input type="password" id="satPwd" class="k-in" autocomplete="off"></div>
+          <div><button class="k-btn" onclick="guardarSat()">Guardar e.firma</button></div>
+        </div>
+        <div class="sub" style="font-size:12px;color:#5a7a8a;margin:6px 0 0">Se necesita la e.firma (FIEL) de la empresa que timbra, no el sello digital. La contraseña se usa una vez para abrir la llave y no se guarda; la llave queda cifrada.</div>
+      </div>
+      <div id="satPedir" class="oculto">
+        <div class="frm" style="margin-top:10px">
+          <div><label>Emitidos desde (opcional)</label><input type="date" id="satDesde" class="k-in"></div>
+          <div><label>Hasta (opcional)</label><input type="date" id="satHasta" class="k-in"></div>
+          <div><button class="k-btn" onclick="pedirSat()">Pedir al SAT los CFDI del encargo</button></div>
+        </div>
+        <div class="sub" style="font-size:12px;color:#5a7a8a;margin:6px 0 0">Sin fechas se pide el periodo del encargo con margen (7 días antes y 15 después), porque el SAT busca por fecha de timbrado y el portal asigna por fecha de pago.</div>
+      </div>
+      <div id="msgSat"></div>
+      <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Pedido</th><th>Qué</th><th>Emitidos</th><th>Estado</th><th class="num">Comprobantes</th><th class="num">Paquetes</th><th>Siguiente revisión</th><th></th></tr></thead><tbody id="tbSat"></tbody></table></div>
+    </div>
     <div class="k-card">
       <h2>Maestro de empleados</h2>
       <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">Fechas de alta y baja por trabajador para detectar pagos a personas sin alta o ya dadas de baja (siempre material). Sólo se guardan número de empleado, RFC, fechas y grupo de nómina.</div>
@@ -486,7 +510,7 @@ function cambiarEncargo(){
   var id=document.getElementById('selEnc').value;ENC=ENCS.filter(function(e){return e.id===id})[0]||null;
   try{if(ENC)localStorage.setItem('hrm_kernel_enc',ENC.id)}catch(x){}
   ING=null;document.getElementById('detIng').classList.add('oculto');
-  cargarIngestas();cargarCfdi();cargarMaestro();cargarSua();
+  cargarIngestas();cargarCfdi();cargarMaestro();cargarSua();cargarSat();
   var act=document.querySelector('.k-tab.act');if(act&&act.dataset.t!=='archivos')act.click();
 }
 function crearEncargo(){
@@ -1014,6 +1038,69 @@ function subirCfdi(f,eid){
   aviso('msgCfdi','Subiendo '+f.name+'…');
   return api('POST','/api/kernel/cfdi',fd).then(function(r){aviso('msgCfdi','Recibido. Se lee en el servidor; puedes cerrar esta pestaña.','ok');document.getElementById('fCfdi').value='';if(ENC&&ENC.id===eid)cargarCfdi(r.id);return r})
     .catch(function(e){aviso('msgCfdi',e.message,'err');throw e});
+}
+// ── Descarga directa del SAT (sólo HRM)
+var POLLS=null,SATC=null;
+var SAT_EST={pendiente:['b-run','Por enviar'],solicitada:['b-run','El SAT la está armando'],lista:['b-run','Bajando paquetes'],descargada:['b-run','Entregando'],entregada:['b-ok','Entregada'],sin_datos:['b-neu','Sin comprobantes'],rechazada:['b-lim','Rechazada'],vencida:['b-lim','Vencida'],error:['b-lim','Error']};
+function cargarSat(){
+  if(CARGA)return;
+  clearTimeout(POLLS);
+  if(!ENC){document.getElementById('satCred').innerHTML='';document.getElementById('tbSat').innerHTML='';document.getElementById('satPedir').classList.add('oculto');return}
+  api('GET','/api/kernel/sat/credencial?empresa_id='+encodeURIComponent(ENC.empresa_id)).then(function(r){
+    SATC=r;var c=r.credencial,h='';
+    if(!r.secreto_configurado)h='<div class="aviso err">Falta configurar el secreto SAT_LLAVE_MAESTRA en el Worker: sin él la e.firma no se puede guardar.</div>';
+    else if(!c)h='<div class="aviso">Esta empresa no tiene e.firma cargada. <a href="#" id="satAbrir" style="color:#1a8a8a;font-weight:700">Cargarla</a></div>';
+    else h='<div class="aviso '+(c.vencida?'err':'ok')+'">e.firma de <b>'+esc(c.rfc)+'</b> · '+esc(c.titular||'')+' · certificado '+esc(c.serie)+' · '+(c.vencida?'venció el ':'vigente hasta el ')+esc(String(c.vigente_hasta).slice(0,10))+
+      (!c.vencida&&c.dias_para_vencer<60?' (faltan '+c.dias_para_vencer+' días)':'')+' · <a href="#" id="satProbar" style="color:#1a8a8a;font-weight:700">Probar conexión</a> · <a href="#" id="satAbrir" style="color:#1a8a8a;font-weight:700">Sustituir</a> · <a href="#" id="satBorrar" style="color:#b94a48;font-weight:700">Borrar</a></div>';
+    document.getElementById('satCred').innerHTML=h;
+    document.getElementById('satPedir').classList.toggle('oculto',!(c&&!c.vencida&&r.secreto_configurado&&ENC.estado==='abierto'));
+    var a=document.getElementById('satAbrir');if(a)a.addEventListener('click',function(ev){ev.preventDefault();toggle('frmSat')});
+    var p=document.getElementById('satProbar');if(p)p.addEventListener('click',function(ev){ev.preventDefault();probarSat()});
+    var b=document.getElementById('satBorrar');if(b)b.addEventListener('click',function(ev){ev.preventDefault();borrarSat()});
+  }).catch(function(e){aviso('msgSat',e.message,'err')});
+  listarSat();
+}
+function listarSat(){
+  if(CARGA||!ENC)return;
+  api('GET','/api/kernel/sat/solicitudes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
+    var l=r.solicitudes||[];
+    document.getElementById('tbSat').innerHTML=l.length?l.map(function(x){
+      var e=SAT_EST[x.estado]||['b-neu',x.estado],enCurso=['pendiente','solicitada','lista','descargada'].indexOf(x.estado)>=0;
+      var acc=x.estado==='error'?'<button class="k-btn sec" data-sr="'+esc(x.id)+'">Reintentar</button>':x.estado==='solicitada'?'<button class="k-btn sec" data-sa="'+esc(x.id)+'">Revisar ahora</button>':'';
+      return '<tr><td>'+fecha(x.creado_en)+'</td><td>'+(x.tipo==='xml'?'XML de nómina':'Metadata (estado ante el SAT)')+'</td><td>'+esc(String(x.fecha_inicial).slice(0,10))+' a '+esc(String(x.fecha_final).slice(0,10))+'</td>'+
+        '<td><span class="b '+e[0]+'">'+esc(e[1])+'</span>'+(x.error?'<div style="font-size:11px;color:#b94a48;margin-top:3px">'+esc(x.error)+'</div>':'')+'</td>'+
+        '<td class="num">'+(x.numero_cfdis==null?'—':Number(x.numero_cfdis).toLocaleString('es-MX'))+'</td><td class="num">'+(x.paquetes?x.paquetes_descargados+' de '+x.paquetes:'—')+'</td>'+
+        '<td>'+(enCurso?fecha(x.proxima_accion)+' UTC':'—')+'</td><td>'+acc+'</td></tr>'}).join('')
+      :'<tr><td colspan="8" class="vacio">Todavía no se ha pedido nada al SAT para este encargo.</td></tr>';
+    document.querySelectorAll('#tbSat [data-sr]').forEach(function(b){b.addEventListener('click',function(){api('POST','/api/kernel/sat/reintentar',{id:b.dataset.sr}).then(listarSat).catch(function(e){aviso('msgSat',e.message,'err')})})});
+    document.querySelectorAll('#tbSat [data-sa]').forEach(function(b){b.addEventListener('click',function(){b.disabled=true;api('POST','/api/kernel/sat/avanzar',{id:b.dataset.sa}).then(listarSat).catch(function(e){aviso('msgSat',e.message,'err');listarSat()})})});
+    var activa=l.some(function(x){return ['pendiente','solicitada','lista','descargada'].indexOf(x.estado)>=0});
+    var entregando=l.some(function(x){return x.estado==='entregada'});
+    clearTimeout(POLLS);if(activa)POLLS=setTimeout(function(){listarSat();if(entregando)cargarCfdi(CFI&&CFI.id)},15000);
+  }).catch(function(e){aviso('msgSat',e.message,'err')});
+}
+function guardarSat(){
+  var cer=document.getElementById('satCer').files[0],key=document.getElementById('satKey').files[0],pwd=document.getElementById('satPwd').value;
+  if(!ENC||!cer||!key||!pwd){aviso('msgSat','Elige el .cer, el .key y escribe la contraseña de la llave','err');return}
+  var fd=new FormData();fd.append('empresa_id',ENC.empresa_id);fd.append('cer',cer);fd.append('key',key);fd.append('contrasena',pwd);
+  aviso('msgSat','Validando la e.firma…');
+  api('POST','/api/kernel/sat/credencial',fd).then(function(r){
+    document.getElementById('satPwd').value='';document.getElementById('satCer').value='';document.getElementById('satKey').value='';document.getElementById('frmSat').classList.add('oculto');
+    aviso('msgSat','e.firma guardada.'+((r.avisos||[]).length?' Ojo: '+r.avisos.join(' · '):''),(r.avisos||[]).length?'':'ok');cargarSat();
+  }).catch(function(e){document.getElementById('satPwd').value='';aviso('msgSat',e.message,'err')});
+}
+function probarSat(){aviso('msgSat','Conectando con el SAT…');api('POST','/api/kernel/sat/probar',{empresa_id:ENC.empresa_id}).then(function(r){aviso('msgSat','El SAT aceptó la e.firma de '+r.rfc+'.','ok')}).catch(function(e){aviso('msgSat',e.message,'err')})}
+function borrarSat(){
+  if(!confirm('¿Borrar la e.firma guardada de esta empresa? Las descargas en curso se detienen.'))return;
+  api('POST','/api/kernel/sat/credencial/borrar',{empresa_id:ENC.empresa_id}).then(function(){aviso('msgSat','e.firma borrada.','ok');cargarSat()}).catch(function(e){aviso('msgSat',e.message,'err')});
+}
+function pedirSat(){
+  var b={encargo_id:ENC.id},d=document.getElementById('satDesde').value,h=document.getElementById('satHasta').value;
+  if(d)b.desde=d;if(h)b.hasta=h;
+  aviso('msgSat','Enviando la solicitud al SAT…');
+  api('POST','/api/kernel/sat/solicitudes',b).then(function(r){
+    aviso('msgSat','Solicitud enviada: comprobantes emitidos del '+String(r.desde).slice(0,10)+' al '+String(r.hasta).slice(0,10)+'. Cuando el SAT entregue los paquetes aparecerán en «XML de nómina y estado ante el SAT».','ok');listarSat();setTimeout(listarSat,6000);
+  }).catch(function(e){aviso('msgSat',e.message,'err')});
 }
 function badgeC(e){var m={pendiente:['b-run','En cola'],leyendo:['b-run','Leyendo'],cruzando:['b-run','Cruzando'],terminado:['b-ok','Terminado'],error:['b-lim','Error']};var x=m[e]||['b-neu',e];return '<span class="b '+x[0]+'">'+x[1]+'</span>'}
 function cargarCfdi(abrir){

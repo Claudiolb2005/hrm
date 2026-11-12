@@ -63,6 +63,50 @@ terminar la ejecución queda sellada y reconciliada contra lo que calculó la n�
 `ingesta/README.md` (incluye los pasos para correr agosto 2026). Migraciones 0003 y 0004
 aplicadas en producción el 15-oct-2026.
 
+### Descarga directa del SAT (`sat/`, migración 0020)
+
+El portal pide al **Web Service de Descarga Masiva del SAT (v1.5)** los CFDI de nómina emitidos por el cliente y su
+metadata (vigentes y cancelados), y los entrega a la ingesta de comprobantes de arriba. Sustituye bajar los XML en
+One Facture y subirlos a mano. Sin dependencias: corre igual en el Worker y en Node.
+
+```
+e.firma (cifrada en D1) ─► autenticar ─► solicitar ─► verificar … ─► descargar paquetes ─► R2 ─► ingesta_cfdi
+   pendiente              solicitada (minutos a horas)   lista          descargada            entregada
+```
+
+| Archivo | Qué hace |
+|---|---|
+| `sat/der.js` | Lee el `.cer` (X.509): RFC, serie, emisor, vigencia, llave pública; distingue e.firma de sello (CSD). |
+| `sat/des.js` | 3DES-CBC para abrir el `.key` (WebCrypto no lo trae). Probado contra OpenSSL. |
+| `sat/efirma.js` | Abre el `.key` (PBES2), comprueba que es par del `.cer`, firma (RSA-SHA1) y cifra la llave (AES-256-GCM). |
+| `sat/soap.js` | Los cuatro sobres firmados y la lectura de respuestas. Con la e.firma de prueba del SAT, las firmas salen idénticas byte por byte a las de la referencia pública `phpcfdi/sat-ws-descarga-masiva`. |
+| `sat/cliente.js` | Autenticar, solicitar, verificar y descargar (el paquete se decodifica en streaming, nunca entero en memoria). |
+| `sat/paquetes.js` | Escritura por partes a R2, unión de varios ZIP en uno y metadata de varios paquetes en un `.txt`. |
+| `sat/descarga.js` | e.firma guardada, cola de solicitudes (tarea programada cada minuto) y entrega a `ingesta_cfdi`. |
+| `api/sat.js` | Rutas `/api/kernel/sat/*`, **sólo admin**. Tarjeta «Descarga directa del SAT» en `/kernel` › Archivos. |
+
+**Antes de usarla (una vez):**
+
+1. Aplicar la migración: `wrangler d1 execute hrm-nomina-portal --remote --file=migrations/0020_sat_descarga.sql`
+2. Crear el secreto del Worker `SAT_LLAVE_MAESTRA` (32 caracteres o más, aleatorio). En el panel de Cloudflare:
+   Workers › `clientes-hrm` › Settings › Variables and Secrets › Add › tipo **Secret**. Sin él la e.firma no se guarda.
+   Si el secreto se cambia o se pierde, la e.firma guardada deja de abrir y hay que cargarla otra vez.
+3. En `/kernel` › Archivos › «Descarga directa del SAT»: cargar el `.cer`, el `.key` y la contraseña de la e.firma
+   **de la empresa que timbra** (el emisor de los recibos) y pulsar «Probar conexión».
+
+**Reglas:**
+
+- La contraseña del `.key` se usa una vez y no se guarda. La llave privada sólo existe cifrada; la llave de cifrado
+  es el secreto del Worker, no está en D1 ni en el repositorio. Cada uso queda en `sat_bitacora` (no se borra).
+- Se piden los **emitidos** de tipo **N** (nómina), **vigentes y cancelados**, por fecha de emisión: el periodo del
+  encargo con 7 días antes y 15 después. La corrida de cada comprobante la sigue asignando el calendario (D5).
+- Cada paquete se guarda en R2 la primera vez que se baja (`encargos/<encargo>/cfdi/sat/…`, con su SHA-256): el SAT
+  limita las descargas. Varios paquetes de XML se unen en un solo ZIP porque el cruce es por paquete.
+- El SAT acepta dos veces la misma solicitud de XML: si un periodo ya se pidió, el inicio se corre un segundo.
+- Fallas de red o del SAT se reintentan con espera creciente; un rechazo de la e.firma no se reintenta.
+- **No probado contra el SAT real**: las pruebas usan un SAT simulado que verifica cada firma. La primera corrida
+  con la e.firma del cliente es la prueba de producción («Probar conexión» sólo autentica, no pide nada).
+
 ### Panel de auditoría (`/kernel`, sólo admin)
 
 Botón **Auditoría** en el Administrador. Encargos, subida del Excel con avance en vivo,

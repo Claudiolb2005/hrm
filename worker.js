@@ -2,6 +2,8 @@ import { rutasKernel } from "./api/kernel.js";
 import { rutasDictamen } from "./api/dictamen.js";
 import { rutasCfdi } from "./api/cfdi.js";
 import { rutasSua } from "./api/sua.js";
+import { rutasSat } from "./api/sat.js";
+import { avanzarSat } from "./sat/descarga.js";
 import { rutasMaestro } from "./api/maestro.js";
 import { rutasCotizador } from "./api/cotizador.js";
 import { rutasExpediente } from "./api/expediente.js";
@@ -22,6 +24,9 @@ var worker_default = {
     // Cola de ingesta del kernel (T8): avanza el trabajo pendiente más antiguo.
     // Primero la prenómina (el cruce con los XML la necesita terminada), luego los comprobantes.
     ctx.waitUntil(avanzarIngestas(env, { presupuesto_ms: 12000 }).then(() => avanzarCfdi(env, { presupuesto_ms: 12000 })));
+    // Descarga directa del SAT: un paso (pedir, verificar o bajar un paquete) de la solicitud más atrasada.
+    // Va aparte para que una respuesta lenta del SAT no detenga la cola de ingesta.
+    ctx.waitUntil(avanzarSat(env, { presupuesto_ms: 20000 }).catch((e) => console.error("avanzarSat", e && e.message)));
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -70,6 +75,11 @@ var worker_default = {
         if (p.startsWith("/api/kernel/cfdi") || p.startsWith("/api/kernel/cruces")) {
           const rc = await rutasCfdi(request, env, u, C, J, ctx);
           if (rc) return rc;
+        }
+        if (p.startsWith("/api/kernel/sat/")) {
+          const rt = await rutasSat(request, env, u, C, J, ctx);
+          if (rt) return rt;
+          return J({ error: "No encontrado" }, 404, C);
         }
         if (p.startsWith("/api/kernel/sua")) {
           const rs = await rutasSua(request, env, u, C, J);

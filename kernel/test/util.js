@@ -35,11 +35,15 @@ export function r2Local() {
     meta: new Map(),
     async put(k, v, o) { if (v && typeof v.getReader === 'function') v = await new Response(v).arrayBuffer(); const u8 = typeof v === 'string' ? new TextEncoder().encode(v) : new Uint8Array(v); m.set(k, u8); this.meta.set(k, (o && o.customMetadata) || {}); return { key: k, size: u8.length }; },
     async list({ prefix = '' } = {}) { return { truncated: false, objects: [...m.keys()].filter(k => k.startsWith(prefix)).sort().map(k => ({ key: k, size: m.get(k).length, uploaded: new Date('2026-10-15T12:00:00Z'), customMetadata: this.meta.get(k) || {} })) }; },
+    async createMultipartUpload(k, o) { const partes = []; const yo = this;
+      return { async uploadPart(n, v) { const u8 = new Uint8Array(v); partes[n - 1] = u8.slice(); return { partNumber: n, etag: 'e' + n }; },
+        async complete() { const t = partes.reduce((s, p) => s + p.length, 0); const u = new Uint8Array(t); let q = 0; for (const p of partes) { u.set(p, q); q += p.length; } yo.multipartes = (yo.multipartes || 0) + 1; return yo.put(k, u, o); },
+        async abort() { yo.abortadas = (yo.abortadas || 0) + 1; } }; },
     async head(k) { return m.has(k) ? { key: k, size: m.get(k).length } : null; },
     async get(k, o) { if (!m.has(k)) return null; let u8 = m.get(k); if (o?.range) u8 = u8.subarray(o.range.offset, o.range.offset + o.range.length); return obj(u8); } };
 }
 
-export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql', '0008_requerimiento.sql', '0009_maestro_afiliacion.sql', '0010_parametros_valuacion.sql', '0011_cotizacion.sql', '0012_retencion.sql', '0013_parametros_cotejo_oficial.sql', '0014_reglas_174_95_isn_criterios.sql', '0015_casos_dorados_c13_c14_c23_criterios.sql', '0016_municipio_registro_patronal.sql', '0017_sua.sql', '0018_perfil_carga.sql', '0019_encargo_automatico.sql']) {
+export function baseDatos(migraciones = ['0001_kernel_v1.sql', '0002_semilla_kernel_v1.sql', '0003_ingesta_lotes.sql', '0004_sync_reglas_v1_1.sql', '0005_vista_diferencia.sql', '0006_hallazgos_dictamen.sql', '0007_cfdi_nomina.sql', '0008_requerimiento.sql', '0009_maestro_afiliacion.sql', '0010_parametros_valuacion.sql', '0011_cotizacion.sql', '0012_retencion.sql', '0013_parametros_cotejo_oficial.sql', '0014_reglas_174_95_isn_criterios.sql', '0015_casos_dorados_c13_c14_c23_criterios.sql', '0016_municipio_registro_patronal.sql', '0017_sua.sql', '0018_perfil_carga.sql', '0019_encargo_automatico.sql', '0020_sat_descarga.sql']) {
   const RAIZ = new URL('../../', import.meta.url);
   const db = d1Local();
   db.raw.exec(readFileSync(new URL('schema.sql', RAIZ), 'utf8'));
