@@ -156,7 +156,7 @@ html body .k-row>label input{width:auto;margin:0}
       <div class="scroll" style="margin-top:10px"><table class="k-tbl"><thead><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Avance</th><th class="num">Entradas</th><th>Actualizado</th></tr></thead><tbody id="tbCfdi"></tbody></table></div>
     </div>
     <div class="k-card oculto" id="detCfdi"></div>
-    <div class="k-card solo-admin" id="cardSat">
+    <div class="k-card" id="cardSat">
       <h2>Descarga directa del SAT</h2>
       <div class="sub" style="font-size:12px;color:#5a7a8a;margin-bottom:8px">El portal pide al SAT los CFDI de nómina emitidos por la empresa y su metadata (vigentes y cancelados) con la e.firma, y los deja en la lista de arriba, listos para el cruce. El SAT puede tardar de minutos a horas en armar los paquetes: no hace falta dejar esta página abierta.</div>
       <div id="satCred"></div>
@@ -1043,12 +1043,11 @@ function subirCfdi(f,eid){
 var POLLS=null,SATC=null;
 var SAT_EST={pendiente:['b-run','Por enviar'],solicitada:['b-run','El SAT la está armando'],lista:['b-run','Bajando paquetes'],descargada:['b-run','Entregando'],entregada:['b-ok','Entregada'],sin_datos:['b-neu','Sin comprobantes'],rechazada:['b-lim','Rechazada'],vencida:['b-lim','Vencida'],error:['b-lim','Error']};
 function cargarSat(){
-  if(CARGA)return;
   clearTimeout(POLLS);
   if(!ENC){document.getElementById('satCred').innerHTML='';document.getElementById('tbSat').innerHTML='';document.getElementById('satPedir').classList.add('oculto');return}
   api('GET','/api/kernel/sat/credencial?empresa_id='+encodeURIComponent(ENC.empresa_id)).then(function(r){
     SATC=r;var c=r.credencial,h='';
-    if(!r.secreto_configurado)h='<div class="aviso err">Falta configurar el secreto SAT_LLAVE_MAESTRA en el Worker: sin él la e.firma no se puede guardar.</div>';
+    if(!r.secreto_configurado)h='<div class="aviso err">'+(CARGA?'La descarga directa del SAT todavía no está activada. Avisa a HRM.':'Falta configurar el secreto SAT_LLAVE_MAESTRA en el Worker: sin él la e.firma no se puede guardar.')+'</div>';
     else if(!c)h='<div class="aviso">Esta empresa no tiene e.firma cargada. <a href="#" id="satAbrir" style="color:#1a8a8a;font-weight:700">Cargarla</a></div>';
     else h='<div class="aviso '+(c.vencida?'err':'ok')+'">e.firma de <b>'+esc(c.rfc)+'</b> · '+esc(c.titular||'')+' · certificado '+esc(c.serie)+' · '+(c.vencida?'venció el ':'vigente hasta el ')+esc(String(c.vigente_hasta).slice(0,10))+
       (!c.vencida&&c.dias_para_vencer<60?' (faltan '+c.dias_para_vencer+' días)':'')+' · <a href="#" id="satProbar" style="color:#1a8a8a;font-weight:700">Probar conexión</a> · <a href="#" id="satAbrir" style="color:#1a8a8a;font-weight:700">Sustituir</a> · <a href="#" id="satBorrar" style="color:#b94a48;font-weight:700">Borrar</a></div>';
@@ -1061,7 +1060,7 @@ function cargarSat(){
   listarSat();
 }
 function listarSat(){
-  if(CARGA||!ENC)return;
+  if(!ENC)return;
   api('GET','/api/kernel/sat/solicitudes?encargo_id='+encodeURIComponent(ENC.id)).then(function(r){
     var l=r.solicitudes||[];
     document.getElementById('tbSat').innerHTML=l.length?l.map(function(x){

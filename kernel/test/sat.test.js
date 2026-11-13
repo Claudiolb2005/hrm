@@ -461,7 +461,7 @@ test('reglas de las solicitudes: periodo, encargo cerrado, sin e.firma, hora de 
   await assert.rejects(crearSolicitudes(env, { encargo_id: 'enc_c', tipos: ['xml'] }), /venció/);
 });
 
-test('API: sólo HRM; el perfil carga y el socio no ven ni usan la e.firma', async () => {
+test('API: HRM usa todo; el socio de consulta no ve ni usa la e.firma', async () => {
   const { db, env, sat } = await preparar();
   const sesiones = new Map([['t_carga', { id: 5, rol: 'socio', perfil: 'carga', empresa_id: 1 }], ['t_socio', { id: 3, rol: 'socio', perfil: null, empresa_id: 1 }], ['t_admin', { id: 2, nombre: 'Revisor', rol: 'admin' }]]);
   env.SESSIONS = { get: async (t) => sesiones.has(t) ? JSON.stringify(sesiones.get(t)) : null, put: async () => {}, delete: async () => {} };
@@ -473,11 +473,12 @@ test('API: sólo HRM; el perfil carga y el socio no ven ni usan la e.firma', asy
     const r = await worker.fetch(new Request('https://clientes-hrm.com' + ruta, init), env, { waitUntil(p) { pendientes.push(p); } });
     return { status: r.status, j: await r.json().catch(() => null) };
   };
-  assert.deepEqual(Object.keys(PERMISOS_CARGA).filter(k => k.includes('/sat/')), [], 'ninguna ruta del SAT está en la lista blanca del perfil carga');
-  for (const tk of ['t_carga', 't_socio']) {
+  for (const tk of ['t_socio']) {
     assert.equal((await pedir(tk, 'GET', '/api/kernel/sat/credencial?empresa_id=1')).status, 403);
     assert.equal((await pedir(tk, 'POST', '/api/kernel/sat/solicitudes', { encargo_id: 'enc_c' })).status, 403);
     assert.equal((await pedir(tk, 'GET', '/api/kernel/sat/solicitudes?encargo_id=enc_c')).status, 403);
+    assert.equal((await pedir(tk, 'POST', '/api/kernel/sat/probar', { empresa_id: 1 })).status, 403);
+    assert.equal((await pedir(tk, 'GET', '/api/kernel/sat/bitacora?empresa_id=1')).status, 403);
   }
   assert.equal((await pedir('nadie', 'GET', '/api/kernel/sat/credencial?empresa_id=1')).status, 401);
 
@@ -510,12 +511,87 @@ test('API: sólo HRM; el perfil carga y el socio no ven ni usan la e.firma', asy
   assert.ok(sat.llamadas.length > 0);
 });
 
-test('la página de auditoría trae la tarjeta del SAT sólo para HRM y su JavaScript es válido', async () => {
+test('perfil carga (12-nov-2026): administra la e.firma de SU empresa y pide las descargas de sus encargos abiertos; nada de otra empresa ni la bitácora', async () => {
+  const { db, env } = await preparar();
+  db.raw.exec("INSERT INTO encargo (id, empresa_id, nivel, periodo_desde, periodo_hasta, ejercicio, origen_nomina, aplica_ajuste_mensual) VALUES " +
+    "('enc_otra', 2, 'B5+', '2026-08-01', '2026-08-31', 2026, 'cliente', 0), ('enc_cerrado', 1, 'B5+', '2026-07-01', '2026-07-31', 2026, 'cliente', 0)");
+  db.raw.exec("UPDATE encargo SET estado = 'cerrado' WHERE id = 'enc_cerrado'");
+  const sesiones = new Map([['t_carga', { id: 5, nombre: 'Carga PRIME', rol: 'socio', perfil: 'carga', empresa_id: 1 }], ['t_admin', { id: 2, nombre: 'Revisor', rol: 'admin' }]]);
+  env.SESSIONS = { get: async (t) => sesiones.has(t) ? JSON.stringify(sesiones.get(t)) : null, put: async () => {}, delete: async () => {} };
+  const pendientes = [];
+  const pedir = async (tk, m, ruta, cuerpo) => {
+    const init = { method: m, headers: { Authorization: 'Bearer ' + tk } };
+    if (cuerpo instanceof FormData) init.body = cuerpo;
+    else if (cuerpo) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(cuerpo); }
+    const r = await worker.fetch(new Request('https://clientes-hrm.com' + ruta, init), env, { waitUntil(p) { pendientes.push(p); } });
+    return { status: r.status, j: await r.json().catch(() => null) };
+  };
+  const fd = (empresa, pwd = CONTRASENA) => { const f = new FormData(); f.append('empresa_id', String(empresa)); f.append('cer', new File([cer], 'e.cer')); f.append('key', new File([key], 'e.key')); f.append('contrasena', pwd); return f; };
+  assert.deepEqual(Object.keys(PERMISOS_CARGA).filter(k => k.includes('/sat/')).sort(), ['GET /api/kernel/sat/credencial', 'GET /api/kernel/sat/solicitudes', 'POST /api/kernel/sat/avanzar',
+    'POST /api/kernel/sat/credencial', 'POST /api/kernel/sat/credencial/borrar', 'POST /api/kernel/sat/probar', 'POST /api/kernel/sat/reintentar', 'POST /api/kernel/sat/solicitudes'], 'la bitácora no está en la lista blanca');
+
+  // Su empresa: ve el estado, carga la e.firma, la prueba y pide la descarga.
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/sat/credencial?empresa_id=1')).j.credencial, null);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/credencial', fd(1, 'nope'))).status, 400);
+  const ok = await pedir('t_carga', 'POST', '/api/kernel/sat/credencial', fd(1));
+  assert.equal(ok.status, 201);
+  assert.ok(!/llave_cifrada|certificado_b64|"iv"/.test(JSON.stringify(ok.j)));
+  assert.equal(db.raw.prepare('SELECT subida_por FROM sat_credencial WHERE empresa_id = 1').get().subida_por, 5);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/probar', { empresa_id: 1 })).j.rfc, 'EKU9003173C9');
+  const s = await pedir('t_carga', 'POST', '/api/kernel/sat/solicitudes', { encargo_id: 'enc_c', tipos: ['metadata'] });
+  assert.equal(s.status, 201);
+  await Promise.all(pendientes);
+  const l = await pedir('t_carga', 'GET', '/api/kernel/sat/solicitudes?encargo_id=enc_c');
+  assert.deepEqual(l.j.solicitudes.map(x => [x.tipo, x.estado]), [['metadata', 'solicitada']]);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/avanzar', { id: s.j.solicitudes[0] })).j.estado, 'solicitada');
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/reintentar', { id: s.j.solicitudes[0] })).status, 400, 'sólo se reintenta una en error');
+
+  // La bitácora es de HRM, y ahí queda quién hizo cada cosa.
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/sat/bitacora?empresa_id=1')).status, 403);
+  const bit = await pedir('t_admin', 'GET', '/api/kernel/sat/bitacora?empresa_id=1');
+  assert.deepEqual(bit.j.bitacora.map(b => [b.accion, b.usuario]).reverse(), [['efirma_cargada', 'Carga PRIME'], ['prueba_conexion', 'Carga PRIME'], ['solicitud', 'Carga PRIME']]);
+
+  // Otra empresa: «no encontrado», sin confirmar que existe; nada se escribe.
+  await pedir('t_admin', 'POST', '/api/kernel/sat/credencial', fd(2));
+  const ajena = await pedir('t_admin', 'POST', '/api/kernel/sat/solicitudes', { encargo_id: 'enc_otra', tipos: ['metadata'] });
+  assert.equal(ajena.status, 201);
+  await Promise.all(pendientes);
+  const antes = db.raw.prepare('SELECT count(*) AS n FROM sat_bitacora').get().n;
+  for (const [m, ruta, b] of [
+    ['GET', '/api/kernel/sat/credencial?empresa_id=2'],
+    ['POST', '/api/kernel/sat/credencial', fd(2)],
+    ['POST', '/api/kernel/sat/credencial/borrar', { empresa_id: 2 }],
+    ['POST', '/api/kernel/sat/probar', { empresa_id: 2 }],
+    ['GET', '/api/kernel/sat/solicitudes?encargo_id=enc_otra'],
+    ['POST', '/api/kernel/sat/solicitudes', { encargo_id: 'enc_otra' }],
+    ['POST', '/api/kernel/sat/avanzar', { id: ajena.j.solicitudes[0] }],
+    ['POST', '/api/kernel/sat/reintentar', { id: ajena.j.solicitudes[0] }],
+    ['POST', '/api/kernel/sat/avanzar', { id: 'sat_no_existe' }],
+  ]) assert.equal((await pedir('t_carga', m, ruta, b)).status, 404, m + ' ' + ruta);
+  assert.equal(db.raw.prepare('SELECT count(*) AS n FROM sat_credencial WHERE empresa_id = 2').get().n, 1, 'la e.firma de la otra empresa sigue ahí');
+  assert.equal(db.raw.prepare('SELECT count(*) AS n FROM sat_bitacora').get().n, antes);
+  // No se cuela otra empresa mezclando identificadores ni repitiendo el parámetro.
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/probar', { empresa_id: 1, encargo_id: 'enc_otra' })).status, 404);
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/sat/credencial?empresa_id=1&empresa_id=2')).status, 400);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/probar', {})).status, 400);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/credencial', { empresa_id: 1 })).status, 403, 'la e.firma sólo entra por formulario');
+
+  // Encargo cerrado: se consulta, pero ya no se pide nada.
+  assert.equal((await pedir('t_carga', 'GET', '/api/kernel/sat/solicitudes?encargo_id=enc_cerrado')).status, 200);
+  assert.equal((await pedir('t_carga', 'POST', '/api/kernel/sat/solicitudes', { encargo_id: 'enc_cerrado' })).status, 409);
+
+  // Borra la e.firma de su empresa.
+  const borrar = await pedir('t_carga', 'POST', '/api/kernel/sat/credencial/borrar', { empresa_id: 1 });
+  assert.deepEqual([borrar.status, borrar.j.borrada], [200, true]);
+});
+
+test('la página de auditoría trae la tarjeta del SAT para HRM y para el perfil carga, y su JavaScript es válido', async () => {
   const { paginaKernel } = await import('../../paginas/kernel.js');
   const vm = await import('node:vm');
   const h = paginaKernel({ CSS: '', LOGO: '', AUTH_ADMIN: 'var tk="x",U={rol:"admin"};', LOGOUT_FN: 'function logout(){}' });
   const html = typeof h === 'string' ? h : await h.text();
-  assert.match(html, /<div class="k-card solo-admin" id="cardSat">/);
+  assert.match(html, /<div class="k-card" id="cardSat">/);
   for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(m[1]);
-  assert.match(html, /function cargarSat\(\)\{\s*if\(CARGA\)return;/);
+  assert.doesNotMatch(html, /function (cargarSat|listarSat)\(\)\{\s*if\(CARGA/);
+  assert.match(html, /CARGA\?'La descarga directa del SAT todavía no está activada/, 'al cliente no se le habla del secreto del Worker');
 });

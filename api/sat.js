@@ -1,4 +1,4 @@
-// api/sat.js — Descarga directa del SAT (Web Service de Descarga Masiva). Sólo admin (HRM).
+// api/sat.js — Descarga directa del SAT (Web Service de Descarga Masiva). HRM (admin) y el perfil «carga» del cliente.
 //
 // /api/kernel/sat/credencial            GET ?empresa_id · POST multipart (empresa_id, cer, key, contrasena)
 // /api/kernel/sat/credencial/borrar     POST { empresa_id }
@@ -6,10 +6,13 @@
 // /api/kernel/sat/solicitudes           GET ?encargo_id · POST { encargo_id, tipos?, desde?, hasta? }
 // /api/kernel/sat/avanzar               POST { id }                    verifica o baja ahora, sin esperar a la tarea programada
 // /api/kernel/sat/reintentar            POST { id }
-// /api/kernel/sat/bitacora              GET ?empresa_id
+// /api/kernel/sat/bitacora              GET ?empresa_id                sólo admin
 //
-// La e.firma es del cliente: no se abre al perfil «carga» ni al socio (no están en la lista blanca de permisos.js y
-// aquí se exige admin). La contraseña del .key viaja una vez en el formulario, por HTTPS, y no se guarda ni se registra.
+// La e.firma es del cliente. Desde el 12-nov-2026 (decisión de Claudio) el perfil «carga» la administra para SU
+// empresa y pide las descargas de sus encargos abiertos: la lista blanca y el alcance por empresa están en
+// permisos.js y aquí se vuelve a comprobar la empresa. El socio de consulta no entra y la bitácora es sólo de HRM.
+// La contraseña del .key viaja una vez en el formulario, por HTTPS, y no se guarda ni se registra.
+import { esCarga, puedeOperar } from './permisos.js';
 import { estadoCredencial, guardarCredencial, borrarCredencial, probarConexion, crearSolicitudes, listarSolicitudes, avanzarSat, reintentarSat } from '../sat/descarga.js';
 
 async function cuerpo(request) { try { return await request.json(); } catch { return null; } }
@@ -19,11 +22,16 @@ export async function rutasSat(request, env, u, C, J, ctx) {
   const url = new URL(request.url);
   const p = url.pathname, m = request.method, db = env.DB;
   if (!p.startsWith('/api/kernel/sat/')) return null;
-  if (!u || u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
+  if (!puedeOperar(u)) return J({ error: 'Forbidden' }, 403, C);
+  // Segunda comprobación para el perfil «carga» (la primera es la lista blanca): sólo su empresa. 404 y no 403,
+  // para no confirmar que existe algo de otra empresa.
+  const ajena = (empresa_id) => esCarga(u) && Number(empresa_id) !== Number(u.empresa_id);
+  const NO_ES = () => J({ error: 'No encontrado' }, 404, C);
 
   if (p === '/api/kernel/sat/credencial' && m === 'GET') {
     const id = Number(url.searchParams.get('empresa_id'));
     if (!Number.isInteger(id)) return J({ error: 'empresa_id requerido' }, 400, C);
+    if (ajena(id)) return NO_ES();
     return J(await estadoCredencial(env, id), 200, C);
   }
   if (p === '/api/kernel/sat/credencial' && m === 'POST') {
@@ -33,6 +41,7 @@ export async function rutasSat(request, env, u, C, J, ctx) {
     if (!cer || !key || typeof cer === 'string' || typeof key === 'string' || typeof contrasena !== 'string' || !contrasena || !Number.isInteger(empresa_id)) {
       return J({ error: 'Faltan campos: empresa_id, cer (archivo .cer), key (archivo .key) y contrasena' }, 400, C);
     }
+    if (ajena(empresa_id)) return NO_ES();
     if (cer.size > MAX_ARCHIVO || key.size > MAX_ARCHIVO) return J({ error: 'Los archivos de la e.firma pesan unos cuantos KB: revisa que sean el .cer y el .key' }, 413, C);
     try {
       const r = await guardarCredencial(env, { empresa_id, cer: new Uint8Array(await cer.arrayBuffer()), key: new Uint8Array(await key.arrayBuffer()), contrasena, usuario_id: u.id });
@@ -40,6 +49,7 @@ export async function rutasSat(request, env, u, C, J, ctx) {
     } catch (e) { return J({ error: e.message }, 400, C); }
   }
   if (p === '/api/kernel/sat/bitacora' && m === 'GET') {
+    if (u.rol !== 'admin') return J({ error: 'Forbidden' }, 403, C);
     const { results } = await db.prepare('SELECT b.accion, b.detalle, b.en, us.nombre AS usuario FROM sat_bitacora b LEFT JOIN usuarios us ON us.id = b.usuario_id WHERE b.empresa_id = ?1 ORDER BY b.id DESC LIMIT 100')
       .bind(Number(url.searchParams.get('empresa_id'))).all();
     return J({ bitacora: results }, 200, C);
@@ -53,9 +63,12 @@ export async function rutasSat(request, env, u, C, J, ctx) {
   if (!d || typeof d !== 'object') return J({ error: 'JSON inválido' }, 400, C);
   if (p === '/api/kernel/sat/credencial/borrar') {
     if (!Number.isInteger(Number(d.empresa_id))) return J({ error: 'empresa_id requerido' }, 400, C);
+    if (ajena(d.empresa_id)) return NO_ES();
     return J({ ok: true, ...(await borrarCredencial(env, d.empresa_id, u.id)) }, 200, C);
   }
   if (p === '/api/kernel/sat/probar') {
+    if (!Number.isInteger(Number(d.empresa_id))) return J({ error: 'empresa_id requerido' }, 400, C);
+    if (ajena(d.empresa_id)) return NO_ES();
     try { return J(await probarConexion(env, d.empresa_id, u.id), 200, C); }
     catch (e) { return J({ error: e.message }, 502, C); }
   }

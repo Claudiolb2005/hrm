@@ -83,7 +83,7 @@ e.firma (cifrada en D1) ─► autenticar ─► solicitar ─► verificar … 
 | `sat/cliente.js` | Autenticar, solicitar, verificar y descargar (el paquete se decodifica en streaming, nunca entero en memoria). |
 | `sat/paquetes.js` | Escritura por partes a R2, unión de varios ZIP en uno y metadata de varios paquetes en un `.txt`. |
 | `sat/descarga.js` | e.firma guardada, cola de solicitudes (tarea programada cada minuto) y entrega a `ingesta_cfdi`. |
-| `api/sat.js` | Rutas `/api/kernel/sat/*`, **sólo admin**. Tarjeta «Descarga directa del SAT» en `/kernel` › Archivos. |
+| `api/sat.js` | Rutas `/api/kernel/sat/*`: HRM (admin) y, desde el 12-nov-2026, el perfil **carga** para la e.firma y las descargas de **su empresa** (encargos abiertos). La bitácora es sólo de HRM; el socio de consulta no entra. Tarjeta «Descarga directa del SAT» en `/kernel` › Archivos. |
 
 **Antes de usarla (una vez):**
 
@@ -266,6 +266,8 @@ Migración: `wrangler d1 execute hrm-nomina-portal --remote --file=migrations/00
 | `admin` | HRM | Todo |
 | `socio` | Cliente (consulta) | `/portal`: encargos, requerimiento (sube archivos del PBC), hallazgos ya dictaminados, dictámenes de su empresa |
 | `socio` + `perfil = 'carga'` | Persona del cliente que sube los documentos | Lo del socio y, en `/kernel`, sólo en encargos **abiertos** de **su empresa**: sube prenómina, XML/metadata del SAT, maestro y SUA; captura el calendario; avanza y reintenta lecturas; ejecuta y reconcilia; consulta diferencias, cruces, registros y criterios |
+
+Desde el 12-nov-2026 (decisión de Claudio) el perfil `carga` también usa la **Descarga directa del SAT** de su empresa: carga, prueba, sustituye y borra la e.firma, pide la descarga de sus encargos abiertos y la avanza o reintenta. No consulta la bitácora del uso de la e.firma.
 
 El perfil `carga` **no** clasifica diferencias ni cruces, no crea encargos, no cambia registros patronales, no procesa ni revisa el requerimiento, no redacta hallazgos ni emite o cierra: lo que se audita no se califica a sí mismo. La revisión está en `api/permisos.js` por **lista blanca** (`PERMISOS_CARGA`): toda ruta de `/api/kernel/` que no esté ahí contesta 403, y cada identificador que llega (`encargo_id`, `ejecucion_id`, `ingesta_id`, `ingesta_cfdi_id`, `ingesta_sua_id`, `carga_id`, `empresa_id`, o el `id` de la ruta) se resuelve a su empresa; si es de otra, contesta 404. Las cargas por formulario verifican el encargo al leerlo (`verificarEncargo`) y no se aceptan por referencia a un `r2_key`. Al entrar, el perfil va directo a `/kernel`.
 
