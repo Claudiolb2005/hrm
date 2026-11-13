@@ -103,17 +103,26 @@ export async function unirZips(bucket, keys, destino, opciones = {}) {
         p += largo;
       }
       es.sort((a, b) => a.local - b.local);
+      // Se copia por TRAMOS contiguos, no por entrada: una lectura de R2 por cada 8 MB. Con una lectura por entrada,
+      // un mes de nómina (más de 20 mil XML) rebasa el límite de subpeticiones del Worker y la invocación muere.
+      let tramo = null; // { ini, fin, base }
+      const copiar = async () => {
+        if (!tramo) return;
+        for (let o = tramo.ini; o < tramo.fin; o += PARTE) await w.escribir((await d.fuente.leer(o, Math.min(PARTE, tramo.fin - o))).slice());
+        base += tramo.fin - tramo.ini;
+        tramo = null;
+      };
       for (let i = 0; i < es.length; i++) {
         const x = es[i], fin = i + 1 < es.length ? es[i + 1].local : d.cdOff;
-        if (vistos.has(x.nombre)) { repetidas += 1; continue; }
+        if (vistos.has(x.nombre)) { repetidas += 1; await copiar(); continue; } // el repetido corta el tramo y no se copia
         vistos.add(x.nombre);
+        if (!tramo) tramo = { ini: x.local, fin: x.local };
         const reg = d.cd.slice(x.p, x.p + x.largo);
-        w32(reg, 42, base);
+        w32(reg, 42, base + (x.local - tramo.ini));
         cds.push(reg); cdTotal += reg.length; entradas += 1;
-        // Copia por tramos para no cargar una entrada grande entera.
-        for (let o = x.local; o < fin; o += PARTE) await w.escribir((await d.fuente.leer(o, Math.min(PARTE, fin - o))).slice());
-        base += fin - x.local;
+        tramo.fin = fin;
       }
+      await copiar();
     }
     if (entradas > 65535 || base > 0xfffffffe) throw new Error('Demasiados comprobantes para un solo paquete (' + entradas + '): pide el periodo en partes');
     for (const reg of cds) await w.escribir(reg);
